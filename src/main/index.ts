@@ -1,6 +1,9 @@
 import { app, BrowserWindow } from 'electron'
 import { createWindow } from './window'
 
+// Side-effect import: registers all IPC handlers
+import './ipc/index'
+
 let mainWindow: BrowserWindow | null = null
 
 app.whenReady().then(() => {

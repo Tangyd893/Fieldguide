@@ -6,6 +6,12 @@ import type { IpcResult } from '../shared/ipc'
  * See architecture.md §7 for the full IPC contract.
  */
 const api = {
+  // Config
+  configGet: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('config:get'),
+  configSet: (patch: Record<string, unknown>): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('config:set', patch),
+
   // Projects
   projectList: (): Promise<IpcResult<unknown[]>> =>
     ipcRenderer.invoke('project:list'),
@@ -24,7 +30,9 @@ const api = {
   onIndexProgress: (cb: (data: unknown) => void) => {
     const handler = (_event: unknown, data: unknown) => cb(data)
     ipcRenderer.on('index:progress', handler)
-    return () => ipcRenderer.removeListener('index:progress', handler)
+    return () => {
+      ipcRenderer.removeListener('index:progress', handler)
+    }
   },
 
   // App
