@@ -14,9 +14,9 @@ import {
   updateProjectStatus,
   removeProject,
 } from '../db'
-import { cloneRepo } from '../git'
-import { indexProject } from '../ua/client'
-import { v4 as uuid } from './uuid'
+import { readProjectTree, FileEntry } from '../file-tree'
+import { readFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { IpcResult } from '../../shared/ipc'
 import { ipcOk, ipcErr } from '../../shared/ipc'
 
@@ -148,7 +148,31 @@ ipcMain.handle('graph:get', (_e, { projectId }: { projectId: string }): IpcResul
   }
 })
 
-/* ──────────── Index ──────────── */
+/* ──────────── File Tree & Code ──────────── */
+
+ipcMain.handle('file:tree', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const tree = readProjectTree(project.root_path)
+    return ipcOk(tree)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('file:read', (_e, { projectId, filePath }: { projectId: string; filePath: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  const fullPath = join(project.root_path, filePath)
+  if (!existsSync(fullPath)) return ipcErr('SOURCE_UNAVAILABLE', `文件不存在: ${filePath}`)
+  try {
+    const content = readFileSync(fullPath, 'utf-8')
+    return ipcOk({ path: filePath, content, size: content.length })
+  } catch (err) {
+    return ipcErr('PARSE_ERROR', String(err))
+  }
+})
 
 ipcMain.handle('project:index', async (_e, { projectId }: { projectId: string }): Promise<IpcResult<unknown>> => {
   const project = getProject(projectId)

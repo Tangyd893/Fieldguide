@@ -1,6 +1,12 @@
 /// <reference types="vite/client" />
 
-interface ProjectRow {
+interface FileEntry {
+  name: string
+  path: string
+  isDirectory: boolean
+  size: number
+  children?: FileEntry[]
+}
   id: string
   name: string
   slug: string
@@ -31,6 +37,10 @@ interface FieldguideAPI {
   // Index
   projectIndex(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   onIndexProgress(cb: (data: unknown) => void): () => void
+
+  // File tree & code
+  fileTree(projectId: string): Promise<{ ok: boolean; data?: FileEntry[]; error?: { message: string } }>
+  fileRead(projectId: string, filePath: string): Promise<{ ok: boolean; data?: { path: string; content: string; size: number }; error?: { message: string } }>
 
   // App
   appVersion(): Promise<string>

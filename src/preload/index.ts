@@ -35,6 +35,12 @@ const api = {
     }
   },
 
+  // File tree & code
+  fileTree: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('file:tree', { projectId }),
+  fileRead: (projectId: string, filePath: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('file:read', { projectId, filePath }),
+
   // App
   appVersion: (): Promise<string> =>
     ipcRenderer.invoke('app:version'),

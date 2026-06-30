@@ -1,17 +1,26 @@
 /**
- * Fieldguide App Shell — ui-spec.md §2.2 三栏布局
+ * Fieldguide App Shell — ui-spec v0.4
  *
- * ┌──────────────────────────────────────────────────────────┐
- * │  [Logo]  项目库│代码地图│理论│桥接          🔍  ⚙        │ 顶栏 48px
- * ├────────────┬──────────────────────────────┬──────────────┤
- * │  左栏 240  │     中央 (UA Dashboard)       │  右栏 320    │
- * │  Tour/操作 │                              │  Phase 1 隐藏 │
- * ├────────────┴──────────────────────────────┴──────────────┤
- * │  状态栏: 索引状态 · 节点数 · 当前项目                      │ 24px
- * └──────────────────────────────────────────────────────────┘
+ * VSCode/Obsidian 风格布局：
+ * ┌──────────────────────────────────────────────────────────────┐
+ * │  [Logo]  项目库│代码地图│理论│桥接              🔍  ⚙       │ 顶栏 48px
+ * ├────────────┬─────────────────────────────────────────────────┤
+ * │  文件树     │  右侧面板区（可拖拽分隔 1~2 个面板）              │
+ * │  260px     │  ┌─────────────────┬───────────────────────────┐│
+ * │            │  │ 图谱 / 代码 /    │  图谱 / 代码 / 问答        ││
+ * │            │  │ 问答             │                           ││
+ * │            │  └─────────────────┴───────────────────────────┘│
+ * ├────────────┴─────────────────────────────────────────────────┤
+ * │  状态栏：就绪 · 13 节点 · tiny-go                               │ 24px
+ * └──────────────────────────────────────────────────────────────┘
  */
 import { useState, useEffect } from 'react'
 import ProjectLibrary from './views/ProjectLibrary/ProjectLibrary'
+import FileTree from './views/CodeMap/FileTree'
+import SplitPanel from './views/CodeMap/SplitPanel'
+import GraphPanel from './views/CodeMap/GraphPanel'
+import CodeViewer from './views/CodeMap/CodeViewer'
+import ChatPanel from './views/CodeMap/ChatPanel'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
 
@@ -19,18 +28,22 @@ interface Project {
   id: string
   name: string
   slug: string
-  language: string
-  nodeCount: number
+  source_type: string
+  source_uri: string
+  root_path: string
   status: 'pending' | 'indexing' | 'ready' | 'failed' | 'stale'
-  indexedAt?: string
-  rootPath: string
+  language: string
+  node_count: number
+  created_at: string
+  indexed_at: string | null
 }
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('library')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [leftCollapsed, setLeftCollapsed] = useState(false)
-  const [rightCollapsed, setRightCollapsed] = useState(true) // Phase 1: hidden
+  const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
+  const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false)
+  const [fileTreeWidth, setFileTreeWidth] = useState(260)
 
   const noProject = !selectedProject
 
@@ -50,29 +63,54 @@ export default function App() {
         onTabChange={setActiveTab}
       />
 
-      {/* ── Body: 左 + 中 + 右 ── */}
+      {/* ── Body: 文件树 + 面板区 ── */}
       <div className="flex-1 flex overflow-hidden">
-        {/* 左栏 240px — 可收窄 */}
-        {!leftCollapsed && activeTab === 'codemap' && (
-          <LeftPanel
-            project={selectedProject}
-            onCollapse={() => setLeftCollapsed(true)}
-          />
+        {/* 文件树 — 仅在代码地图 Tab 显示 */}
+        {activeTab === 'codemap' && !fileTreeCollapsed && (
+          <>
+            <div style={{ width: fileTreeWidth }} className="flex-shrink-0 border-r border-[var(--fg-border)]">
+              <FileTree
+                projectId={selectedProject?.id ?? ''}
+                onFileClick={(p) => setActiveFilePath(p)}
+                activeFilePath={activeFilePath}
+              />
+            </div>
+            {/* File tree resize handle */}
+            <div
+              className="w-1 bg-[var(--fg-border)] hover:bg-blue-400 cursor-col-resize shrink-0 transition-colors"
+              onMouseDown={(e) => {
+                const startX = e.clientX
+                const startW = fileTreeWidth
+                const onMove = (ev: MouseEvent) => {
+                  const w = Math.max(160, Math.min(400, startW + ev.clientX - startX))
+                  setFileTreeWidth(w)
+                }
+                const onUp = () => {
+                  document.removeEventListener('mousemove', onMove)
+                  document.removeEventListener('mouseup', onUp)
+                  document.body.style.cursor = ''
+                }
+                document.body.style.cursor = 'col-resize'
+                document.addEventListener('mousemove', onMove)
+                document.addEventListener('mouseup', onUp)
+              }}
+            />
+          </>
         )}
 
-        {/* 收窄后的展开按钮 */}
-        {leftCollapsed && activeTab === 'codemap' && (
+        {/* 文件树折叠后的小条 */}
+        {activeTab === 'codemap' && fileTreeCollapsed && (
           <button
-            onClick={() => setLeftCollapsed(false)}
-            className="w-1 bg-gray-200 hover:bg-blue-400 transition-colors cursor-col-resize flex items-center justify-center group"
-            title="展开左栏"
+            onClick={() => setFileTreeCollapsed(false)}
+            className="w-8 bg-[var(--fg-card)] border-r border-[var(--fg-border)] flex items-start justify-center pt-2 hover:bg-gray-100 transition-colors shrink-0"
+            title="展开文件树"
           >
-            <span className="text-gray-400 group-hover:text-white text-xs">▶</span>
+            <span className="text-gray-400 text-xs">📁</span>
           </button>
         )}
 
-        {/* 中央 flex-1 */}
-        <main className="flex-1 overflow-auto">
+        {/* 主内容区 */}
+        <main className="flex-1 overflow-hidden">
           {activeTab === 'library' && (
             <ProjectLibrary
               selected={selectedProject}
@@ -82,27 +120,53 @@ export default function App() {
               }}
             />
           )}
-          {activeTab === 'codemap' && <CodeMapView project={selectedProject} />}
+          {activeTab === 'codemap' && (
+            <CodeMapLayout
+              project={selectedProject}
+              activeFilePath={activeFilePath}
+              onToggleFileTree={() => setFileTreeCollapsed(!fileTreeCollapsed)}
+              fileTreeCollapsed={fileTreeCollapsed}
+            />
+          )}
           {activeTab === 'theory' && <PlaceholderView title="理论学习" desc="arXiv / PDF / RAG（Phase 3）" />}
           {activeTab === 'bridge' && <PlaceholderView title="概念桥接" desc="论文 ↔ 代码节点（Phase 3）" />}
         </main>
-
-        {/* 右栏 320px — Phase 1 折叠 */}
-        {!rightCollapsed && (
-          <>
-            <div
-              className="w-1 bg-gray-200 hover:bg-blue-400 transition-colors cursor-col-resize"
-              onClick={() => setRightCollapsed(true)}
-              title="折叠右栏"
-            />
-            <RightPanel />
-          </>
-        )}
       </div>
 
       {/* ── Status Bar 24px ── */}
       <StatusBar project={selectedProject} />
     </div>
+  )
+}
+
+/* ──────────── CodeMap Layout ──────────── */
+
+function CodeMapLayout({
+  project,
+  activeFilePath,
+  onToggleFileTree,
+  fileTreeCollapsed,
+}: {
+  project: Project | null
+  activeFilePath?: string
+  onToggleFileTree: () => void
+  fileTreeCollapsed: boolean
+}) {
+  if (!project) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400">
+        <p>请先在项目库中添加项目</p>
+      </div>
+    )
+  }
+
+  return (
+    <SplitPanel
+      renderGraph={() => <GraphPanel />}
+      renderCode={(path) => <CodeViewer projectId={project.id} filePath={path} />}
+      renderChat={() => <ChatPanel />}
+      activeFilePath={activeFilePath}
+    />
   )
 }
 
@@ -118,8 +182,7 @@ function TopBar({
   onTabChange: (t: Tab) => void
 }) {
   return (
-    <header className="h-12 flex items-center px-4 border-b border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0">
-      {/* Logo */}
+    <header className="h-12 flex items-center px-4 border-b border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0 select-none">
       <button
         onClick={() => onTabChange('library')}
         className="font-bold text-lg mr-8 hover:opacity-80 transition-opacity"
@@ -127,7 +190,6 @@ function TopBar({
         Fieldguide
       </button>
 
-      {/* Nav Tabs */}
       <nav className="flex gap-0.5 h-full items-stretch">
         {tabs.map((t) => (
           <button
@@ -152,142 +214,27 @@ function TopBar({
       </nav>
 
       <div className="flex-1" />
-
-      {/* Right actions */}
-      <button
-        className="p-1.5 text-gray-400 hover:text-gray-600 rounded transition-colors"
-        title="搜索 (Ctrl+K)"
-      >
-        🔍
-      </button>
-      <button
-        className="p-1.5 text-gray-400 hover:text-gray-600 rounded transition-colors ml-1"
-        title="设置"
-      >
-        ⚙
-      </button>
+      <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded" title="搜索 (Ctrl+K)">🔍</button>
+      <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded ml-1" title="设置">⚙</button>
     </header>
   )
 }
 
-/* ──────────── Left Panel (240px) ──────────── */
-
-function LeftPanel({
-  project,
-  onCollapse,
-}: {
-  project: Project | null
-  onCollapse: () => void
-}) {
-  return (
-    <aside className="w-60 border-r border-[var(--fg-border)] bg-[var(--fg-card)] flex flex-col shrink-0">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--fg-border)]">
-        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">导览</span>
-        <button
-          onClick={onCollapse}
-          className="text-gray-400 hover:text-gray-600 text-xs"
-          title="收窄左栏"
-        >
-          ◀
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-auto p-3">
-        {project ? (
-          <>
-            {/* Tour 快捷列表 — Phase 2 */}
-            <div className="text-xs text-gray-400 mb-2">Tour 列表</div>
-            <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center text-xs text-gray-300">
-              Phase 2 实现
-            </div>
-
-            {/* 索引操作 */}
-            <div className="mt-4 space-y-2">
-              <button className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors">
-                重新索引
-              </button>
-              <button className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors">
-                增量更新
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="text-xs text-gray-400 text-center mt-4">
-            请先在项目库中选择项目
-          </div>
-        )}
-      </div>
-    </aside>
-  )
-}
-
-/* ──────────── Right Panel (320px, Phase 1 hidden) ──────────── */
-
-function RightPanel() {
-  return (
-    <aside className="w-80 border-l border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0 p-3">
-      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">助手</div>
-      <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center text-xs text-gray-300">
-        Phase 2 开放
-      </div>
-    </aside>
-  )
-}
-
-/* ──────────── Status Bar 24px ──────────── */
+/* ──────────── Status Bar ──────────── */
 
 function StatusBar({ project }: { project: Project | null }) {
   return (
-    <footer className="h-6 flex items-center px-4 border-t border-[var(--fg-border)] bg-[var(--fg-card)] text-xs text-gray-400 shrink-0 select-none gap-4">
-      <span>{project ? `状态: ${project.status}` : '就绪'}</span>
-      {project && <span>·</span>}
-      {project && <span>节点: {project.nodeCount || '—'}</span>}
+    <footer className="h-6 flex items-center px-4 border-t border-[var(--fg-border)] bg-[var(--fg-card)] text-xs text-gray-400 shrink-0 select-none gap-3">
+      <span>{project ? project.status : '就绪'}</span>
+      {project?.node_count ? <span>· {project.node_count} 节点</span> : null}
+      {project ? <span>· {project.name}</span> : null}
       <span className="flex-1" />
       <span>Fieldguide v0.1.0</span>
     </footer>
   )
 }
 
-/* ──────────── Code Map View ──────────── */
-
-function CodeMapView({ project }: { project: Project | null }) {
-  const [dashboardUrl, setDashboardUrl] = useState<string>('')
-
-  useEffect(() => {
-    window.fieldguide.dashboardUrl?.().then(setDashboardUrl).catch(() => {})
-  }, [])
-
-  if (!project) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center text-gray-400">
-          <p className="text-lg mb-2">请先在项目库中添加项目</p>
-          <p className="text-sm">切换到「项目库」Tab 开始</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!dashboardUrl) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-400 text-sm">加载 Dashboard…</div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="h-full w-full relative">
-      <iframe
-        src={dashboardUrl}
-        className="w-full h-full border-0"
-        title="UA Dashboard"
-      />
-    </div>
-  )
-}
-
-/* ──────────── Placeholder View ──────────── */
+/* ──────────── Placeholder ──────────── */
 
 function PlaceholderView({ title, desc }: { title: string; desc: string }) {
   return (
