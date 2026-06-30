@@ -4,8 +4,8 @@
  * Registers all invoke handlers and event emitters.
  * Renderer communicates exclusively through these channels.
  */
-import { ipcMain } from 'electron'
-import { join } from 'node:path'
+import { ipcMain, BrowserWindow } from 'electron'
+import { join, existsSync, readFileSync } from 'node:path'
 import { loadConfig, updateConfig } from '../config'
 import {
   listProjects,
@@ -15,6 +15,7 @@ import {
   removeProject,
 } from '../db'
 import { cloneRepo } from '../git'
+import { indexProject } from '../ua/client'
 import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
 import { ipcOk, ipcErr } from '../../shared/ipc'
@@ -124,15 +125,65 @@ ipcMain.handle('graph:get', (_e, { projectId }: { projectId: string }): IpcResul
   if (!project) {
     return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
   }
-  return ipcErr('UNKNOWN', 'graph:get 尚未实现（Phase 1.5）')
+  const graphPath = join(project.root_path, '.understand-anything', 'knowledge-graph.json')
+  if (!existsSync(graphPath)) {
+    return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+  }
+  try {
+    const data = JSON.parse(readFileSync(graphPath, 'utf-8'))
+    return ipcOk(data)
+  } catch (err) {
+    return ipcErr('PARSE_ERROR', `读取图谱失败: ${String(err)}`)
+  }
 })
 
-/* ──────────── Index (placeholder — 1.5 fills) ──────────── */
+/* ──────────── Index ──────────── */
 
-ipcMain.handle('project:index', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+ipcMain.handle('project:index', async (_e, { projectId }: { projectId: string }): Promise<IpcResult<unknown>> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  if (project.status === 'indexing') return ipcErr('INDEX_IN_PROGRESS', '索引正在进行中', true)
+
+  // Start indexing
   updateProjectStatus(projectId, 'indexing')
-  // TODO 1.5: trigger UA pipeline, send index:progress events
-  return ipcErr('UNKNOWN', '索引功能尚未实现（Phase 1.5）')
+  const win = BrowserWindow.getAllWindows()[0]
+
+  try {
+    const result = await indexProject(
+      project.root_path,
+      project.name,
+      (phase) => {
+        win?.webContents.send('index:progress', { type: 'phase', phase, projectId })
+      },
+      (current, total) => {
+        win?.webContents.send('index:progress', {
+          type: 'progress',
+          phase: 'parse',
+          current,
+          total,
+          projectId,
+        })
+      },
+    )
+
+    if (result.success) {
+      updateProjectStatus(projectId, 'ready', result.nodeCount)
+      win?.webContents.send('index:progress', {
+        type: 'complete',
+        projectId,
+        nodeCount: result.nodeCount,
+        edgeCount: result.edgeCount,
+      })
+      return ipcOk({ nodeCount: result.nodeCount, edgeCount: result.edgeCount })
+    } else {
+      updateProjectStatus(projectId, 'failed')
+      win?.webContents.send('index:progress', { type: 'error', projectId, error: result.error })
+      return ipcErr('UNKNOWN', result.error ?? '索引失败')
+    }
+  } catch (err) {
+    updateProjectStatus(projectId, 'failed')
+    const msg = err instanceof Error ? err.message : String(err)
+    win?.webContents.send('index:progress', { type: 'error', projectId, error: msg })
+    return ipcErr('UNKNOWN', msg)
+  }
 })

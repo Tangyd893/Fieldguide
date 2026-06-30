@@ -1,13 +1,14 @@
 {
   "version": "1.0.0",
   "project": {
-    "name": "tiny-go",
+    "name": "tiny-go-test",
     "languages": [
-      "go"
+      "go",
+      "json"
     ],
     "frameworks": [],
     "description": "",
-    "analyzedAt": "2026-06-30T03:48:34.079Z",
+    "analyzedAt": "2026-06-30T04:26:44.013Z",
     "gitCommitHash": ""
   },
   "nodes": [
@@ -16,12 +17,8 @@
       "type": "file",
       "name": "main.go",
       "filePath": "cmd/main.go",
-      "summary": "Main entry point that wires together store, service, and HTTP server",
-      "tags": [
-        "entry",
-        "http",
-        "server"
-      ],
+      "summary": "",
+      "tags": [],
       "complexity": "moderate"
     },
     {
@@ -33,7 +30,7 @@
         12,
         21
       ],
-      "summary": "Entry point: creates DB, handler, and starts HTTP server on :8080",
+      "summary": "",
       "tags": [],
       "complexity": "moderate"
     },
@@ -42,12 +39,8 @@
       "type": "file",
       "name": "handler.go",
       "filePath": "internal/service/handler.go",
-      "summary": "Service layer with HTTP handlers for hello and items endpoints",
-      "tags": [
-        "http",
-        "handler",
-        "service"
-      ],
+      "summary": "",
+      "tags": [],
       "complexity": "moderate"
     },
     {
@@ -59,7 +52,7 @@
         17,
         19
       ],
-      "summary": "Constructor: creates a Handler with the given DB",
+      "summary": "",
       "tags": [],
       "complexity": "moderate"
     },
@@ -72,7 +65,7 @@
         22,
         28
       ],
-      "summary": "GET /hello - responds with a greeting",
+      "summary": "",
       "tags": [],
       "complexity": "moderate"
     },
@@ -85,7 +78,7 @@
         31,
         35
       ],
-      "summary": "GET /items - returns all stored items as JSON",
+      "summary": "",
       "tags": [],
       "complexity": "moderate"
     },
@@ -98,7 +91,7 @@
         12,
         14
       ],
-      "summary": "HTTP handler struct that wraps the data store",
+      "summary": "",
       "tags": [],
       "complexity": "moderate"
     },
@@ -107,13 +100,9 @@
       "type": "file",
       "name": "db.go",
       "filePath": "internal/store/db.go",
-      "summary": "Simple in-memory data store layer",
-      "tags": [
-        "store",
-        "data",
-        "memory"
-      ],
-      "complexity": "low"
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
     },
     {
       "id": "function:internal/store/db.go:NewDB",
@@ -122,11 +111,11 @@
       "filePath": "internal/store/db.go",
       "lineRange": [
         18,
-        26
+        25
       ],
-      "summary": "Constructor: creates a new DB with initial items",
+      "summary": "",
       "tags": [],
-      "complexity": "low"
+      "complexity": "moderate"
     },
     {
       "id": "function:internal/store/db.go:All",
@@ -134,12 +123,25 @@
       "name": "All",
       "filePath": "internal/store/db.go",
       "lineRange": [
-        29,
+        28,
         34
       ],
-      "summary": "Returns a thread-safe copy of all stored items",
+      "summary": "",
       "tags": [],
-      "complexity": "low"
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/store/db.go:Item",
+      "type": "class",
+      "name": "Item",
+      "filePath": "internal/store/db.go",
+      "lineRange": [
+        6,
+        9
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
     },
     {
       "id": "class:internal/store/db.go:DB",
@@ -147,24 +149,20 @@
       "name": "DB",
       "filePath": "internal/store/db.go",
       "lineRange": [
-        13,
-        16
+        12,
+        15
       ],
-      "summary": "Thread-safe in-memory data store with RWMutex",
+      "summary": "",
       "tags": [],
-      "complexity": "low"
+      "complexity": "moderate"
     },
     {
-      "id": "config:go.mod",
+      "id": "config:scan-result.json",
       "type": "config",
-      "name": "go.mod",
-      "filePath": "go.mod",
-      "summary": "Go module definition for tiny-go",
-      "tags": [
-        "go",
-        "module",
-        "config"
-      ],
+      "name": "scan-result.json",
+      "filePath": "scan-result.json",
+      "summary": "",
+      "tags": [],
       "complexity": "simple"
     }
   ],
@@ -220,52 +218,17 @@
     },
     {
       "source": "file:internal/store/db.go",
-      "target": "class:internal/store/db.go:DB",
+      "target": "class:internal/store/db.go:Item",
       "type": "contains",
       "direction": "forward",
       "weight": 1
     },
     {
-      "source": "file:cmd/main.go",
-      "target": "file:internal/service/handler.go",
-      "type": "imports",
+      "source": "file:internal/store/db.go",
+      "target": "class:internal/store/db.go:DB",
+      "type": "contains",
       "direction": "forward",
-      "weight": 0.7
-    },
-    {
-      "source": "file:cmd/main.go",
-      "target": "file:internal/store/db.go",
-      "type": "imports",
-      "direction": "forward",
-      "weight": 0.7
-    },
-    {
-      "source": "file:internal/service/handler.go",
-      "target": "file:internal/store/db.go",
-      "type": "imports",
-      "direction": "forward",
-      "weight": 0.7
-    },
-    {
-      "source": "function:cmd/main.go:main",
-      "target": "function:internal/store/db.go:NewDB",
-      "type": "calls",
-      "direction": "forward",
-      "weight": 0.8
-    },
-    {
-      "source": "function:cmd/main.go:main",
-      "target": "function:internal/service/handler.go:NewHandler",
-      "type": "calls",
-      "direction": "forward",
-      "weight": 0.8
-    },
-    {
-      "source": "function:internal/service/handler.go:ListItems",
-      "target": "function:internal/store/db.go:All",
-      "type": "calls",
-      "direction": "forward",
-      "weight": 0.8
+      "weight": 1
     }
   ],
   "layers": [],
