@@ -44,7 +44,7 @@ doc-index（本文）
 | [product-spec.md](./product-spec.md) | 愿景、用户场景、功能 F-01–F-15、非目标 | IPC 字段、SQL schema |
 | [understand-anything-integration.md](./understand-anything-integration.md) | UA/FG 边界、数据流、Spike、禁止重复实现 | UI 像素级规格 |
 | [architecture.md](./architecture.md) | 进程模型、目录结构、IPC、SQLite 表、Agent 工具表 | Phase 排期 |
-| [ui-spec.md](./ui-spec.md) | 布局、壳层 vs Dashboard 分工、视觉 token | graph schema |
+| [ui-spec.md](./ui-spec.md) | 布局、文件树、可分隔面板、面板 Tab 分工 | graph schema |
 | [roadmap.md](./roadmap.md) | Phase 任务 ID、验收、周期 | 架构细节 |
 | [onboarding-spec.md](./onboarding-spec.md) | 引导四步、Demo 仓库约定 | — |
 | [testing-strategy.md](./testing-strategy.md) | 测试金字塔、fixture | 产品愿景 |
@@ -117,6 +117,7 @@ flowchart TD
 | D-08 | Dashboard 嵌入为 Phase 1 默认方案 | integration §4.3 |
 | D-09 | EPUB/Markdown Phase 3 不做 | product-spec §九 |
 | D-10 | Fieldguide MIT + [NOTICE.md](../NOTICE.md) 保留 UA 归属 | README、NOTICE |
+| D-11 | 布局改为 VSCode/Obsidian 风格（左文件树 + 右可分隔面板），替代 v0.3 三栏布局 | ui-spec v0.4 §二 |
 
 ---
 
@@ -202,9 +203,10 @@ flowchart TD
 
 ### 7.3 若改了 UI
 
-- [ ] `ui-spec.md` 壳层 vs Dashboard 分工清晰
-- [ ] 未引入 Monaco/xyflow 作为 Fieldguide 自建画布（除非 D-08 变更）
-- [ ] 双聊天入口：代码→Dashboard，跨源→右栏 Agent
+- [ ] `ui-spec.md` 文件树 + 面板分工清晰
+- [ ] 面板 Tab（图谱/代码/问答）未重复实现 UA 已有能力
+- [ ] 图谱仍由 UA Dashboard 提供（iframe），未引入自建 @xyflow/react
+- [ ] 双聊天入口：Dashboard 内（代码问答）→ 面板「问答」Tab（Phase 2）
 
 ### 7.4 若改了数据模型
 
@@ -224,11 +226,10 @@ flowchart TD
 
 | 张力 | 文档约定 | 处理阶段 |
 |------|----------|----------|
-| Dashboard 与三栏视觉割裂 | ui-spec §3.2 | Phase 2 主题统一 |
-| Phase 1 右栏可折叠 | ui-spec §3.2 | Phase 1 允许 |
-| 全局 Ctrl+K 跳节点 | ui-spec §4.3；roadmap **2.11** | Phase 2 |
-| 索引进度阶段名 | ui-spec §4.2 映射 UA | 实现时 |
-| Demo / fixture 未创建 | fieldguide-demo-spec、fixtures-tiny-go-spec | Phase 1 第 0 周 |
+| Dashboard iframe 与 Fieldguide 面板视觉割裂 | ui-spec §3.2.3 | Phase 2 主题统一 |
+| 文件树需实时反映项目文件变更 | ui-spec §3.2.1 stale badge | Phase 2 |
+| 面板联动（图谱↔代码↔问答）| ui-spec §3.2.2 | Phase 2 |
+| Demo / fixture 未创建 | fieldguide-demo-spec、fixtures-tiny-go-spec | ✅ Phase 1 已完成 |
 
 ---
 
@@ -238,8 +239,8 @@ flowchart TD
 |------|----------|
 | README | Phase 0 v0.3 叙述 |
 | product-spec | v0.3 |
-| architecture | v0.3 |
-| ui-spec | v0.3 |
+| architecture | v0.4 |
+| ui-spec | v0.4 |
 | roadmap | v0.3 |
 | design-review | v0.3 |
 | getting-started | v0.3 |

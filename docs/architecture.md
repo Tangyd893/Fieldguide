@@ -1,6 +1,7 @@
 # Fieldguide 技术架构
 
-> 版本：v0.3 | 状态：设计定稿（Phase 0，已纳入 Understand-Anything 集成）  
+> 版本：v0.4 | 状态：设计修订（Phase 1，VSCode/Obsidian 风格布局）  
+> v0.4 变更：三栏布局 → 左文件树 + 右可分隔面板（2026-07-01）  
 > 集成细节见 [understand-anything-integration.md](./understand-anything-integration.md)
 
 ---
@@ -12,8 +13,8 @@ Fieldguide 是 **Electron 单体桌面应用**：在 **[Understand-Anything](htt
 ```mermaid
 flowchart TB
   subgraph renderer [Renderer Process]
-    Shell[Fieldguide UI: 项目库 / 理论 / 桥接]
-    Dash[UA Dashboard 嵌入]
+    Shell[Fieldguide UI: 项目库 / 文件树 / 可分隔面板 / 理论 / 桥接]
+    Dash[UA Dashboard 嵌入 - iframe]
   end
 
   subgraph preload [Preload]
@@ -116,7 +117,7 @@ Fieldguide/
 │       ├── App.tsx
 │       ├── views/
 │       │   ├── ProjectLibrary/
-│       │   ├── CodeMap/         # 嵌入 UA Dashboard
+│       │   ├── CodeMap/         # 文件树 + 可分隔面板 + 图谱/代码/问答
 │       │   ├── Theory/
 │       │   └── Bridge/
 │       └── locales/
