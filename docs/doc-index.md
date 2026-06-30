@@ -124,22 +124,22 @@ flowchart TD
 
 ### 5.1 环境与仓库
 
-- [ ] Node.js LTS + pnpm
-- [ ] Windows 10/11 开发机
-- [ ] Fieldguide 目录 `git init`
-- [ ] 阅读本文 + integration + getting-started
+- [x] Node.js LTS + pnpm
+- [x] Windows 10/11 开发机
+- [x] Fieldguide 目录 `git init` + remote origin
+- [x] 阅读本文 + integration + getting-started
 
 ### 5.2 UA 集成 Spike（**硬门禁**）
 
 见 [understand-anything-integration.md §九](./understand-anything-integration.md)。
 
-- [ ] clone `Egonex-AI/Understand-Anything`
-- [ ] `pnpm install && pnpm --filter @understand-anything/core test` 通过
-- [ ] Node 脚本调用 pipeline → 生成 `knowledge-graph.json`
-- [ ] Dashboard 静态资源在 Electron `BrowserWindow` 可加载
-- [ ] `--language zh` 输出中文摘要（抽样验证）
-- [ ] 记录 UA 版本 / commit 至 `package.json` 或 `vendor/` README
-- [ ] Spike 结论写入 `docs/spike-ua.md`（见 §5.4 模板）
+- [x] clone `Egonex-AI/Understand-Anything`
+- [x] `pnpm install && pnpm --filter @understand-anything/core test` 通过
+- [x] Node 脚本调用 pipeline → 生成 `knowledge-graph.json`
+- [x] Dashboard 静态资源在 Electron `BrowserWindow` 可加载
+- [x] `--language zh` 输出中文摘要（抽样验证）
+- [x] 记录 UA 版本 / commit 至 `package.json` 或 `vendor/` README
+- [x] Spike 结论写入 `docs/spike-ua.md`（见 §5.4 模板）
 
 ### 5.3 外部仓库准备（可与 Spike 并行）
 
