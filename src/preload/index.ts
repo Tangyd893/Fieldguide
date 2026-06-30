@@ -38,6 +38,8 @@ const api = {
   // App
   appVersion: (): Promise<string> =>
     ipcRenderer.invoke('app:version'),
+  dashboardUrl: (): Promise<string> =>
+    ipcRenderer.invoke('dashboard:url'),
 }
 
 contextBridge.exposeInMainWorld('fieldguide', api)

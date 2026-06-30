@@ -1,14 +1,14 @@
 {
   "version": "1.0.0",
   "project": {
-    "name": "tiny-go-test",
+    "name": "tiny-go",
     "languages": [
       "go",
       "json"
     ],
     "frameworks": [],
     "description": "",
-    "analyzedAt": "2026-06-30T04:26:44.013Z",
+    "analyzedAt": "2026-06-30T04:27:19.710Z",
     "gitCommitHash": ""
   },
   "nodes": [

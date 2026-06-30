@@ -10,7 +10,7 @@
  * │  状态栏: 索引状态 · 节点数 · 当前项目                      │ 24px
  * └──────────────────────────────────────────────────────────┘
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ProjectLibrary from './views/ProjectLibrary/ProjectLibrary'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
@@ -251,6 +251,12 @@ function StatusBar({ project }: { project: Project | null }) {
 /* ──────────── Code Map View ──────────── */
 
 function CodeMapView({ project }: { project: Project | null }) {
+  const [dashboardUrl, setDashboardUrl] = useState<string>('')
+
+  useEffect(() => {
+    window.fieldguide.dashboardUrl?.().then(setDashboardUrl).catch(() => {})
+  }, [])
+
   if (!project) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -262,15 +268,21 @@ function CodeMapView({ project }: { project: Project | null }) {
     )
   }
 
-  return (
-    <div className="h-full flex items-center justify-center">
-      <div className="border-2 border-dashed border-gray-300 rounded-xl p-16 text-center text-gray-400 max-w-lg">
-        <p className="text-lg font-medium mb-2">UA Dashboard 嵌入区域</p>
-        <p className="text-sm mb-4">Phase 1.7 — 将在此嵌入 Understand-Anything Dashboard</p>
-        <div className="text-xs text-gray-300 bg-gray-100 rounded p-2 font-mono">
-          {project.rootPath}/.understand-anything/
-        </div>
+  if (!dashboardUrl) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-400 text-sm">加载 Dashboard…</div>
       </div>
+    )
+  }
+
+  return (
+    <div className="h-full w-full relative">
+      <iframe
+        src={dashboardUrl}
+        className="w-full h-full border-0"
+        title="UA Dashboard"
+      />
     </div>
   )
 }

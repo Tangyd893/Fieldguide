@@ -44,6 +44,17 @@ ipcMain.handle('app:version', (): string => {
   return '0.1.0'
 })
 
+// Dashboard URL is set by main process after protocol registration
+let dashboardUrl = ''
+
+export function setDashboardUrl(url: string): void {
+  dashboardUrl = url
+}
+
+ipcMain.handle('dashboard:url', (): string => {
+  return dashboardUrl
+})
+
 /* ──────────── Projects ──────────── */
 
 ipcMain.handle('project:list', (): IpcResult<unknown[]> => {

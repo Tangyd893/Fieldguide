@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
@@ -26,7 +26,6 @@ export function createWindow(): BrowserWindow {
     return { action: 'deny' }
   })
 
-  // Load renderer
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
