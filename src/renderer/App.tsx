@@ -12,6 +12,7 @@ import ChatPanel from './views/CodeMap/ChatPanel'
 import TourPanel from './views/CodeMap/TourPanel'
 import OnboardingWizard from './views/OnboardingWizard'
 import CommandPalette from './views/CommandPalette'
+import SettingsPanel from './views/SettingsPanel'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
 
@@ -38,6 +39,7 @@ export default function App() {
   const [fileTreeWidth, setFileTreeWidth] = useState(260)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [indexing, setIndexing] = useState(false)
   const [indexProgress, setIndexProgress] = useState('')
   const [indexError, setIndexError] = useState<string | null>(null)
@@ -112,7 +114,7 @@ export default function App() {
       { id: 'reindex', label: `重新索引: ${selectedProject.name}`, action: handleReIndex },
       { id: 'codemap', label: '代码地图', shortcut: 'Tab', action: () => setActiveTab('codemap') },
     ] : []),
-    { id: 'settings', label: '打开设置', action: () => { /* placeholder */ } },
+    { id: 'settings', label: '打开设置', action: () => setShowSettings(true) },
     { id: 'toggleTheme', label: '切换主题', action: () => { /* placeholder */ } },
   ]
 
@@ -210,6 +212,11 @@ export default function App() {
       {showPalette && (
         <CommandPalette commands={commands} onClose={() => setShowPalette(false)} />
       )}
+
+      {/* Settings */}
+      {showSettings && (
+        <SettingsPanel t={t} onClose={() => setShowSettings(false)} />
+      )}
     </div>
   )
 }
@@ -274,7 +281,7 @@ function TopBar({
       </nav>
       <div className="flex-1" />
       <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded" title={t('tooltip.search')}>🔍</button>
-      <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded ml-1" title={t('tooltip.settings')}>⚙</button>
+      <button onClick={() => setShowSettings(true)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded ml-1" title={t('tooltip.settings')}>⚙</button>
     </header>
   )
 }
