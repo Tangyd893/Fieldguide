@@ -5,6 +5,7 @@
  * Renderer communicates exclusively through these channels.
  */
 import { ipcMain } from 'electron'
+import { join } from 'node:path'
 import { loadConfig, updateConfig } from '../config'
 import {
   listProjects,
@@ -13,6 +14,7 @@ import {
   updateProjectStatus,
   removeProject,
 } from '../db'
+import { cloneRepo } from '../git'
 import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
 import { ipcOk, ipcErr } from '../../shared/ipc'
@@ -72,14 +74,25 @@ ipcMain.handle('project:addLocal', (_e, { path }: { path: string }): IpcResult<u
   }
 })
 
-ipcMain.handle('project:addGit', (_e, { url, branch }: { url: string; branch?: string }): IpcResult<unknown> => {
+ipcMain.handle('project:addGit', async (_e, { url, branch }: { url: string; branch?: string }): Promise<IpcResult<unknown>> => {
   try {
     if (!url) return ipcErr('SOURCE_UNAVAILABLE', 'Git URL 不能为空')
     const id = `git-${uuid()}`
     const name = url.split('/').pop()?.replace('.git', '') || url
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-')
     const config = loadConfig()
-    const targetPath = `${config.projectsRoot || ''}/${slug}`
+    
+    if (!config.projectsRoot) {
+      return ipcErr('SOURCE_UNAVAILABLE', '请先在设置中配置项目根目录（projectsRoot）')
+    }
+
+    const targetPath = join(config.projectsRoot, slug)
+    const cloneResult = await cloneRepo(url, targetPath, branch)
+    
+    if (!cloneResult.success) {
+      return ipcErr('GIT_CLONE_FAILED', cloneResult.error ?? '克隆失败', true)
+    }
+
     const project = insertProject({
       id,
       name,

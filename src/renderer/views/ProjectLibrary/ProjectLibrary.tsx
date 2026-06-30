@@ -1,56 +1,107 @@
 /**
  * ProjectLibrary — ui-spec.md §3.1
  *
- * 空状态: 插图 + 添加按钮
- * 列表: 卡片 (name, language badge, status, node count, indexedAt)
- * 添加: 本地文件夹 / Git URL 对话框
+ * Connected to main process via window.fieldguide IPC.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-interface Project {
+interface ProjectRow {
   id: string
   name: string
   slug: string
-  language: string
-  nodeCount: number
+  source_type: 'local' | 'git'
+  source_uri: string
+  root_path: string
   status: 'pending' | 'indexing' | 'ready' | 'failed' | 'stale'
-  indexedAt?: string
-  rootPath: string
+  language: string
+  node_count: number
+  created_at: string
+  indexed_at: string | null
 }
 
-// Mock data for Phase 1 development
-const MOCK_PROJECTS: Project[] = []
-
 interface Props {
-  selected: Project | null
-  onSelect: (p: Project) => void
+  selected: ProjectRow | null
+  onSelect: (p: ProjectRow) => void
 }
 
 export default function ProjectLibrary({ selected, onSelect }: Props) {
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS)
+  const [projects, setProjects] = useState<ProjectRow[]>([])
+  const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [addMode, setAddMode] = useState<'local' | 'git'>('local')
   const [localPath, setLocalPath] = useState('')
   const [gitUrl, setGitUrl] = useState('')
   const [gitBranch, setGitBranch] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load projects on mount
+  useEffect(() => {
+    loadProjects()
+  }, [])
+
+  async function loadProjects() {
+    try {
+      const result = await window.fieldguide.projectList()
+      if (result.ok && result.data) {
+        setProjects(result.data)
+      }
+    } catch (err) {
+      console.error('Failed to load projects:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAdd() {
+    setError(null)
+    setAdding(true)
+    try {
+      let result
+      if (addMode === 'local') {
+        result = await window.fieldguide.projectAddLocal(localPath)
+      } else {
+        result = await window.fieldguide.projectAddGit(gitUrl, gitBranch || undefined)
+      }
+      if (result.ok && result.data) {
+        setProjects((prev) => [result.data!, ...prev])
+        setShowAdd(false)
+        setLocalPath('')
+        setGitUrl('')
+        setGitBranch('')
+        onSelect(result.data!)
+      } else {
+        setError(result.error?.message ?? '添加失败')
+      }
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-400 text-sm">加载中…</div>
+      </div>
+    )
+  }
 
   // Empty state
   if (projects.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center max-w-sm">
-          {/* Placeholder illustration */}
           <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-blue-50 flex items-center justify-center">
             <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
           </div>
-
           <h2 className="text-xl font-semibold text-gray-800 mb-2">添加你的第一个项目</h2>
           <p className="text-sm text-gray-500 mb-8">
             Fieldguide 会分析项目源码并生成交互式知识图谱
           </p>
-
           <div className="flex flex-col gap-3">
             <button
               onClick={() => { setAddMode('local'); setShowAdd(true) }}
@@ -66,22 +117,19 @@ export default function ProjectLibrary({ selected, onSelect }: Props) {
             </button>
           </div>
 
-          {/* Add dialog */}
           {showAdd && (
             <AddDialog
               mode={addMode}
               localPath={localPath}
               gitUrl={gitUrl}
               gitBranch={gitBranch}
+              error={error}
+              adding={adding}
               onLocalPathChange={setLocalPath}
               onGitUrlChange={setGitUrl}
               onGitBranchChange={setGitBranch}
-              onClose={() => setShowAdd(false)}
-              onAdd={(p) => {
-                setProjects([...projects, p])
-                setShowAdd(false)
-                onSelect(p)
-              }}
+              onClose={() => { setShowAdd(false); setError(null) }}
+              onAdd={handleAdd}
             />
           )}
         </div>
@@ -89,7 +137,7 @@ export default function ProjectLibrary({ selected, onSelect }: Props) {
     )
   }
 
-  // Project list view
+  // Project list
   return (
     <div className="max-w-3xl mx-auto p-8">
       <div className="flex items-center justify-between mb-6">
@@ -110,7 +158,6 @@ export default function ProjectLibrary({ selected, onSelect }: Props) {
         </div>
       </div>
 
-      {/* Project cards */}
       <div className="space-y-3">
         {projects.map((p) => (
           <button
@@ -126,15 +173,17 @@ export default function ProjectLibrary({ selected, onSelect }: Props) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-900 truncate">{p.name}</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-mono">
-                    {p.language}
-                  </span>
+                  {p.language && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-mono">
+                      {p.language}
+                    </span>
+                  )}
                   <StatusBadge status={p.status} />
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                  <span className="truncate max-w-[300px]" title={p.rootPath}>{p.rootPath}</span>
-                  {p.indexedAt && <span>索引于 {p.indexedAt}</span>}
-                  {p.nodeCount > 0 && <span>{p.nodeCount} 个节点</span>}
+                  <span className="truncate max-w-[300px]" title={p.root_path}>{p.root_path}</span>
+                  {p.indexed_at && <span>索引于 {new Date(p.indexed_at).toLocaleDateString('zh-CN')}</span>}
+                  {p.node_count > 0 && <span>{p.node_count} 个节点</span>}
                 </div>
               </div>
               <span className="text-gray-300 text-lg">→</span>
@@ -149,15 +198,13 @@ export default function ProjectLibrary({ selected, onSelect }: Props) {
           localPath={localPath}
           gitUrl={gitUrl}
           gitBranch={gitBranch}
+          error={error}
+          adding={adding}
           onLocalPathChange={setLocalPath}
           onGitUrlChange={setGitUrl}
           onGitBranchChange={setGitBranch}
-          onClose={() => setShowAdd(false)}
-          onAdd={(p) => {
-            setProjects([...projects, p])
-            setShowAdd(false)
-            onSelect(p)
-          }}
+          onClose={() => { setShowAdd(false); setError(null) }}
+          onAdd={handleAdd}
         />
       )}
     </div>
@@ -166,7 +213,7 @@ export default function ProjectLibrary({ selected, onSelect }: Props) {
 
 /* ──────────── Status Badge ──────────── */
 
-function StatusBadge({ status }: { status: Project['status'] }) {
+function StatusBadge({ status }: { status: ProjectRow['status'] }) {
   const map: Record<string, { label: string; cls: string }> = {
     pending: { label: '待索引', cls: 'bg-gray-100 text-gray-500' },
     indexing: { label: '索引中…', cls: 'bg-yellow-100 text-yellow-700' },
@@ -189,6 +236,8 @@ function AddDialog({
   localPath,
   gitUrl,
   gitBranch,
+  error,
+  adding,
   onLocalPathChange,
   onGitUrlChange,
   onGitBranchChange,
@@ -199,46 +248,19 @@ function AddDialog({
   localPath: string
   gitUrl: string
   gitBranch: string
+  error: string | null
+  adding: boolean
   onLocalPathChange: (v: string) => void
   onGitUrlChange: (v: string) => void
   onGitBranchChange: (v: string) => void
   onClose: () => void
-  onAdd: (p: Project) => void
+  onAdd: () => void
 }) {
-  const handleAdd = () => {
-    if (mode === 'local') {
-      const name = localPath.split(/[/\\]/).pop() || localPath
-      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-      onAdd({
-        id: `local-${Date.now()}`,
-        name,
-        slug,
-        language: '—',
-        nodeCount: 0,
-        status: 'pending',
-        rootPath: localPath,
-      })
-    } else {
-      const name = gitUrl.split('/').pop()?.replace('.git', '') || gitUrl
-      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-      onAdd({
-        id: `git-${Date.now()}`,
-        name,
-        slug,
-        language: '—',
-        nodeCount: 0,
-        status: 'pending',
-        rootPath: `{projectsRoot}/${slug}`,
-      })
-    }
-  }
+  const canSubmit = mode === 'local' ? localPath.trim().length > 0 : gitUrl.trim().length > 0
 
   return (
     <>
-      {/* Backdrop */}
       <div className="fixed inset-0 bg-black/25 z-40" onClick={onClose} />
-
-      {/* Modal */}
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] bg-white rounded-xl shadow-xl z-50 p-6">
         <h3 className="text-lg font-semibold mb-4">
           {mode === 'local' ? '选择本地文件夹' : '从 Git 克隆'}
@@ -248,22 +270,19 @@ function AddDialog({
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">项目路径</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={localPath}
-                  onChange={(e) => onLocalPathChange(e.target.value)}
-                  placeholder="D:\Projects\my-repo"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  autoFocus
-                />
-                <button className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
-                  浏览…
-                </button>
-              </div>
+              <input
+                type="text"
+                value={localPath}
+                onChange={(e) => onLocalPathChange(e.target.value)}
+                placeholder="D:\Projects\my-repo"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                autoFocus
+                disabled={adding}
+              />
             </div>
             <p className="text-xs text-gray-400">
-              Fieldguide 不会复制源码，仅在项目目录下生成 <code className="bg-gray-100 px-1 rounded">.understand-anything/</code> 索引文件。
+              Fieldguide 不会复制源码，仅在项目目录下生成{' '}
+              <code className="bg-gray-100 px-1 rounded">.understand-anything/</code> 索引文件。
             </p>
           </div>
         ) : (
@@ -277,6 +296,7 @@ function AddDialog({
                 placeholder="https://github.com/user/repo.git"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 autoFocus
+                disabled={adding}
               />
             </div>
             <div>
@@ -287,24 +307,32 @@ function AddDialog({
                 onChange={(e) => onGitBranchChange(e.target.value)}
                 placeholder="main"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={adding}
               />
             </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+            {error}
           </div>
         )}
 
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            disabled={adding}
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-40"
           >
             取消
           </button>
           <button
-            onClick={handleAdd}
-            disabled={mode === 'local' ? !localPath.trim() : !gitUrl.trim()}
+            onClick={onAdd}
+            disabled={!canSubmit || adding}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            添加项目
+            {adding ? '处理中…' : '添加项目'}
           </button>
         </div>
       </div>
