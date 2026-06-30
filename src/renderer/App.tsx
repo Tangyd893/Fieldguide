@@ -13,6 +13,7 @@ import TourPanel from './views/CodeMap/TourPanel'
 import OnboardingWizard from './views/OnboardingWizard'
 import CommandPalette from './views/CommandPalette'
 import SettingsPanel from './views/SettingsPanel'
+import CostDialog from './views/CostDialog'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
 
@@ -43,6 +44,8 @@ export default function App() {
   const [indexing, setIndexing] = useState(false)
   const [indexProgress, setIndexProgress] = useState('')
   const [indexError, setIndexError] = useState<string | null>(null)
+  const [showCostDialog, setShowCostDialog] = useState(false)
+  const [pendingIndex, setPendingIndex] = useState<string | null>(null)
 
   // Check onboarding
   useEffect(() => {
@@ -82,16 +85,46 @@ export default function App() {
 
   async function handleReIndex() {
     if (!selectedProject) return
+
+    // Check if LLM is configured — show cost dialog
+    const llmStatus = await window.fieldguide.configGet?.()
+    const cfg = (llmStatus?.data as Record<string, unknown>)
+    const hasLLM = !!(cfg?.llm as Record<string, string>)?.apiKey
+
+    if (hasLLM) {
+      setPendingIndex(selectedProject.id)
+      setShowCostDialog(true)
+      return
+    }
+
+    doIndex(selectedProject.id, selectedProject.name)
+  }
+
+  async function doIndex(projectId: string, _projectName: string) {
+    setShowCostDialog(false)
+    setPendingIndex(null)
     setIndexing(true)
     setIndexError(null)
     setIndexProgress('scan')
-    try {
-      const result = await window.fieldguide.projectIndex(selectedProject.id)
-      if (result.ok) {
+
+    // Listen for progress events
+    const unsub = window.fieldguide.onIndexProgress?.((data: unknown) => {
+      const ev = data as { type: string; phase?: string; current?: number; total?: number; error?: string; nodeCount?: number }
+      if (ev.type === 'phase') setIndexProgress(ev.phase ?? '')
+      else if (ev.type === 'progress') setIndexProgress(`${ev.phase ?? ''} ${ev.current ?? 0}/${ev.total ?? 0}`)
+      else if (ev.type === 'complete') {
         setIndexing(false)
         setIndexProgress('')
-        setSelectedProject((prev) => prev ? { ...prev, status: 'ready' } : null)
-      } else {
+        setSelectedProject((prev) => prev ? { ...prev, status: 'ready', node_count: ev.nodeCount ?? prev.node_count } : null)
+      } else if (ev.type === 'error') {
+        setIndexError(ev.error ?? '索引失败')
+        setIndexing(false)
+      }
+    })
+
+    try {
+      const result = await window.fieldguide.projectIndex(projectId)
+      if (!result.ok) {
         setIndexError(result.error?.message ?? '索引失败')
         setIndexing(false)
       }
@@ -99,10 +132,11 @@ export default function App() {
       setIndexError(String(err))
       setIndexing(false)
     }
-    // Refresh project list
+    unsub?.()
+    // Refresh
     const list = await window.fieldguide.projectList()
     if (list.ok && list.data) {
-      const updated = list.data.find((p: Project) => p.id === selectedProject?.id) as Project | undefined
+      const updated = list.data.find((p: Project) => p.id === projectId) as Project | undefined
       if (updated) setSelectedProject(updated)
     }
   }
@@ -216,6 +250,27 @@ export default function App() {
       {/* Settings */}
       {showSettings && (
         <SettingsPanel t={t} onClose={() => setShowSettings(false)} />
+      )}
+
+      {/* LLM Cost Dialog */}
+      {showCostDialog && (
+        <CostDialog
+          t={t}
+          onCancel={() => { setShowCostDialog(false); setPendingIndex(null) }}
+          onContinue={() => {
+            if (pendingIndex) {
+              const p = selectedProject
+              if (p) doIndex(p.id, p.name)
+            }
+          }}
+          onSkipLLM={() => {
+            // TODO: skip LLM phases, do structural-only index
+            if (pendingIndex) {
+              const p = selectedProject
+              if (p) doIndex(p.id, p.name)
+            }
+          }}
+        />
       )}
     </div>
   )
