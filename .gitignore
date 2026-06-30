@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+.vite/
+
+# UA vendor (submodule or referenced externally)
+# vendor/Understand-Anything/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Env
+.env
+.env.local
+
+# Test artifacts
+tests/fixtures/*/.understand-anything/intermediate/
+
+# Reasonix
+.reasonix/

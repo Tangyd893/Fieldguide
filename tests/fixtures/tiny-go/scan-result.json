@@ -1,0 +1,43 @@
+{
+  "scriptCompleted": true,
+  "files": [
+    {
+      "path": "cmd/main.go",
+      "language": "go",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "go.mod",
+      "language": "mod",
+      "sizeLines": 3,
+      "fileCategory": "config"
+    },
+    {
+      "path": "internal/service/handler.go",
+      "language": "go",
+      "sizeLines": 35,
+      "fileCategory": "code"
+    },
+    {
+      "path": "internal/store/db.go",
+      "language": "go",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    }
+  ],
+  "totalFiles": 4,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "small",
+  "stats": {
+    "filesScanned": 4,
+    "byCategory": {
+      "code": 3,
+      "config": 1
+    },
+    "byLanguage": {
+      "go": 3,
+      "mod": 1
+    }
+  }
+}

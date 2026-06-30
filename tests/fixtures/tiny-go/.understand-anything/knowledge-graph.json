@@ -1,0 +1,273 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "tiny-go",
+    "languages": [
+      "go"
+    ],
+    "frameworks": [],
+    "description": "",
+    "analyzedAt": "2026-06-30T03:48:34.079Z",
+    "gitCommitHash": ""
+  },
+  "nodes": [
+    {
+      "id": "file:cmd/main.go",
+      "type": "file",
+      "name": "main.go",
+      "filePath": "cmd/main.go",
+      "summary": "Main entry point that wires together store, service, and HTTP server",
+      "tags": [
+        "entry",
+        "http",
+        "server"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:cmd/main.go:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "cmd/main.go",
+      "lineRange": [
+        12,
+        21
+      ],
+      "summary": "Entry point: creates DB, handler, and starts HTTP server on :8080",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/service/handler.go",
+      "type": "file",
+      "name": "handler.go",
+      "filePath": "internal/service/handler.go",
+      "summary": "Service layer with HTTP handlers for hello and items endpoints",
+      "tags": [
+        "http",
+        "handler",
+        "service"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/service/handler.go:NewHandler",
+      "type": "function",
+      "name": "NewHandler",
+      "filePath": "internal/service/handler.go",
+      "lineRange": [
+        17,
+        19
+      ],
+      "summary": "Constructor: creates a Handler with the given DB",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/service/handler.go:Hello",
+      "type": "function",
+      "name": "Hello",
+      "filePath": "internal/service/handler.go",
+      "lineRange": [
+        22,
+        28
+      ],
+      "summary": "GET /hello - responds with a greeting",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/service/handler.go:ListItems",
+      "type": "function",
+      "name": "ListItems",
+      "filePath": "internal/service/handler.go",
+      "lineRange": [
+        31,
+        35
+      ],
+      "summary": "GET /items - returns all stored items as JSON",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/service/handler.go:Handler",
+      "type": "class",
+      "name": "Handler",
+      "filePath": "internal/service/handler.go",
+      "lineRange": [
+        12,
+        14
+      ],
+      "summary": "HTTP handler struct that wraps the data store",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/store/db.go",
+      "type": "file",
+      "name": "db.go",
+      "filePath": "internal/store/db.go",
+      "summary": "Simple in-memory data store layer",
+      "tags": [
+        "store",
+        "data",
+        "memory"
+      ],
+      "complexity": "low"
+    },
+    {
+      "id": "function:internal/store/db.go:NewDB",
+      "type": "function",
+      "name": "NewDB",
+      "filePath": "internal/store/db.go",
+      "lineRange": [
+        18,
+        26
+      ],
+      "summary": "Constructor: creates a new DB with initial items",
+      "tags": [],
+      "complexity": "low"
+    },
+    {
+      "id": "function:internal/store/db.go:All",
+      "type": "function",
+      "name": "All",
+      "filePath": "internal/store/db.go",
+      "lineRange": [
+        29,
+        34
+      ],
+      "summary": "Returns a thread-safe copy of all stored items",
+      "tags": [],
+      "complexity": "low"
+    },
+    {
+      "id": "class:internal/store/db.go:DB",
+      "type": "class",
+      "name": "DB",
+      "filePath": "internal/store/db.go",
+      "lineRange": [
+        13,
+        16
+      ],
+      "summary": "Thread-safe in-memory data store with RWMutex",
+      "tags": [],
+      "complexity": "low"
+    },
+    {
+      "id": "config:go.mod",
+      "type": "config",
+      "name": "go.mod",
+      "filePath": "go.mod",
+      "summary": "Go module definition for tiny-go",
+      "tags": [
+        "go",
+        "module",
+        "config"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:cmd/main.go",
+      "target": "function:cmd/main.go:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "function:internal/service/handler.go:NewHandler",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "function:internal/service/handler.go:Hello",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "function:internal/service/handler.go:ListItems",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "class:internal/service/handler.go:Handler",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/store/db.go",
+      "target": "function:internal/store/db.go:NewDB",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/store/db.go",
+      "target": "function:internal/store/db.go:All",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/store/db.go",
+      "target": "class:internal/store/db.go:DB",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:cmd/main.go",
+      "target": "file:internal/service/handler.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:cmd/main.go",
+      "target": "file:internal/store/db.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "file:internal/store/db.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "function:cmd/main.go:main",
+      "target": "function:internal/store/db.go:NewDB",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:cmd/main.go:main",
+      "target": "function:internal/service/handler.go:NewHandler",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/service/handler.go:ListItems",
+      "target": "function:internal/store/db.go:All",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ],
+  "layers": [],
+  "tour": []
+}
