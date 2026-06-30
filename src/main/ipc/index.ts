@@ -5,7 +5,8 @@
  * Renderer communicates exclusively through these channels.
  */
 import { ipcMain, BrowserWindow } from 'electron'
-import { join, existsSync, readFileSync } from 'node:path'
+import { join } from 'node:path'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { loadConfig, updateConfig } from '../config'
 import {
   listProjects,
@@ -14,9 +15,11 @@ import {
   updateProjectStatus,
   removeProject,
 } from '../db'
-import { readProjectTree, FileEntry } from '../file-tree'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { readProjectTree } from '../file-tree'
+import { cloneRepo } from '../git'
+import { indexProject } from '../ua/client'
+import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
+import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
 import { ipcOk, ipcErr } from '../../shared/ipc'
 
@@ -33,6 +36,22 @@ ipcMain.handle('config:get', (): IpcResult<unknown> => {
 ipcMain.handle('config:set', (_e, patch: Record<string, unknown>): IpcResult<unknown> => {
   try {
     return ipcOk(updateConfig(patch as never))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('config:llmStatus', (): IpcResult<unknown> => {
+  try {
+    return ipcOk({ configured: isLLMConfigured(), maskedKey: maskedApiKey() })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('config:uaRuntime', (): IpcResult<unknown> => {
+  try {
+    return ipcOk(buildUARuntimeConfig())
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }

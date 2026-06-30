@@ -1,7 +1,7 @@
 /**
  * Fieldguide App Shell — ui-spec v0.4, i18n enabled.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import ProjectLibrary from './views/ProjectLibrary/ProjectLibrary'
 import FileTree from './views/CodeMap/FileTree'
@@ -10,6 +10,7 @@ import GraphPanel from './views/CodeMap/GraphPanel'
 import CodeViewer from './views/CodeMap/CodeViewer'
 import ChatPanel from './views/CodeMap/ChatPanel'
 import OnboardingWizard from './views/OnboardingWizard'
+import CommandPalette from './views/CommandPalette'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
 
@@ -35,8 +36,12 @@ export default function App() {
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false)
   const [fileTreeWidth, setFileTreeWidth] = useState(260)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showPalette, setShowPalette] = useState(false)
+  const [indexing, setIndexing] = useState(false)
+  const [indexProgress, setIndexProgress] = useState('')
+  const [indexError, setIndexError] = useState<string | null>(null)
 
-  // Check onboarding status on mount
+  // Check onboarding
   useEffect(() => {
     window.fieldguide.configGet().then((r) => {
       if (r.ok && r.data && !(r.data as Record<string, unknown>).onboardingCompleted) {
@@ -45,11 +50,61 @@ export default function App() {
     })
   }, [])
 
+  // Ctrl+K
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowPalette((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   async function handleOnboardingComplete(locale: string, projectsRoot: string) {
     await window.fieldguide.configSet({ locale, projectsRoot, onboardingCompleted: true })
     i18n.changeLanguage(locale)
     setShowOnboarding(false)
   }
+
+  async function handleReIndex() {
+    if (!selectedProject) return
+    setIndexing(true)
+    setIndexError(null)
+    setIndexProgress('scan')
+    try {
+      const result = await window.fieldguide.projectIndex(selectedProject.id)
+      if (result.ok) {
+        setIndexing(false)
+        setIndexProgress('')
+        setSelectedProject((prev) => prev ? { ...prev, status: 'ready' } : null)
+      } else {
+        setIndexError(result.error?.message ?? '索引失败')
+        setIndexing(false)
+      }
+    } catch (err) {
+      setIndexError(String(err))
+      setIndexing(false)
+    }
+    // Refresh project list
+    const list = await window.fieldguide.projectList()
+    if (list.ok && list.data) {
+      const updated = list.data.find((p: Project) => p.id === selectedProject?.id) as Project | undefined
+      if (updated) setSelectedProject(updated)
+    }
+  }
+
+  // Command palette commands
+  const commands = [
+    { id: 'library', label: '项目库', shortcut: 'Tab', action: () => setActiveTab('library') },
+    ...(selectedProject ? [
+      { id: 'reindex', label: `重新索引: ${selectedProject.name}`, action: handleReIndex },
+      { id: 'codemap', label: '代码地图', shortcut: 'Tab', action: () => setActiveTab('codemap') },
+    ] : []),
+    { id: 'settings', label: '打开设置', action: () => { /* placeholder */ } },
+    { id: 'toggleTheme', label: '切换主题', action: () => { /* placeholder */ } },
+  ]
 
   const noProject = !selectedProject
 
@@ -134,11 +189,16 @@ export default function App() {
         </main>
       </div>
 
-      <StatusBar project={selectedProject} t={t} />
+      <StatusBar project={selectedProject} t={t} indexing={indexing} indexProgress={indexProgress} indexError={indexError} />
 
       {/* Onboarding overlay */}
       {showOnboarding && (
         <OnboardingWizard t={t} onComplete={handleOnboardingComplete} />
+      )}
+
+      {/* Command palette */}
+      {showPalette && (
+        <CommandPalette commands={commands} onClose={() => setShowPalette(false)} />
       )}
     </div>
   )
@@ -208,10 +268,22 @@ function TopBar({
   )
 }
 
-function StatusBar({ project, t }: { project: Project | null; t: (k: string) => string }) {
+function StatusBar({ project, t, indexing, indexProgress, indexError }: {
+  project: Project | null
+  t: (k: string) => string
+  indexing?: boolean
+  indexProgress?: string
+  indexError?: string | null
+}) {
   return (
     <footer className="h-6 flex items-center px-4 border-t border-[var(--fg-border)] bg-[var(--fg-card)] text-xs text-gray-400 shrink-0 select-none gap-3">
-      <span>{project ? project.status : t('status.ready')}</span>
+      {indexing ? (
+        <span className="text-yellow-600">⏳ 索引中… {indexProgress}</span>
+      ) : indexError ? (
+        <span className="text-red-500">❌ {indexError}</span>
+      ) : (
+        <span>{project ? project.status : t('status.ready')}</span>
+      )}
       {project?.node_count ? <span>· {t('status.nodes', { count: project.node_count })}</span> : null}
       {project ? <span>· {project.name}</span> : null}
       <span className="flex-1" />
