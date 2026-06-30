@@ -14,6 +14,7 @@ import OnboardingWizard from './views/OnboardingWizard'
 import CommandPalette from './views/CommandPalette'
 import SettingsPanel from './views/SettingsPanel'
 import CostDialog from './views/CostDialog'
+import TheoryView from './views/Theory/TheoryView'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
 
@@ -226,9 +227,7 @@ export default function App() {
               t={t}
             />
           )}
-          {activeTab === 'theory' && (
-            <PlaceholderView title={t('theory.title')} desc={t('theory.desc')} />
-          )}
+          {activeTab === 'theory' && <TheoryView t={t} />}
           {activeTab === 'bridge' && (
             <PlaceholderView title={t('bridge.title')} desc={t('bridge.desc')} />
           )}
