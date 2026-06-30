@@ -15,7 +15,7 @@ import {
   removeProject,
 } from '../db'
 import { readProjectTree, FileEntry } from '../file-tree'
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { IpcResult } from '../../shared/ipc'
 import { ipcOk, ipcErr } from '../../shared/ipc'
@@ -51,6 +51,24 @@ export function setDashboardUrl(url: string): void {
   dashboardUrl = url
 }
 
+function getLatestMtime(rootPath: string): string | null {
+  let latest = 0
+  function walk(dir: string) {
+    let entries: string[]
+    try { entries = readdirSync(dir) } catch { return }
+    for (const entry of entries) {
+      if (entry.startsWith('.')) continue
+      const full = join(dir, entry)
+      let st: ReturnType<typeof statSync>
+      try { st = statSync(full) } catch { continue }
+      if (st.isDirectory()) walk(full)
+      else if (st.isFile() && st.mtimeMs > latest) latest = st.mtimeMs
+    }
+  }
+  walk(rootPath)
+  return latest > 0 ? new Date(latest).toISOString() : null
+}
+
 ipcMain.handle('dashboard:url', (): string => {
   return dashboardUrl
 })
@@ -59,7 +77,24 @@ ipcMain.handle('dashboard:url', (): string => {
 
 ipcMain.handle('project:list', (): IpcResult<unknown[]> => {
   try {
-    return ipcOk(listProjects())
+    const projects = listProjects()
+    // Check staleness for each project
+    const enriched = projects.map((p) => {
+      if (p.status !== 'ready') return p
+      const graphPath = join(p.root_path, '.understand-anything', 'knowledge-graph.json')
+      if (!existsSync(graphPath)) return p
+      try {
+        const graph = JSON.parse(readFileSync(graphPath, 'utf-8'))
+        const indexedAt = graph?.project?.analyzedAt
+        if (!indexedAt) return p
+        const latestMtime = getLatestMtime(p.root_path)
+        if (latestMtime && new Date(latestMtime) > new Date(indexedAt)) {
+          return { ...p, status: 'stale' as const }
+        }
+      } catch { /* leave status as-is */ }
+      return p
+    })
+    return ipcOk(enriched)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }
