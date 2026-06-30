@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fieldguide base styles — see ui-spec.md §5 */
+:root {
+  --fg-bg: #fafafa;
+  --fg-card: #ffffff;
+  --fg-border: #e5e7eb;
+  --fg-text-primary: #111827;
+  --fg-text-secondary: #6b7280;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg-bg: #0f172a;
+    --fg-card: #1e293b;
+    --fg-border: #334155;
+    --fg-text-primary: #f8fafc;
+    --fg-text-secondary: #94a3b8;
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  background: var(--fg-bg);
+  color: var(--fg-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Prevent text selection on UI chrome */
+[role='toolbar'],
+header,
+footer {
+  user-select: none;
+  -webkit-user-select: none;
+}

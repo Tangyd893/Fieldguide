@@ -1,0 +1,41 @@
+{
+  "name": "fieldguide",
+  "version": "0.1.0",
+  "description": "Fieldguide — 把代码库变成可探索、可导览、可提问的知识地图",
+  "private": true,
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@electron-toolkit/utils": "^4.0.0",
+    "@understand-anything/core": "workspace:*",
+    "better-sqlite3": "^11.10.0",
+    "i18next": "^25.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^16.3.0",
+    "simple-git": "^3.28.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.4.1",
+    "autoprefixer": "^10.5.2",
+    "electron": "^33.4.0",
+    "electron-vite": "^5.0.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.0"
+  },
+  "ua": {
+    "repo": "https://github.com/Egonex-AI/Understand-Anything",
+    "commit": "54754a6f97051d1d76c8758353d8ea41afe502a6"
+  }
+}
