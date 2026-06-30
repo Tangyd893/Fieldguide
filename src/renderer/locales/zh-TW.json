@@ -1,0 +1,79 @@
+{
+  "app": {
+    "name": "Fieldguide",
+    "version": "v0.1.0"
+  },
+  "tabs": {
+    "library": "專案庫",
+    "codemap": "程式碼地圖",
+    "theory": "理論",
+    "bridge": "橋接"
+  },
+  "panels": {
+    "graph": "圖譜",
+    "code": "程式碼",
+    "chat": "問答"
+  },
+  "project": {
+    "emptyTitle": "加入你的第一個專案",
+    "emptyDesc": "Fieldguide 會分析專案原始碼並產生互動式知識圖譜",
+    "addLocal": "選擇本機資料夾",
+    "addGit": "從 Git URL 複製",
+    "addLocalTitle": "選擇本機資料夾",
+    "addGitTitle": "從 Git 複製",
+    "pathLabel": "專案路徑",
+    "gitUrlLabel": "Git URL",
+    "branchLabel": "分支（選填）",
+    "branchPlaceholder": "main",
+    "addProject": "加入專案",
+    "cancel": "取消",
+    "processing": "處理中…",
+    "localPathHint": "Fieldguide 不會複製原始碼，僅在專案目錄下產生 .understand-anything/ 索引檔。",
+    "status": {
+      "pending": "待索引",
+      "indexing": "索引中…",
+      "ready": "就緒",
+      "failed": "失敗",
+      "stale": "原始碼已更新"
+    },
+    "nodes": "{{count}} 個節點",
+    "indexedAt": "索引於 {{date}}"
+  },
+  "codeMap": {
+    "noProject": "請先在專案庫中加入專案",
+    "switchToLibrary": "切換到「專案庫」分頁開始",
+    "dashboardLoading": "載入 Dashboard…",
+    "dashboardUnavailable": "Dashboard 無法使用 — 請確認已建置 UA Dashboard",
+    "fileTreeSearch": "搜尋檔案…",
+    "noFiles": "無符合檔案",
+    "loading": "載入中…",
+    "clickToOpen": "點擊左側檔案樹開啟檔案",
+    "lines": "{{count}} 行",
+    "readError": "讀取失敗"
+  },
+  "chat": {
+    "title": "LLM 問答",
+    "placeholder": "Phase 2 開放 — 基於專案圖譜的智慧問答"
+  },
+  "theory": {
+    "title": "理論學習",
+    "desc": "arXiv / PDF / RAG（Phase 3）"
+  },
+  "bridge": {
+    "title": "概念橋接",
+    "desc": "論文 ↔ 程式碼節點（Phase 3）"
+  },
+  "status": {
+    "ready": "就緒",
+    "nodes": "{{count}} 節點"
+  },
+  "tooltip": {
+    "addProjectFirst": "請先加入專案",
+    "search": "搜尋 (Ctrl+K)",
+    "settings": "設定",
+    "expandFileTree": "展開檔案樹",
+    "collapseFileTree": "摺疊檔案樹",
+    "addPanel": "新增面板",
+    "closePanel": "關閉面板"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "app": {
+    "name": "Fieldguide",
+    "version": "v0.1.0"
+  },
+  "tabs": {
+    "library": "Projects",
+    "codemap": "Code Map",
+    "theory": "Theory",
+    "bridge": "Bridge"
+  },
+  "panels": {
+    "graph": "Graph",
+    "code": "Code",
+    "chat": "Chat"
+  },
+  "project": {
+    "emptyTitle": "Add your first project",
+    "emptyDesc": "Fieldguide analyzes source code and generates interactive knowledge graphs",
+    "addLocal": "Open Local Folder",
+    "addGit": "Clone from Git URL",
+    "addLocalTitle": "Open Local Folder",
+    "addGitTitle": "Clone from Git",
+    "pathLabel": "Project Path",
+    "gitUrlLabel": "Git URL",
+    "branchLabel": "Branch (optional)",
+    "branchPlaceholder": "main",
+    "addProject": "Add Project",
+    "cancel": "Cancel",
+    "processing": "Processing…",
+    "localPathHint": "Fieldguide does not copy source code. Only .understand-anything/ index files are created in the project directory.",
+    "status": {
+      "pending": "Pending",
+      "indexing": "Indexing…",
+      "ready": "Ready",
+      "failed": "Failed",
+      "stale": "Source Changed"
+    },
+    "nodes": "{{count}} nodes",
+    "indexedAt": "Indexed on {{date}}"
+  },
+  "codeMap": {
+    "noProject": "Add a project in the project library first",
+    "switchToLibrary": "Switch to the Projects tab to get started",
+    "dashboardLoading": "Loading Dashboard…",
+    "dashboardUnavailable": "Dashboard unavailable — make sure UA Dashboard is built",
+    "fileTreeSearch": "Search files…",
+    "noFiles": "No matching files",
+    "loading": "Loading…",
+    "clickToOpen": "Click a file in the explorer to open",
+    "lines": "{{count}} lines",
+    "readError": "Read error"
+  },
+  "chat": {
+    "title": "LLM Chat",
+    "placeholder": "Phase 2 — Smart Q&A based on project knowledge graph"
+  },
+  "theory": {
+    "title": "Theory",
+    "desc": "arXiv / PDF / RAG (Phase 3)"
+  },
+  "bridge": {
+    "title": "Concept Bridge",
+    "desc": "Paper ↔ Code nodes (Phase 3)"
+  },
+  "status": {
+    "ready": "Ready",
+    "nodes": "{{count}} nodes"
+  },
+  "tooltip": {
+    "addProjectFirst": "Add a project first",
+    "search": "Search (Ctrl+K)",
+    "settings": "Settings",
+    "expandFileTree": "Expand file explorer",
+    "collapseFileTree": "Collapse file explorer",
+    "addPanel": "Add panel",
+    "closePanel": "Close panel"
+  }
+}

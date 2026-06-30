@@ -1,0 +1,86 @@
+{
+  "app": {
+    "name": "Fieldguide",
+    "version": "v0.1.0"
+  },
+  "tabs": {
+    "library": "项目库",
+    "codemap": "代码地图",
+    "theory": "理论",
+    "bridge": "桥接"
+  },
+  "panels": {
+    "graph": "图谱",
+    "code": "代码",
+    "chat": "问答"
+  },
+  "project": {
+    "emptyTitle": "添加你的第一个项目",
+    "emptyDesc": "Fieldguide 会分析项目源码并生成交互式知识图谱",
+    "addLocal": "选择本地文件夹",
+    "addGit": "从 Git URL 克隆",
+    "addLocalTitle": "选择本地文件夹",
+    "addGitTitle": "从 Git 克隆",
+    "pathLabel": "项目路径",
+    "gitUrlLabel": "Git URL",
+    "branchLabel": "分支（可选）",
+    "branchPlaceholder": "main",
+    "addProject": "添加项目",
+    "cancel": "取消",
+    "processing": "处理中…",
+    "localPathHint": "Fieldguide 不会复制源码，仅在项目目录下生成 .understand-anything/ 索引文件。",
+    "status": {
+      "pending": "待索引",
+      "indexing": "索引中…",
+      "ready": "就绪",
+      "failed": "失败",
+      "stale": "源码已更新"
+    },
+    "nodes": "{{count}} 个节点",
+    "indexedAt": "索引于 {{date}}"
+  },
+  "codeMap": {
+    "noProject": "请先在项目库中添加项目",
+    "switchToLibrary": "切换到「项目库」Tab 开始",
+    "dashboardLoading": "加载 Dashboard…",
+    "dashboardUnavailable": "Dashboard 不可用 — 请确保已构建 UA Dashboard",
+    "fileTreeSearch": "搜索文件…",
+    "noFiles": "无匹配文件",
+    "loading": "加载中…",
+    "clickToOpen": "点击左侧文件树打开文件",
+    "lines": "{{count}} 行",
+    "readError": "读取失败"
+  },
+  "chat": {
+    "title": "LLM 问答",
+    "placeholder": "Phase 2 开放 — 基于项目图谱的智能问答"
+  },
+  "theory": {
+    "title": "理论学习",
+    "desc": "arXiv / PDF / RAG（Phase 3）"
+  },
+  "bridge": {
+    "title": "概念桥接",
+    "desc": "论文 ↔ 代码节点（Phase 3）"
+  },
+  "status": {
+    "ready": "就绪",
+    "nodes": "{{count}} 节点"
+  },
+  "tooltip": {
+    "addProjectFirst": "请先添加项目",
+    "search": "搜索 (Ctrl+K)",
+    "settings": "设置",
+    "expandFileTree": "展开文件树",
+    "collapseFileTree": "折叠文件树",
+    "addPanel": "添加面板",
+    "closePanel": "关闭面板"
+  },
+  "settings": {
+    "title": "设置",
+    "llm": "LLM",
+    "general": "通用",
+    "language": "界面语言",
+    "theme": "主题"
+  }
+}
