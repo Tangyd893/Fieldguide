@@ -41,6 +41,10 @@ const api = {
   fileRead: (projectId: string, filePath: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('file:read', { projectId, filePath }),
 
+  // Shell
+  openInExplorer: (projectId: string, filePath: string): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('shell:openPath', { projectId, filePath }),
+
   // App
   appVersion: (): Promise<string> =>
     ipcRenderer.invoke('app:version'),

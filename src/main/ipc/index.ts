@@ -4,7 +4,7 @@
  * Registers all invoke handlers and event emitters.
  * Renderer communicates exclusively through these channels.
  */
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { loadConfig, updateConfig } from '../config'
@@ -95,6 +95,17 @@ ipcMain.handle('dashboard:url', (): string => {
 
 ipcMain.handle('dashboard:setProject', (_e, { projectRoot }: { projectRoot: string | null }): void => {
   setDashboardGraph(projectRoot)
+})
+
+/* ──────────── Shell ──────────── */
+
+ipcMain.handle('shell:openPath', async (_e, { projectId, filePath }: { projectId: string; filePath: string }): Promise<IpcResult<null>> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', '项目不存在')
+  const fullPath = join(project.root_path, filePath)
+  const result = await shell.openPath(fullPath)
+  if (result) return ipcErr('UNKNOWN', result)
+  return ipcOk(null)
 })
 
 /* ──────────── Projects ──────────── */
