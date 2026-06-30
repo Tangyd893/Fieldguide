@@ -7,16 +7,29 @@ import ProjectLibrary from './views/ProjectLibrary/ProjectLibrary'
 import FileTree from './views/CodeMap/FileTree'
 import SplitPanel from './views/CodeMap/SplitPanel'
 import GraphPanel from './views/CodeMap/GraphPanel'
+import { type DashboardMessage, dashboardSelectNode } from './views/CodeMap/GraphPanel'
 import CodeViewer from './views/CodeMap/CodeViewer'
 import ChatPanel from './views/CodeMap/ChatPanel'
 import TourPanel from './views/CodeMap/TourPanel'
+import NodeSearchBar from './views/CodeMap/NodeSearchBar'
 import OnboardingWizard from './views/OnboardingWizard'
 import CommandPalette from './views/CommandPalette'
 import SettingsPanel from './views/SettingsPanel'
 import CostDialog from './views/CostDialog'
 import TheoryView from './views/Theory/TheoryView'
+import BridgeView from './views/Bridge/BridgeView'
+import { useToast, ToastContainer, showToast } from './views/Toast'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
+
+/** Apply theme to <html> element. Call on mount and after settings save. */
+export function applyTheme(theme: string): void {
+  if (theme === 'light' || theme === 'dark') {
+    document.documentElement.dataset.theme = theme
+  } else {
+    delete document.documentElement.dataset.theme
+  }
+}
 
 interface Project {
   id: string
@@ -47,6 +60,31 @@ export default function App() {
   const [indexError, setIndexError] = useState<string | null>(null)
   const [showCostDialog, setShowCostDialog] = useState(false)
   const [pendingIndex, setPendingIndex] = useState<string | null>(null)
+  const { toasts, removeToast } = useToast()
+
+  // Apply saved theme on mount
+  useEffect(() => {
+    window.fieldguide.configGet().then((r) => {
+      if (r.ok && r.data) {
+        const cfg = r.data as Record<string, unknown>
+        const theme = cfg.theme as string | undefined
+        applyTheme(theme || 'system')
+
+        // Restore last project and tab
+        const lastProjectId = cfg.lastProjectId as string | undefined
+        const lastTab = cfg.lastTab as Tab | undefined
+        if (lastTab) setActiveTab(lastTab)
+        if (lastProjectId) {
+          window.fieldguide.projectList().then((list) => {
+            if (list.ok && list.data) {
+              const found = list.data.find((p: Project) => p.id === lastProjectId)
+              if (found) setSelectedProject(found)
+            }
+          })
+        }
+      }
+    })
+  }, [])
 
   // Check onboarding
   useEffect(() => {
@@ -78,13 +116,65 @@ export default function App() {
     }
   }, [selectedProject?.id])
 
+  // Persist last active tab
+  useEffect(() => {
+    window.fieldguide.configSet({ lastTab: activeTab } as never).catch(() => {})
+  }, [activeTab])
+
+  // Persist last selected project
+  useEffect(() => {
+    if (selectedProject) {
+      window.fieldguide.configSet({ lastProjectId: selectedProject.id } as never).catch(() => {})
+    }
+  }, [selectedProject?.id])
+
   async function handleOnboardingComplete(locale: string, projectsRoot: string) {
     await window.fieldguide.configSet({ locale, projectsRoot, onboardingCompleted: true })
     i18n.changeLanguage(locale)
     setShowOnboarding(false)
   }
 
-  async function handleReIndex() {
+  async function handleOnboardingStart(option: 'demo' | 'local' | 'skip', locale: string, projectsRoot: string) {
+    // Complete onboarding first
+    await window.fieldguide.configSet({ locale, projectsRoot, onboardingCompleted: true })
+    i18n.changeLanguage(locale)
+    setShowOnboarding(false)
+
+    // Handle the selected option
+    switch (option) {
+      case 'demo': {
+        const demoUrl = 'https://github.com/fieldguide-app/fieldguide-demo'
+        const result = await window.fieldguide.projectAddGit(demoUrl)
+        if (result.ok && result.data) {
+          const project = result.data as Project
+          setSelectedProject(project)
+          setActiveTab('codemap')
+          // Auto-index the demo project
+          setTimeout(() => doIndex(project.id, project.name), 500)
+        } else {
+          showToast('error', result.error?.message ?? 'Demo 克隆失败，请检查网络后重试')
+        }
+        break
+      }
+      case 'local': {
+        const folderResult = await window.fieldguide.openFolderDialog?.()
+        if (folderResult?.ok && folderResult.data) {
+          const result = await window.fieldguide.projectAddLocal(folderResult.data)
+          if (result.ok && result.data) {
+            const project = result.data as Project
+            setSelectedProject(project)
+            setActiveTab('codemap')
+          }
+        }
+        break
+      }
+      case 'skip':
+        // Just go to library
+        break
+    }
+  }
+
+  async function handleReIndex(incremental = false) {
     if (!selectedProject) return
 
     // Check if LLM is configured — show cost dialog
@@ -98,15 +188,15 @@ export default function App() {
       return
     }
 
-    doIndex(selectedProject.id, selectedProject.name)
+    doIndex(selectedProject.id, selectedProject.name, incremental)
   }
 
-  async function doIndex(projectId: string, _projectName: string) {
+  async function doIndex(projectId: string, _projectName: string, incremental = false) {
     setShowCostDialog(false)
     setPendingIndex(null)
     setIndexing(true)
     setIndexError(null)
-    setIndexProgress('scan')
+    setIndexProgress(incremental ? 'scan-changed' : 'scan')
 
     // Listen for progress events
     const unsub = window.fieldguide.onIndexProgress?.((data: unknown) => {
@@ -116,15 +206,17 @@ export default function App() {
       else if (ev.type === 'complete') {
         setIndexing(false)
         setIndexProgress('')
+        showToast('success', `索引完成 — ${ev.nodeCount ?? '?'} 个节点`)
         setSelectedProject((prev) => prev ? { ...prev, status: 'ready', node_count: ev.nodeCount ?? prev.node_count } : null)
       } else if (ev.type === 'error') {
         setIndexError(ev.error ?? '索引失败')
         setIndexing(false)
+        showToast('error', ev.error ?? '索引失败')
       }
     })
 
     try {
-      const result = await window.fieldguide.projectIndex(projectId)
+      const result = await window.fieldguide.projectIndex(projectId, incremental)
       if (!result.ok) {
         setIndexError(result.error?.message ?? '索引失败')
         setIndexing(false)
@@ -148,10 +240,39 @@ export default function App() {
     ...(selectedProject ? [
       { id: 'reindex', label: `重新索引: ${selectedProject.name}`, action: handleReIndex },
       { id: 'codemap', label: '代码地图', shortcut: 'Tab', action: () => setActiveTab('codemap') },
+      { id: 'openFolder', label: `在资源管理器打开项目`, action: () => window.fieldguide.openInExplorer(selectedProject.id, '.') },
     ] : []),
     { id: 'settings', label: '打开设置', action: () => setShowSettings(true) },
-    { id: 'toggleTheme', label: '切换主题', action: () => { /* placeholder */ } },
+    { id: 'toggleTheme', label: '切换主题 (亮/暗)', action: () => {
+      const current = document.documentElement.dataset.theme
+      const next = current === 'dark' ? 'light' : 'dark'
+      applyTheme(next)
+    }},
   ]
+
+  // Handle messages from the Dashboard iframe
+  function handleDashboardMessage(msg: DashboardMessage) {
+    switch (msg.type) {
+      case 'nodeSelected': {
+        // Dashboard selected a node — sync to shell: open the file
+        if (msg.nodeId && selectedProject) {
+          window.fieldguide.graphGet(selectedProject.id).then(r => {
+            if (r.ok && r.data) {
+              const g = r.data as { nodes?: Array<{ id: string; filePath?: string }> }
+              const node = (g.nodes || []).find(n => n.id === msg.nodeId)
+              if (node?.filePath) {
+                setActiveFilePath(node.filePath)
+              }
+            }
+          })
+        }
+        break
+      }
+      case 'tourStepChanged':
+        // Dashboard advanced tour — update TourPanel (it reads from graph, no direct state needed)
+        break
+    }
+  }
 
   const noProject = !selectedProject
 
@@ -164,7 +285,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen bg-[var(--fg-bg)] text-[var(--fg-text-primary)]">
-      <TopBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} t={t} />
+      <TopBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} onSettings={() => setShowSettings(true)} t={t} />
 
       <div className="flex-1 flex overflow-hidden">
         {activeTab === 'codemap' && !fileTreeCollapsed && (
@@ -217,19 +338,33 @@ export default function App() {
                 setSelectedProject(p)
                 if (p) setActiveTab('codemap')
               }}
+              onIndex={async (projectId) => {
+                // For stale projects, do incremental; for pending/failed, do full
+                const list = await window.fieldguide.projectList()
+                const p = list.ok ? (list.data as Project[] | undefined)?.find(x => x.id === projectId) : undefined
+                if (p) doIndex(p.id, p.name, p.status === 'stale')
+              }}
               t={t}
             />
           )}
           {activeTab === 'codemap' && (
-            <CodeMapLayout
-              project={selectedProject}
-              activeFilePath={activeFilePath}
-              t={t}
-            />
+            <div className="h-full flex flex-col">
+              <NodeSearchBar projectId={selectedProject?.id ?? ''} onNodeSelect={(nodeId, filePath) => {
+                if (filePath) setActiveFilePath(filePath)
+              }} t={t} />
+              <div className="flex-1 overflow-hidden">
+                <CodeMapLayout
+                  project={selectedProject}
+                  activeFilePath={activeFilePath}
+                  t={t}
+                  onDashboardMessage={handleDashboardMessage}
+                />
+              </div>
+            </div>
           )}
-          {activeTab === 'theory' && <TheoryView t={t} />}
+          {activeTab === 'theory' && <TheoryView t={t} projectId={selectedProject?.id} />}
           {activeTab === 'bridge' && (
-            <PlaceholderView title={t('bridge.title')} desc={t('bridge.desc')} />
+            <BridgeView t={t} projectId={selectedProject?.id} />
           )}
         </main>
       </div>
@@ -238,11 +373,66 @@ export default function App() {
 
       {/* Onboarding overlay */}
       {showOnboarding && (
-        <OnboardingWizard t={t} onComplete={handleOnboardingComplete} />
+        <OnboardingWizard t={t} onComplete={handleOnboardingComplete} onStartOption={handleOnboardingStart} />
       )}
 
       {/* Command palette */}
-      {showPalette && (
+      {showPalette && selectedProject && (
+        <CommandPalette
+          commands={commands}
+          onClose={() => setShowPalette(false)}
+          onFileSelect={(filePath) => {
+            setActiveFilePath(filePath)
+            setActiveTab('codemap')
+            setFileTreeCollapsed(false)
+          }}
+          searchFiles={async (q: string) => {
+            const r = await window.fieldguide.fileTree(selectedProject.id)
+            if (!r.ok || !r.data) return []
+            const results: Array<{ path: string; name: string }> = []
+            const walk = (entries: unknown[], depth = 0) => {
+              for (const e of entries) {
+                const entry = e as Record<string, unknown>
+                const name = entry.name as string
+                const path = entry.path as string
+                if (!entry.isDirectory && name.toLowerCase().includes(q.toLowerCase())) {
+                  results.push({ path, name })
+                }
+                if (Array.isArray(entry.children) && depth < 5) walk(entry.children as unknown[], depth + 1)
+              }
+            }
+            walk(r.data as unknown[])
+            return results.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)
+          }}
+          searchNodes={async (q: string) => {
+            const r = await window.fieldguide.graphGet(selectedProject.id)
+            if (!r.ok || !r.data) return []
+            const g = r.data as { nodes?: Array<{ id: string; label?: string; type?: string; filePath?: string }> }
+            const ql = q.toLowerCase()
+            return (g.nodes || [])
+              .filter(n => (n.label || n.id).toLowerCase().includes(ql))
+              .slice(0, 8)
+              .map(n => ({ id: n.id, label: n.label || n.id, type: n.type || 'unknown', filePath: n.filePath }))
+          }}
+          onNodeSelect={(nodeId: string) => {
+            // Highlight node in Dashboard via postMessage
+            dashboardSelectNode(nodeId)
+            // Also open the node's file in the code viewer
+            window.fieldguide.graphGet(selectedProject.id).then(r => {
+              if (r.ok && r.data) {
+                const g = r.data as { nodes?: Array<{ id: string; filePath?: string }> }
+                const node = (g.nodes || []).find(n => n.id === nodeId)
+                if (node?.filePath) {
+                  setActiveFilePath(node.filePath)
+                  setActiveTab('codemap')
+                  setFileTreeCollapsed(false)
+                }
+              }
+            })
+          }}
+        />
+      )}
+      {showPalette && !selectedProject && (
         <CommandPalette commands={commands} onClose={() => setShowPalette(false)} />
       )}
 
@@ -252,9 +442,11 @@ export default function App() {
       )}
 
       {/* LLM Cost Dialog */}
-      {showCostDialog && (
+      {showCostDialog && selectedProject && (
         <CostDialog
           t={t}
+          projectId={selectedProject.id}
+          projectName={selectedProject.name}
           onCancel={() => { setShowCostDialog(false); setPendingIndex(null) }}
           onContinue={() => {
             if (pendingIndex) {
@@ -263,7 +455,7 @@ export default function App() {
             }
           }}
           onSkipLLM={() => {
-            // TODO: skip LLM phases, do structural-only index
+            // Skip LLM phases, do structural-only index
             if (pendingIndex) {
               const p = selectedProject
               if (p) doIndex(p.id, p.name)
@@ -279,10 +471,12 @@ function CodeMapLayout({
   project,
   activeFilePath,
   t,
+  onDashboardMessage,
 }: {
   project: Project | null
   activeFilePath?: string
   t: (key: string) => string
+  onDashboardMessage?: (msg: DashboardMessage) => void
 }) {
   if (!project) {
     return (
@@ -293,9 +487,9 @@ function CodeMapLayout({
   }
   return (
     <SplitPanel
-      renderGraph={() => <GraphPanel t={t} />}
+      renderGraph={() => <GraphPanel t={t} projectRoot={project.root_path} onDashboardMessage={onDashboardMessage} />}
       renderCode={(path) => <CodeViewer projectId={project.id} filePath={path} t={t} />}
-      renderChat={() => <ChatPanel t={t} />}
+      renderChat={() => <ChatPanel projectId={project.id} projectName={project.name} t={t} />}
       renderTour={() => <TourPanel projectId={project.id} t={t} />}
       activeFilePath={activeFilePath}
       t={t}
@@ -304,11 +498,12 @@ function CodeMapLayout({
 }
 
 function TopBar({
-  tabs, activeTab, onTabChange, t,
+  tabs, activeTab, onTabChange, onSettings, t,
 }: {
   tabs: { id: Tab; label: string; disabled?: boolean }[]
   activeTab: Tab
   onTabChange: (t: Tab) => void
+  onSettings: () => void
   t: (k: string) => string
 }) {
   return (
@@ -335,14 +530,14 @@ function TopBar({
       </nav>
       <div className="flex-1" />
       <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded" title={t('tooltip.search')}>🔍</button>
-      <button onClick={() => setShowSettings(true)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded ml-1" title={t('tooltip.settings')}>⚙</button>
+      <button onClick={onSettings} className="p-1.5 text-gray-400 hover:text-gray-600 rounded ml-1" title={t('tooltip.settings')}>⚙</button>
     </header>
   )
 }
 
 function StatusBar({ project, t, indexing, indexProgress, indexError }: {
   project: Project | null
-  t: (k: string) => string
+  t: (k: string, opts?: Record<string, unknown>) => string
   indexing?: boolean
   indexProgress?: string
   indexError?: string | null
@@ -361,16 +556,5 @@ function StatusBar({ project, t, indexing, indexProgress, indexError }: {
       <span className="flex-1" />
       <span>{t('app.name')} {t('app.version')}</span>
     </footer>
-  )
-}
-
-function PlaceholderView({ title, desc }: { title: string; desc: string }) {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <div className="border-2 border-dashed border-gray-200 rounded-lg p-12 text-center text-gray-300">
-        <p className="text-lg mb-2">{title}</p>
-        <p className="text-sm">{desc}</p>
-      </div>
-    </div>
   )
 }

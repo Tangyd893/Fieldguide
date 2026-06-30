@@ -7,11 +7,12 @@ interface Props {
   renderGraph: () => React.ReactNode
   renderCode: (filePath?: string) => React.ReactNode
   renderChat: () => React.ReactNode
+  renderTour?: () => React.ReactNode
   activeFilePath?: string
   t: (key: string) => string
 }
 
-export default function SplitPanel({ renderGraph, renderCode, renderChat, activeFilePath, t }: Props) {
+export default function SplitPanel({ renderGraph, renderCode, renderChat, renderTour, activeFilePath, t }: Props) {
   const [panels, setPanels] = useState<PanelState[]>([{ tabs: ['graph', 'code', 'chat', 'tour'], activeTab: 'graph' }])
   const [splitPos, setSplitPos] = useState(50)
   const containerRef = useRef<HTMLDivElement>(null)

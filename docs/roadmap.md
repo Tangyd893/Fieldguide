@@ -1,6 +1,6 @@
 # Fieldguide 路线图
 
-> 版本：v0.3 | 状态：设计定稿（Phase 0，已纳入 Understand-Anything 集成）
+> 版本：v0.4 | 状态：Phase 1 近完成，Phase 2 智能层进行中
 
 ---
 
@@ -9,10 +9,10 @@
 | Phase | 名称 | 目标 | 周期（估） | 状态 |
 |-------|------|------|-----------|------|
 | 0 | 设计 | 产品与技术文档定稿（含 UA 集成） | 1 周 | ✅ 完成 |
-| 1 | 桌面壳 + UA 集成 | Electron 脚手架、项目库、嵌入 UA 图谱 | 3–4 周 | 未开始 |
-| 2 | 智能层打通 | LLM 配置桥接、Tour/聊天/diff 桌面化 | 3–4 周 | 未开始 |
-| 3 | 理论 + 桥接 | 论文/PDF 与代码对照 | 4–5 周 | 未开始 |
-| 4 | 发布 | 安装包、体验 polish、上游同步 | 持续 | 未开始 |
+| 1 | 桌面壳 + UA 集成 | Electron 脚手架、项目库、嵌入 UA 图谱 | 3–4 周 | ✅ 完成 |
+| 2 | 智能层打通 | LLM 配置桥接、Tour/聊天/diff 桌面化 | 3–4 周 | 🔵 进行中 |
+| 3 | 理论 + 桥接 | 论文/PDF 与代码对照 | 4–5 周 | 🔵 进行中 |
+| 4 | 发布 | 安装包、体验 polish、上游同步 | 持续 | ⬜ 未开始 |
 
 **原则**：体验打磨优先；**复用 UA 已有能力，不重复造轮子**；每 Phase 结束有可演示的完整用户路径。
 
@@ -107,17 +107,17 @@ Phase 1 第 0 周：UA 集成 Spike → 任务 1.0 / 1.1
 
 | ID | 任务 | 验收标准 |
 |----|------|---------|
-| 2.1 | `config-bridge.ts` LLM 同步至 UA | 设置页测试连接后 UA 索引可用 |
-| 2.2 | locale → UA language 映射 | 简中 UI + 中文摘要/Tour |
-| 2.3 | Tour 在 Dashboard 内可播放 | ≥1 条 Tour 步骤可前进/后退 |
-| 2.4 | 集成 UA 代码问答 | 右栏或 Dashboard 内提问有节点引用 |
-| 2.5 | 语义搜索可用 | 「入口在哪」类问题有合理结果 |
+| 2.1 | `config-bridge.ts` LLM 同步至 UA | ✅ 设置页测试连接后 UA 索引可用 |
+| 2.2 | locale → UA language 映射 | ✅ 简中 UI + 中文摘要/Tour |
+| 2.3 | Tour 在 Dashboard 内可播放 | ✅ LLM 生成 Tour，Dashboard 内可导航 |
+| 2.4 | 集成 UA 代码问答 | ✅ 右栏 ChatPanel 提问有节点引用 |
+| 2.5 | 语义搜索可用 | ✅ NodeSearchBar 搜索函数/类/文件 |
 | 2.6 | `/understand-diff` 等价集成 | 修改文件后影响节点高亮 |
 | 2.7 | 增量索引 UI | 「更新索引」仅处理变更文件 |
 | 2.8 | LLM 成本提示 | 全量索引前 token 预估 |
-| 2.9 | 左栏 Tour 列表与 Dashboard 联动 | postMessage / IPC 同步当前步骤 |
+| 2.9 | 左栏 Tour 列表与 Dashboard 联动 | ✅ postMessage 同步当前步骤 |
 | 2.10 | 领域视图（UA domain） | 业务域 Tab 或 Dashboard 内切换 |
-| 2.11 | Ctrl+K 跳节点 / 开始 Tour | `graph:search` 包装 UA + postMessage 通知 Dashboard |
+| 2.11 | Ctrl+K 跳节点 / 开始 Tour | ✅ Ctrl+K 搜索节点 + postMessage 通知 Dashboard |
 
 ### 用户路径（Demo）
 
@@ -147,7 +147,7 @@ Phase 1 第 0 周：UA 集成 Spike → 任务 1.0 / 1.1
 | 3.2 | PDF 导入 + 分块 + LanceDB | 10MB PDF < 1 分钟 |
 | 3.3 | 论文 RAG + query_paper | 命中正确段落 |
 | 3.4 | PDF 阅读器 + 笔记 | 高亮持久化 |
-| 3.5 | 概念桥接 UI + concept_links | 手动关联论文段落与 UA node id |
+| 3.5 | 概念桥接 UI + concept_links | ✅ 手动关联论文段落与 UA node id |
 | 3.6 | 扩展 Agent：link_concept + 对照 Tour | ≥3 步对照 Tour |
 | 3.7 | 理论 Tab 与代码地图平等导航 | 顶栏无主次差异 |
 | 3.8 | 跨源 Agent | 同时引用论文 chunk 与代码节点 |
@@ -221,9 +221,9 @@ Week 15+      Phase 4 发布
 ## Phase 1 启动清单
 
 - [x] 设计文档定稿（含 UA 集成）
-- [ ] clone [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)，完成 Spike（integration §九）
-- [ ] Node.js LTS + pnpm + Windows 构建环境
-- [ ] Git 仓库 init（Fieldguide 目录）
+- [x] clone [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)，完成 Spike（integration §九）
+- [x] Node.js LTS + pnpm + Windows 构建环境
+- [x] Git 仓库 init（Fieldguide 目录）
 - [ ] `fieldguide-demo` 仓库创建
 
 确认后执行 **0.0 Spike** → **1.1 脚手架**。详见 [getting-started.md](./getting-started.md)。

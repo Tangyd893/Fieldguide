@@ -11,8 +11,18 @@
   --fg-text-secondary: #6b7280;
 }
 
+/* Explicit dark theme (overrides system preference) */
+:root[data-theme="dark"] {
+  --fg-bg: #0f172a;
+  --fg-card: #1e293b;
+  --fg-border: #334155;
+  --fg-text-primary: #f8fafc;
+  --fg-text-secondary: #94a3b8;
+}
+
+/* System-preference dark (only when no explicit theme set) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --fg-bg: #0f172a;
     --fg-card: #1e293b;
     --fg-border: #334155;
@@ -41,4 +51,20 @@ header,
 footer {
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* Toast animation */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.2s ease-out;
 }

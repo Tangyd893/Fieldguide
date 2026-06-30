@@ -4,9 +4,9 @@
  * Registers all invoke handlers and event emitters.
  * Renderer communicates exclusively through these channels.
  */
-import { ipcMain, BrowserWindow, shell } from 'electron'
+import { ipcMain, BrowserWindow, shell, app } from 'electron'
 import { join } from 'node:path'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs'
 import { loadConfig, updateConfig } from '../config'
 import {
   listProjects,
@@ -14,12 +14,32 @@ import {
   insertProject,
   updateProjectStatus,
   removeProject,
+  listPapers,
+  getPaper,
+  getPaperByArxivId,
+  insertPaper,
+  updatePaper,
+  removePaper,
+  listConceptLinks,
+  insertConceptLink,
+  removeConceptLink,
 } from '../db'
+import type { PaperRow } from '../db'
 import { readProjectTree } from '../file-tree'
 import { cloneRepo } from '../git'
 import { indexProject } from '../ua/client'
 import { setDashboardGraph } from '../ua/dashboard'
 import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
+import {
+  loadGraph,
+  getNode,
+  getNeighbors,
+  searchNodes,
+  getNodeSource,
+  getGraphStats,
+  isGraphStale,
+} from '../ua/graph-reader'
+import { logInfo, logError, logIndexStart, logIndexComplete, logIndexError, logChatRequest } from '../logger'
 import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
 import { ipcOk, ipcErr } from '../../shared/ipc'
@@ -58,6 +78,35 @@ ipcMain.handle('config:uaRuntime', (): IpcResult<unknown> => {
   }
 })
 
+ipcMain.handle('config:testLlm', async (): Promise<IpcResult<unknown>> => {
+  const config = loadConfig()
+  if (!isLLMConfigured()) {
+    return ipcErr('LLM_NOT_CONFIGURED', '请先配置 LLM', true)
+  }
+  const url = `${config.llm.baseUrl}/v1/chat/completions`
+    .replace(/\/+$/, '')
+    .replace(/\/v1\/chat\/completions\/v1\/chat\/completions/, '/v1/chat/completions')
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.llm.apiKey}` },
+      body: JSON.stringify({
+        model: config.llm.chatModel,
+        messages: [{ role: 'user', content: 'Hi' }],
+        max_tokens: 5,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '')
+      return ipcErr('LLM_API_ERROR', `API 返回 ${resp.status}: ${text.slice(0, 200)}`, true)
+    }
+    return ipcOk({ ok: true })
+  } catch (err) {
+    return ipcErr('LLM_API_ERROR', `连接失败: ${err instanceof Error ? err.message : String(err)}`, true)
+  }
+})
+
 /* ──────────── App ──────────── */
 
 ipcMain.handle('app:version', (): string => {
@@ -69,24 +118,6 @@ let dashboardUrl = ''
 
 export function setDashboardUrl(url: string): void {
   dashboardUrl = url
-}
-
-function getLatestMtime(rootPath: string): string | null {
-  let latest = 0
-  function walk(dir: string) {
-    let entries: string[]
-    try { entries = readdirSync(dir) } catch { return }
-    for (const entry of entries) {
-      if (entry.startsWith('.')) continue
-      const full = join(dir, entry)
-      let st: ReturnType<typeof statSync>
-      try { st = statSync(full) } catch { continue }
-      if (st.isDirectory()) walk(full)
-      else if (st.isFile() && st.mtimeMs > latest) latest = st.mtimeMs
-    }
-  }
-  walk(rootPath)
-  return latest > 0 ? new Date(latest).toISOString() : null
 }
 
 ipcMain.handle('dashboard:url', (): string => {
@@ -108,25 +139,45 @@ ipcMain.handle('shell:openPath', async (_e, { projectId, filePath }: { projectId
   return ipcOk(null)
 })
 
+ipcMain.handle('shell:openFile', async (_e, { filePath }: { filePath: string }): Promise<IpcResult<null>> => {
+  try {
+    const result = await shell.openPath(filePath)
+    if (result) return ipcErr('UNKNOWN', result)
+    return ipcOk(null)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('dialog:openFolder', async (): Promise<IpcResult<string | null>> => {
+  const { dialog } = await import('electron')
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) return ipcErr('UNKNOWN', '没有可用窗口')
+  try {
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory'],
+      title: '选择项目文件夹',
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return ipcOk(null)
+    }
+    return ipcOk(result.filePaths[0])
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
 /* ──────────── Projects ──────────── */
 
 ipcMain.handle('project:list', (): IpcResult<unknown[]> => {
   try {
     const projects = listProjects()
-    // Check staleness for each project
+    // Check staleness for each project using graph-reader
     const enriched = projects.map((p) => {
       if (p.status !== 'ready') return p
-      const graphPath = join(p.root_path, '.understand-anything', 'knowledge-graph.json')
-      if (!existsSync(graphPath)) return p
-      try {
-        const graph = JSON.parse(readFileSync(graphPath, 'utf-8'))
-        const indexedAt = graph?.project?.analyzedAt
-        if (!indexedAt) return p
-        const latestMtime = getLatestMtime(p.root_path)
-        if (latestMtime && new Date(latestMtime) > new Date(indexedAt)) {
-          return { ...p, status: 'stale' as const }
-        }
-      } catch { /* leave status as-is */ }
+      if (isGraphStale(p.root_path)) {
+        return { ...p, status: 'stale' as const }
+      }
       return p
     })
     return ipcOk(enriched)
@@ -203,19 +254,100 @@ ipcMain.handle('project:remove', (_e, { id }: { id: string }): IpcResult<null> =
 
 ipcMain.handle('graph:get', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
   const project = getProject(projectId)
-  if (!project) {
-    return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  const graph = loadGraph(project.root_path)
+  if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+
+  return ipcOk(graph)
+})
+
+ipcMain.handle('graph:getNode', (_e, { projectId, nodeId }: { projectId: string; nodeId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  const graph = loadGraph(project.root_path)
+  if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+
+  const node = getNode(graph, nodeId)
+  if (!node) return ipcErr('UNKNOWN', `节点 ${nodeId} 不存在`)
+
+  return ipcOk(node)
+})
+
+ipcMain.handle('graph:neighbors', (_e, { projectId, nodeId, depth }: { projectId: string; nodeId: string; depth?: number }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  const graph = loadGraph(project.root_path)
+  if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+
+  const result = getNeighbors(graph, nodeId, depth ?? 1)
+  return ipcOk(result)
+})
+
+ipcMain.handle('graph:search', (_e, { projectId, query }: { projectId: string; query: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  const graph = loadGraph(project.root_path)
+  if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+
+  const nodes = searchNodes(graph, query)
+  return ipcOk(nodes)
+})
+
+ipcMain.handle('graph:getSource', (_e, { projectId, nodeId, path, lineStart, lineEnd }: {
+  projectId: string; nodeId?: string; path?: string; lineStart?: number; lineEnd?: number
+}): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  // If path is provided directly, read that file
+  if (path) {
+    const fullPath = join(project.root_path, path)
+    if (!existsSync(fullPath)) return ipcErr('SOURCE_UNAVAILABLE', `文件不存在: ${path}`)
+    try {
+      const content = readFileSync(fullPath, 'utf-8')
+      const lines = content.split('\n')
+      const start = Math.max(0, (lineStart ?? 1) - 1)
+      const end = Math.min(lines.length, lineEnd ?? lines.length)
+      return ipcOk({
+        content: lines.slice(start, end).join('\n'),
+        lineStart: start + 1,
+        lineEnd: end,
+        path,
+      })
+    } catch (err) {
+      return ipcErr('PARSE_ERROR', String(err))
+    }
   }
-  const graphPath = join(project.root_path, '.understand-anything', 'knowledge-graph.json')
-  if (!existsSync(graphPath)) {
-    return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+
+  // If nodeId is provided, look up the node and read its source
+  if (nodeId) {
+    const graph = loadGraph(project.root_path)
+    if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+
+    const node = getNode(graph, nodeId)
+    if (!node) return ipcErr('UNKNOWN', `节点 ${nodeId} 不存在`)
+
+    const source = getNodeSource(project.root_path, node)
+    if (!source) return ipcErr('SOURCE_UNAVAILABLE', '无法读取节点源码')
+
+    return ipcOk({ ...source, path: node.filePath })
   }
-  try {
-    const data = JSON.parse(readFileSync(graphPath, 'utf-8'))
-    return ipcOk(data)
-  } catch (err) {
-    return ipcErr('PARSE_ERROR', `读取图谱失败: ${String(err)}`)
-  }
+
+  return ipcErr('UNKNOWN', '请提供 nodeId 或 path')
+})
+
+ipcMain.handle('graph:stats', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  const graph = loadGraph(project.root_path)
+  if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+
+  return ipcOk(getGraphStats(graph))
 })
 
 /* ──────────── File Tree & Code ──────────── */
@@ -244,7 +376,132 @@ ipcMain.handle('file:read', (_e, { projectId, filePath }: { projectId: string; f
   }
 })
 
-ipcMain.handle('project:index', async (_e, { projectId }: { projectId: string }): Promise<IpcResult<unknown>> => {
+/* ──────────── Chat ──────────── */
+
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
+ipcMain.handle('chat:send', async (_e, {
+  projectId,
+  messages,
+}: {
+  projectId: string
+  messages: ChatMessage[]
+}): Promise<IpcResult<unknown>> => {
+  const config = loadConfig()
+
+  if (!isLLMConfigured()) {
+    return ipcErr('LLM_NOT_CONFIGURED', '请先在设置中配置 LLM API Key', true)
+  }
+
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  // Build code context from knowledge graph
+  let codeContext = ''
+  const graphPath = join(project.root_path, '.understand-anything', 'knowledge-graph.json')
+  if (existsSync(graphPath)) {
+    try {
+      const graph = JSON.parse(readFileSync(graphPath, 'utf-8'))
+      const nodes = (graph.nodes || []) as Array<{
+        id: string; type: string; label: string; filePath?: string
+        metadata?: { summary?: string; complexity?: string }
+      }>
+      // Provide a structured overview: file → symbols
+      const fileMap = new Map<string, Array<{ name: string; type: string; summary?: string }>>()
+      for (const node of nodes.slice(0, 200)) {
+        const fp = node.filePath || node.id || ''
+        const fileName = fp.split('/').slice(-1)[0] || fp
+        if (!fileMap.has(fileName)) fileMap.set(fileName, [])
+        fileMap.get(fileName)!.push({
+          name: node.label || node.id || '',
+          type: node.type || 'unknown',
+          summary: node.metadata?.summary,
+        })
+      }
+      const entries = [...fileMap.entries()].slice(0, 30)
+      codeContext = entries.map(([file, syms]) =>
+        `📄 ${file}:\n${syms.map(s => `  - ${s.type === 'function' ? '🔧' : s.type === 'class' ? '🏛️' : '📦'} ${s.name}${s.summary ? ` — ${s.summary}` : ''}`).join('\n')}`
+      ).join('\n\n')
+    } catch { /* ignore parse errors */ }
+  }
+
+  // Build paper context from saved papers
+  let paperContext = ''
+  try {
+    const papers = listPapers()
+    if (papers.length > 0) {
+      paperContext = papers.slice(0, 10).map(p =>
+        `📰 ${p.title} (arxiv:${p.arxiv_id})\n   ${p.summary.slice(0, 300)}${p.notes ? `\n   笔记: ${p.notes.slice(0, 200)}` : ''}`
+      ).join('\n\n')
+    }
+  } catch { /* ignore */ }
+
+  const systemPrompt = [
+    'You are Fieldguide AI, a code analysis assistant that helps developers understand codebases and research papers.',
+    codeContext ? `\n## Project Structure\n\n${codeContext}` : `\nThe project is "${project.name}".`,
+    paperContext ? `\n## Saved Papers\n\n${paperContext}\n\nWhen relevant, reference these papers to connect theory with implementation.` : '',
+    '\nUse all available context to answer precisely. When referencing code, mention specific file names and symbols. When referencing papers, mention the arxiv ID. Keep answers concise and practical. Reply in the same language as the user\'s question.',
+  ].filter(Boolean).join('\n')
+
+  const allMessages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...messages,
+  ]
+
+  const url = `${config.llm.baseUrl}/v1/chat/completions`
+    .replace(/\/+$/, '')
+    .replace(/\/v1\/chat\/completions\/v1\/chat\/completions/, '/v1/chat/completions')
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.llm.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.llm.chatModel,
+        messages: allMessages,
+        temperature: 0.3,
+        max_tokens: 2048,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    })
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '')
+      let errMsg = `LLM API 错误 (${resp.status})`
+      if (resp.status === 401) errMsg = 'API Key 无效，请检查设置'
+      else if (resp.status === 429) errMsg = 'API 请求过于频繁，请稍后再试'
+      else if (text) {
+        try {
+          const j = JSON.parse(text)
+          errMsg = j.error?.message || errMsg
+        } catch { errMsg += `: ${text.slice(0, 200)}` }
+      }
+      return ipcErr('LLM_API_ERROR', errMsg, true)
+    }
+
+    const data = await resp.json() as {
+      choices?: Array<{ message?: { content?: string } }>
+    }
+    const content = data.choices?.[0]?.message?.content || ''
+
+    logChatRequest(project.name, messages.length, content.length)
+    return ipcOk({ content })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('AbortError') || msg.includes('timeout')) {
+      return ipcErr('LLM_API_ERROR', 'LLM 请求超时，请检查网络或 API 地址', true)
+    }
+    return ipcErr('LLM_API_ERROR', `请求失败: ${msg}`, true)
+  }
+})
+
+ipcMain.handle('project:index', async (_e, { projectId, incremental }: { projectId: string; incremental?: boolean }): Promise<IpcResult<unknown>> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
   if (project.status === 'indexing') return ipcErr('INDEX_IN_PROGRESS', '索引正在进行中', true)
@@ -254,11 +511,20 @@ ipcMain.handle('project:index', async (_e, { projectId }: { projectId: string })
   const win = BrowserWindow.getAllWindows()[0]
 
   try {
+    const startTime = Date.now()
+    logIndexStart(project.name, 0, !!incremental)
+
+    const config = loadConfig()
+    const hasLLM = isLLMConfigured()
+
     const result = await indexProject(
       project.root_path,
       project.name,
       (phase) => {
         win?.webContents.send('index:progress', { type: 'phase', phase, projectId })
+        if (phase === 'scan') {
+          // Log file count after scan completes (next phase)
+        }
       },
       (current, total) => {
         win?.webContents.send('index:progress', {
@@ -269,10 +535,17 @@ ipcMain.handle('project:index', async (_e, { projectId }: { projectId: string })
           projectId,
         })
       },
+      incremental,
+      hasLLM ? {
+        baseUrl: config.llm.baseUrl,
+        apiKey: config.llm.apiKey,
+        chatModel: config.llm.chatModel,
+      } : undefined,
     )
 
     if (result.success) {
       updateProjectStatus(projectId, 'ready', result.nodeCount)
+      logIndexComplete(project.name, result.nodeCount, result.edgeCount, Date.now() - startTime)
       win?.webContents.send('index:progress', {
         type: 'complete',
         projectId,
@@ -282,13 +555,161 @@ ipcMain.handle('project:index', async (_e, { projectId }: { projectId: string })
       return ipcOk({ nodeCount: result.nodeCount, edgeCount: result.edgeCount })
     } else {
       updateProjectStatus(projectId, 'failed')
+      logIndexError(project.name, result.error ?? '未知错误')
       win?.webContents.send('index:progress', { type: 'error', projectId, error: result.error })
       return ipcErr('UNKNOWN', result.error ?? '索引失败')
     }
   } catch (err) {
     updateProjectStatus(projectId, 'failed')
     const msg = err instanceof Error ? err.message : String(err)
+    logIndexError(project.name, msg)
     win?.webContents.send('index:progress', { type: 'error', projectId, error: msg })
     return ipcErr('UNKNOWN', msg)
+  }
+})
+
+/* ──────────── Papers ──────────── */
+
+ipcMain.handle('paper:list', (): IpcResult<unknown> => {
+  try {
+    return ipcOk(listPapers())
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('paper:get', (_e, { id }: { id: string }): IpcResult<unknown> => {
+  const p = getPaper(id)
+  if (!p) return ipcErr('UNKNOWN', '论文不存在')
+  return ipcOk(p)
+})
+
+ipcMain.handle('paper:save', (_e, paper: {
+  arxiv_id: string; title: string; authors: string; summary: string
+  published: string; pdf_path?: string; tags?: string
+}): IpcResult<unknown> => {
+  try {
+    // Deduplicate by arxiv_id
+    const existing = getPaperByArxivId(paper.arxiv_id)
+    if (existing) return ipcOk(existing)
+    const p = insertPaper({
+      arxiv_id: paper.arxiv_id,
+      title: paper.title,
+      authors: paper.authors,
+      summary: paper.summary,
+      published: paper.published,
+      pdf_path: paper.pdf_path || '',
+      notes: '',
+      tags: paper.tags || '',
+    })
+    return ipcOk(p)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('paper:update', (_e, { id, patch }: {
+  id: string; patch: { notes?: string; tags?: string; pdf_path?: string }
+}): IpcResult<unknown> => {
+  try {
+    const p = updatePaper(id, patch)
+    if (!p) return ipcErr('UNKNOWN', '论文不存在')
+    return ipcOk(p)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('paper:remove', (_e, { id }: { id: string }): IpcResult<null> => {
+  try {
+    removePaper(id)
+    return ipcOk(null)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('paper:search', (_e, { query }: { query: string }): IpcResult<unknown> => {
+  try {
+    const papers = listPapers()
+    const q = query.toLowerCase()
+    const results = papers.filter(p =>
+      p.title.toLowerCase().includes(q) ||
+      p.summary.toLowerCase().includes(q) ||
+      p.notes.toLowerCase().includes(q) ||
+      p.authors.toLowerCase().includes(q)
+    ).slice(0, 10)
+    return ipcOk(results)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('paper:downloadPdf', async (_e, { id }: { id: string }): Promise<IpcResult<unknown>> => {
+  const paper = getPaper(id)
+  if (!paper) return ipcErr('UNKNOWN', '论文不存在')
+
+  // If already downloaded, just return the path
+  if (paper.pdf_path && existsSync(paper.pdf_path)) {
+    return ipcOk({ pdf_path: paper.pdf_path })
+  }
+
+  // Ensure papers directory exists
+  const config = loadConfig()
+  const papersDir = join(config.projectsRoot || app.getPath('documents'), 'Fieldguide', 'papers')
+  if (!existsSync(papersDir)) mkdirSync(papersDir, { recursive: true })
+
+  const pdfPath = join(papersDir, `${paper.arxiv_id}.pdf`)
+  const pdfUrl = `https://arxiv.org/pdf/${paper.arxiv_id}.pdf`
+
+  try {
+    const resp = await fetch(pdfUrl, { signal: AbortSignal.timeout(60_000) })
+    if (!resp.ok) return ipcErr('SOURCE_UNAVAILABLE', `PDF 下载失败 (${resp.status})`, true)
+    const buffer = Buffer.from(await resp.arrayBuffer())
+    writeFileSync(pdfPath, buffer)
+    updatePaper(id, { pdf_path: pdfPath })
+    return ipcOk({ pdf_path: pdfPath })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return ipcErr('UNKNOWN', `PDF 下载失败: ${msg}`, true)
+  }
+})
+
+/* ──────────── Concept Links ──────────── */
+
+ipcMain.handle('concept:list', (_e, { projectId, paperId }: {
+  projectId?: string; paperId?: string
+}): IpcResult<unknown> => {
+  try {
+    return ipcOk(listConceptLinks(projectId, paperId))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('concept:add', (_e, link: {
+  paper_id: string; project_id: string; node_id: string
+  anchor_text?: string; note?: string
+}): IpcResult<unknown> => {
+  try {
+    const cl = insertConceptLink({
+      paper_id: link.paper_id,
+      project_id: link.project_id,
+      node_id: link.node_id,
+      anchor_text: link.anchor_text || '',
+      note: link.note || '',
+    })
+    return ipcOk(cl)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('concept:remove', (_e, { id }: { id: string }): IpcResult<null> => {
+  try {
+    removeConceptLink(id)
+    return ipcOk(null)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
   }
 })

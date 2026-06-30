@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Fieldguide",
-    "version": "v0.1.0"
+    "version": "v0.2.0"
   },
   "tabs": {
     "library": "项目库",
@@ -28,7 +28,7 @@
     "addProject": "添加项目",
     "cancel": "取消",
     "processing": "处理中…",
-    "localPathHint": "Fieldguide 不会复制源码，仅在项目目录下生成 .understand-anything/ 索引文件。",
+    "localPathHint": "Fieldguide 不会复制源码，仅在项目目录下生成索引文件。",
     "status": {
       "pending": "待索引",
       "indexing": "索引中…",
@@ -41,27 +41,27 @@
   },
   "codeMap": {
     "noProject": "请先在项目库中添加项目",
-    "switchToLibrary": "切换到「项目库」Tab 开始",
-    "dashboardLoading": "加载 Dashboard…",
-    "dashboardUnavailable": "Dashboard 不可用 — 请确保已构建 UA Dashboard",
+    "dashboardLoading": "加载图谱…",
+    "dashboardUnavailable": "图谱暂不可用 — 请确认 UA Dashboard 已构建",
     "fileTreeSearch": "搜索文件…",
     "noFiles": "无匹配文件",
     "loading": "加载中…",
     "clickToOpen": "点击左侧文件树打开文件",
     "lines": "{{count}} 行",
-    "readError": "读取失败"
+    "readError": "读取失败",
+    "nodeSearchPlaceholder": "搜索函数、类…"
   },
   "chat": {
-    "title": "LLM 问答",
-    "placeholder": "Phase 2 开放 — 基于项目图谱的智能问答"
+    "title": "AI 问答",
+    "placeholder": "输入问题，基于项目图谱和论文库智能回答"
   },
   "theory": {
     "title": "理论学习",
-    "desc": "arXiv / PDF / RAG（Phase 3）"
+    "desc": "搜索 arXiv 论文，收藏到本地论文库，与代码对照学习"
   },
   "bridge": {
     "title": "概念桥接",
-    "desc": "论文 ↔ 代码节点（Phase 3）"
+    "desc": "论文段落 ↔ 代码节点，AI 辅助解释关联"
   },
   "status": {
     "ready": "就绪",
@@ -74,13 +74,25 @@
     "expandFileTree": "展开文件树",
     "collapseFileTree": "折叠文件树",
     "addPanel": "添加面板",
-    "closePanel": "关闭面板"
+    "closePanel": "关闭面板",
+    "deleteProject": "删除项目记录",
+    "indexProject": "开始索引",
+    "updateIndex": "更新索引"
   },
   "settings": {
     "title": "设置",
-    "llm": "LLM",
-    "general": "通用",
+    "llm": "LLM 配置",
+    "projectsRoot": "项目根目录",
+    "projectsRootHint": "通过 Git URL 添加项目时，代码将 clone 到此目录下",
     "language": "界面语言",
-    "theme": "主题"
+    "theme": "主题",
+    "testConnection": "测试连接",
+    "testing": "测试中…",
+    "testSuccess": "连接成功",
+    "testFail": "连接失败 — 请检查配置",
+    "save": "保存",
+    "saving": "保存中…",
+    "saved": "已保存",
+    "cancel": "取消"
   }
 }

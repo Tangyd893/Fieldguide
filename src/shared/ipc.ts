@@ -8,6 +8,7 @@ export type IpcErrorCode =
   | 'GIT_CLONE_FAILED'
   | 'LLM_RATE_LIMIT'
   | 'LLM_NOT_CONFIGURED'
+  | 'LLM_API_ERROR'
   | 'PARSE_ERROR'
   | 'SOURCE_UNAVAILABLE'
   | 'UNKNOWN';

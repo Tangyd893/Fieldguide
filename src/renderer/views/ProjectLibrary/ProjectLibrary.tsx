@@ -8,11 +8,12 @@ interface ProjectRow {
 
 interface Props {
   selected: ProjectRow | null
-  onSelect: (p: ProjectRow) => void
+  onSelect: (p: ProjectRow | null) => void
+  onIndex?: (projectId: string) => void
   t: (key: string, opts?: Record<string, unknown>) => string
 }
 
-export default function ProjectLibrary({ selected, onSelect, t }: Props) {
+export default function ProjectLibrary({ selected, onSelect, onIndex, t }: Props) {
   const [projects, setProjects] = useState<ProjectRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
@@ -22,6 +23,7 @@ export default function ProjectLibrary({ selected, onSelect, t }: Props) {
   const [gitBranch, setGitBranch] = useState('')
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string|null>(null)
+  const [deleting, setDeleting] = useState<string|null>(null)
 
   useEffect(() => { loadProjects() }, [])
 
@@ -43,6 +45,20 @@ export default function ProjectLibrary({ selected, onSelect, t }: Props) {
       } else setError(r.error?.message ?? '添加失败')
     } catch (err) { setError(String(err)) }
     finally { setAdding(false) }
+  }
+
+  async function handleDelete(id: string) {
+    setDeleting(id)
+    try {
+      const r = await window.fieldguide.projectRemove(id)
+      if (r.ok) {
+        setProjects(p => p.filter(x => x.id !== id))
+        if (selected?.id === id) onSelect(null)
+      } else {
+        setError(r.error?.message ?? '删除失败')
+      }
+    } catch (err) { setError(String(err)) }
+    finally { setDeleting(null) }
   }
 
   if (loading) return <div className="flex items-center justify-center h-full"><div className="text-gray-400 text-sm">{t('codeMap.loading')}</div></div>
@@ -82,7 +98,8 @@ export default function ProjectLibrary({ selected, onSelect, t }: Props) {
       <div className="space-y-3">
         {projects.map(p=>(
           <button key={p.id} onClick={()=>onSelect(p)}
-            className={`w-full text-left p-4 rounded-lg border transition-all ${selected?.id===p.id?'border-blue-300 bg-blue-50 shadow-sm':'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'}`}>
+            onContextMenu={(e) => { e.preventDefault(); if (window.confirm(`确定删除项目「${p.name}」？\n此操作仅删除记录，不会删除源代码文件。`)) handleDelete(p.id) }}
+            className={`w-full text-left p-4 rounded-lg border transition-all group relative ${selected?.id===p.id?'border-blue-300 bg-blue-50 shadow-sm':'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'}`}>
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -96,6 +113,19 @@ export default function ProjectLibrary({ selected, onSelect, t }: Props) {
                   {p.node_count>0&&<span>{t('project.nodes',{count:p.node_count})}</span>}
                 </div>
               </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); if (window.confirm(`确定删除项目「${p.name}」？\n此操作仅删除记录，不会删除源代码文件。`)) handleDelete(p.id) }}
+                disabled={deleting === p.id}
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 text-lg leading-none px-1 transition-opacity disabled:opacity-40"
+                title="删除项目记录"
+              >×</button>
+              {(p.status === 'pending' || p.status === 'failed' || p.status === 'stale') && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onIndex?.(p.id) }}
+                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-blue-500 text-xs px-2 py-0.5 border border-gray-200 rounded hover:border-blue-300 transition-all"
+                  title={p.status === 'stale' ? '更新索引' : '开始索引'}
+                >{p.status === 'stale' ? '🔄 更新' : '⚡ 索引'}</button>
+              )}
               <span className="text-gray-300 text-lg">→</span>
             </div>
           </button>

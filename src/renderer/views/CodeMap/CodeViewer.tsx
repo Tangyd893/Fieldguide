@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { detectLanguage, highlightLine } from './syntax'
 
 interface Props { projectId?: string; filePath?: string; t: (key: string, opts?: Record<string, unknown>) => string }
 
@@ -25,16 +26,26 @@ export default function CodeViewer({ projectId, filePath, t }: Props) {
   if (error) return <div className="h-full flex items-center justify-center text-red-500 text-sm">{error}</div>
 
   const lines = content.split('\n')
+  const lang = detectLanguage(filePath)
+  const langLabel = { go: 'Go', typescript: 'TypeScript', javascript: 'JavaScript', python: 'Python', rust: 'Rust', java: 'Java', plaintext: 'Text' }[lang] ?? lang
+
   return (
     <div className="h-full overflow-auto bg-[var(--fg-bg)]">
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 bg-[var(--fg-card)] border-b border-[var(--fg-border)] text-xs text-gray-400 font-mono">
-        <span>{filePath}</span><span className="flex-1" /><span>{t('codeMap.lines', { count: lines.length })}</span>
+        <span className="text-gray-500">{filePath}</span>
+        <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[11px] font-medium">{langLabel}</span>
+        <span className="flex-1" />
+        <span>{t('codeMap.lines', { count: lines.length })}</span>
       </div>
       <div className="font-mono text-[13px] leading-5">
         {lines.map((line, i) => (
-          <div key={i} className="flex hover:bg-blue-50/50">
-            <span className="w-12 flex-shrink-0 text-right pr-3 text-gray-300 select-none text-xs leading-5 py-px border-r border-[var(--fg-border)]">{i + 1}</span>
-            <span className="flex-1 pl-3 whitespace-pre text-[var(--fg-text-primary)] py-px">{line || ' '}</span>
+          <div key={i} className="flex hover:bg-blue-50/30 group">
+            <span className="w-12 flex-shrink-0 text-right pr-3 text-gray-300 select-none text-xs leading-5 py-px border-r border-[var(--fg-border)]">
+              {i + 1}
+            </span>
+            <span className="flex-1 pl-3 whitespace-pre text-[var(--fg-text-primary)] py-px min-w-0 overflow-x-auto">
+              {highlightLine(line, lang)}
+            </span>
           </div>
         ))}
       </div>

@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Fieldguide",
-    "version": "v0.1.0"
+    "version": "v0.2.0"
   },
   "tabs": {
     "library": "Projects",
@@ -16,52 +16,52 @@
   },
   "project": {
     "emptyTitle": "Add your first project",
-    "emptyDesc": "Fieldguide analyzes source code and generates interactive knowledge graphs",
-    "addLocal": "Open Local Folder",
+    "emptyDesc": "Fieldguide analyzes source code and generates an interactive knowledge graph",
+    "addLocal": "Add local folder",
     "addGit": "Clone from Git URL",
-    "addLocalTitle": "Open Local Folder",
+    "addLocalTitle": "Add local folder",
     "addGitTitle": "Clone from Git",
-    "pathLabel": "Project Path",
+    "pathLabel": "Project path",
     "gitUrlLabel": "Git URL",
     "branchLabel": "Branch (optional)",
     "branchPlaceholder": "main",
     "addProject": "Add Project",
     "cancel": "Cancel",
     "processing": "Processing…",
-    "localPathHint": "Fieldguide does not copy source code. Only .understand-anything/ index files are created in the project directory.",
+    "localPathHint": "Fieldguide won't copy source code, only creates index files under .understand-anything/.",
     "status": {
       "pending": "Pending",
       "indexing": "Indexing…",
       "ready": "Ready",
       "failed": "Failed",
-      "stale": "Source Changed"
+      "stale": "Source changed"
     },
     "nodes": "{{count}} nodes",
-    "indexedAt": "Indexed on {{date}}"
+    "indexedAt": "Indexed at {{date}}"
   },
   "codeMap": {
-    "noProject": "Add a project in the project library first",
-    "switchToLibrary": "Switch to the Projects tab to get started",
-    "dashboardLoading": "Loading Dashboard…",
-    "dashboardUnavailable": "Dashboard unavailable — make sure UA Dashboard is built",
+    "noProject": "Add a project in the library first",
+    "dashboardLoading": "Loading graph…",
+    "dashboardUnavailable": "Graph unavailable — please build UA Dashboard",
     "fileTreeSearch": "Search files…",
     "noFiles": "No matching files",
     "loading": "Loading…",
-    "clickToOpen": "Click a file in the explorer to open",
+    "clickToOpen": "Click a file in the tree to open",
     "lines": "{{count}} lines",
-    "readError": "Read error"
+    "readError": "Read error",
+    "nodeSearchPlaceholder": "Search functions, classes…"
   },
   "chat": {
-    "title": "LLM Chat",
-    "placeholder": "Phase 2 — Smart Q&A based on project knowledge graph"
+    "title": "AI Chat",
+    "placeholder": "Ask questions — answers based on project graph and paper library"
   },
   "theory": {
     "title": "Theory",
-    "desc": "arXiv / PDF / RAG (Phase 3)"
+    "desc": "Search arXiv papers, save to local library, cross-reference with code"
   },
   "bridge": {
     "title": "Concept Bridge",
-    "desc": "Paper ↔ Code nodes (Phase 3)"
+    "desc": "Paper sections ↔ code nodes, AI-powered explanations"
   },
   "status": {
     "ready": "Ready",
@@ -71,9 +71,28 @@
     "addProjectFirst": "Add a project first",
     "search": "Search (Ctrl+K)",
     "settings": "Settings",
-    "expandFileTree": "Expand file explorer",
-    "collapseFileTree": "Collapse file explorer",
+    "expandFileTree": "Expand file tree",
+    "collapseFileTree": "Collapse file tree",
     "addPanel": "Add panel",
-    "closePanel": "Close panel"
+    "closePanel": "Close panel",
+    "deleteProject": "Delete project record",
+    "indexProject": "Start indexing",
+    "updateIndex": "Update index"
+  },
+  "settings": {
+    "title": "Settings",
+    "llm": "LLM Configuration",
+    "projectsRoot": "Projects Root",
+    "projectsRootHint": "Git clones will be placed in this directory",
+    "language": "Language",
+    "theme": "Theme",
+    "testConnection": "Test Connection",
+    "testing": "Testing…",
+    "testSuccess": "Connected",
+    "testFail": "Connection failed — check settings",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "cancel": "Cancel"
   }
 }

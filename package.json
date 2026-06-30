@@ -1,6 +1,6 @@
 {
   "name": "fieldguide",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fieldguide — 把代码库变成可探索、可导览、可提问的知识地图",
   "private": true,
   "main": "out/main/index.js",
@@ -10,7 +10,9 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "pack": "electron-vite build && electron-builder --win --config",
+    "dist": "electron-vite build && electron-builder --win --publish never"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
@@ -29,6 +31,7 @@
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.5.2",
     "electron": "^33.4.0",
+    "electron-builder": "^25.1.0",
     "electron-vite": "^5.0.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
@@ -37,5 +40,42 @@
   "ua": {
     "repo": "https://github.com/Egonex-AI/Understand-Anything",
     "commit": "54754a6f97051d1d76c8758353d8ea41afe502a6"
+  },
+  "build": {
+    "appId": "com.fieldguide.app",
+    "productName": "Fieldguide",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "!node_modules/**/*",
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico",
+      "license": "NOTICE.md",
+      "shortcutName": "Fieldguide"
+    },
+    "extraResources": [
+      {
+        "from": "../Understand-Anything/understand-anything-plugin/packages/dashboard/dist",
+        "to": "dashboard",
+        "filter": ["**/*"]
+      }
+    ]
   }
 }

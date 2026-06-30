@@ -3,6 +3,7 @@
  * Phase 2: LLM 配置 + 语言切换 + 主题
  */
 import { useState, useEffect } from 'react'
+import { applyTheme } from '../App'
 
 interface Props {
   t: (key: string) => string
@@ -13,10 +14,13 @@ export default function SettingsPanel({ t, onClose }: Props) {
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [chatModel, setChatModel] = useState('')
+  const [projectsRoot, setProjectsRoot] = useState('')
   const [locale, setLocale] = useState('zh-CN')
   const [theme, setTheme] = useState('system')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null)
 
   useEffect(() => {
     window.fieldguide.configGet().then((r) => {
@@ -26,6 +30,7 @@ export default function SettingsPanel({ t, onClose }: Props) {
         setBaseUrl(llm.baseUrl || '')
         setApiKey(llm.apiKey || '')
         setChatModel(llm.chatModel || '')
+        setProjectsRoot((c.projectsRoot as string) || '')
         setLocale((c.locale as string) || 'zh-CN')
         setTheme((c.theme as string) || 'system')
       }
@@ -36,12 +41,39 @@ export default function SettingsPanel({ t, onClose }: Props) {
     setSaving(true)
     await window.fieldguide.configSet({
       llm: { baseUrl, apiKey, chatModel, embedModel: '' },
+      projectsRoot,
       locale,
       theme,
     })
+    // Apply theme immediately
+    applyTheme(theme)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function testConnection() {
+    if (!baseUrl || !apiKey || !chatModel) {
+      setTestResult('fail')
+      return
+    }
+    // Save first so the backend has the latest config
+    await window.fieldguide.configSet({
+      llm: { baseUrl, apiKey, chatModel, embedModel: '' },
+      projectsRoot,
+      locale,
+      theme,
+    })
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const result = await window.fieldguide.configTestLlm()
+      setTestResult(result.ok ? 'success' : 'fail')
+    } catch {
+      setTestResult('fail')
+    } finally {
+      setTesting(false)
+    }
   }
 
   return (
@@ -76,6 +108,26 @@ export default function SettingsPanel({ t, onClose }: Props) {
                   placeholder="deepseek-chat"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+              <div className="flex items-center gap-3">
+                <button onClick={testConnection} disabled={testing}
+                  className="px-4 py-1.5 border border-blue-300 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-50 disabled:opacity-40 transition-colors">
+                  {testing ? '测试中…' : '🔌 测试连接'}
+                </button>
+                {testResult === 'success' && <span className="text-xs text-green-600">✅ 连接成功</span>}
+                {testResult === 'fail' && <span className="text-xs text-red-500">❌ 连接失败 — 请检查配置</span>}
+              </div>
+            </div>
+          </section>
+
+          {/* Projects Root */}
+          <section>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">📁 项目根目录</h3>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Git clone 目标路径</label>
+              <input type="text" value={projectsRoot} onChange={e => setProjectsRoot(e.target.value)}
+                placeholder="D:\Projects"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <p className="text-xs text-gray-400 mt-1.5">通过 Git URL 添加项目时，代码将 clone 到此目录下</p>
             </div>
           </section>
 
@@ -105,7 +157,7 @@ export default function SettingsPanel({ t, onClose }: Props) {
                 { v: 'light', l: '浅色' },
                 { v: 'dark', l: '深色' },
               ].map((opt) => (
-                <button key={opt.v} onClick={() => setTheme(opt.v)}
+                <button key={opt.v} onClick={() => { setTheme(opt.v); applyTheme(opt.v) }}
                   className={`px-4 py-2 rounded-lg text-sm border-2 transition-all ${
                     theme === opt.v ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 text-gray-600 hover:border-gray-300'
                   }`}>{opt.l}</button>

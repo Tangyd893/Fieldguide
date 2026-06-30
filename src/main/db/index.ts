@@ -56,6 +56,31 @@ function migrate(db: Database.Database): void {
       finished_at TEXT,
       FOREIGN KEY (project_id) REFERENCES projects(id)
     );
+
+    CREATE TABLE IF NOT EXISTS papers (
+      id TEXT PRIMARY KEY,
+      arxiv_id TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      authors TEXT NOT NULL DEFAULT '',
+      summary TEXT DEFAULT '',
+      published TEXT DEFAULT '',
+      pdf_path TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      tags TEXT DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS concept_links (
+      id TEXT PRIMARY KEY,
+      paper_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      node_id TEXT NOT NULL,
+      anchor_text TEXT DEFAULT '',
+      note TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (paper_id) REFERENCES papers(id),
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
   `)
 }
 
@@ -106,7 +131,104 @@ export function updateProjectStatus(id: string, status: ProjectRow['status'], no
 export function removeProject(id: string): void {
   const db = getDb()
   db.prepare('DELETE FROM index_jobs WHERE project_id = ?').run(id)
+  db.prepare('DELETE FROM concept_links WHERE project_id = ?').run(id)
   db.prepare('DELETE FROM projects WHERE id = ?').run(id)
+}
+
+/* ──────────── Papers ──────────── */
+
+export interface PaperRow {
+  id: string
+  arxiv_id: string
+  title: string
+  authors: string
+  summary: string
+  published: string
+  pdf_path: string
+  notes: string
+  tags: string
+  created_at: string
+}
+
+export function listPapers(): PaperRow[] {
+  return getDb().prepare('SELECT * FROM papers ORDER BY created_at DESC').all() as PaperRow[]
+}
+
+export function getPaper(id: string): PaperRow | undefined {
+  return getDb().prepare('SELECT * FROM papers WHERE id = ?').get(id) as PaperRow | undefined
+}
+
+export function getPaperByArxivId(arxivId: string): PaperRow | undefined {
+  return getDb().prepare('SELECT * FROM papers WHERE arxiv_id = ?').get(arxivId) as PaperRow | undefined
+}
+
+export function insertPaper(p: Omit<PaperRow, 'id' | 'created_at'>): PaperRow {
+  const db = getDb()
+  const id = `paper-${Date.now()}`
+  const now = new Date().toISOString()
+  db.prepare(`
+    INSERT INTO papers (id, arxiv_id, title, authors, summary, published, pdf_path, notes, tags, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, p.arxiv_id, p.title, p.authors, p.summary, p.published, p.pdf_path, p.notes, p.tags, now)
+  return getPaper(id)!
+}
+
+export function updatePaper(id: string, patch: Partial<Pick<PaperRow, 'notes' | 'tags' | 'pdf_path'>>): PaperRow | undefined {
+  const db = getDb()
+  const sets: string[] = []
+  const vals: unknown[] = []
+  if (patch.notes !== undefined) { sets.push('notes = ?'); vals.push(patch.notes) }
+  if (patch.tags !== undefined) { sets.push('tags = ?'); vals.push(patch.tags) }
+  if (patch.pdf_path !== undefined) { sets.push('pdf_path = ?'); vals.push(patch.pdf_path) }
+  if (sets.length === 0) return getPaper(id)
+  vals.push(id)
+  db.prepare(`UPDATE papers SET ${sets.join(', ')} WHERE id = ?`).run(...vals)
+  return getPaper(id)
+}
+
+export function removePaper(id: string): void {
+  const db = getDb()
+  db.prepare('DELETE FROM concept_links WHERE paper_id = ?').run(id)
+  db.prepare('DELETE FROM papers WHERE id = ?').run(id)
+}
+
+/* ──────────── Concept Links ──────────── */
+
+export interface ConceptLinkRow {
+  id: string
+  paper_id: string
+  project_id: string
+  node_id: string
+  anchor_text: string
+  note: string
+  created_at: string
+}
+
+export function listConceptLinks(projectId?: string, paperId?: string): ConceptLinkRow[] {
+  if (projectId && paperId) {
+    return getDb().prepare('SELECT * FROM concept_links WHERE project_id = ? AND paper_id = ? ORDER BY created_at DESC')
+      .all(projectId, paperId) as ConceptLinkRow[]
+  }
+  if (projectId) {
+    return getDb().prepare('SELECT * FROM concept_links WHERE project_id = ? ORDER BY created_at DESC')
+      .all(projectId) as ConceptLinkRow[]
+  }
+  return getDb().prepare('SELECT * FROM concept_links ORDER BY created_at DESC').all() as ConceptLinkRow[]
+}
+
+export function insertConceptLink(link: Omit<ConceptLinkRow, 'id' | 'created_at'>): ConceptLinkRow {
+  const db = getDb()
+  const id = `cl-${Date.now()}`
+  const now = new Date().toISOString()
+  db.prepare(`
+    INSERT INTO concept_links (id, paper_id, project_id, node_id, anchor_text, note, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, link.paper_id, link.project_id, link.node_id, link.anchor_text, link.note, now)
+  return db.prepare('SELECT * FROM concept_links WHERE id = ?').get(id) as ConceptLinkRow
+}
+
+export function removeConceptLink(id: string): void {
+  getDb().prepare('DELETE FROM concept_links WHERE id = ?').run(id)
 }
 
 export function closeDb(): void {

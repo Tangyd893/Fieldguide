@@ -1,13 +1,15 @@
 /**
- * UA Integration Layer — Phase 1.5
+ * UA Integration Layer — Phase 2
  *
- * Wraps @understand-anything/core to provide a simple index pipeline:
+ * Wraps @understand-anything/core to provide an index pipeline:
  *   1. Scan project directory (list files, classify by language)
  *   2. Extract structure via Tree-sitter (PluginRegistry)
  *   3. Build KnowledgeGraph via GraphBuilder
- *   4. Persist via saveGraph → {projectRoot}/.understand-anything/knowledge-graph.json
+ *   4. LLM enrichment: per-file summaries, architecture layers, tour generation
+ *   5. Persist via saveGraph → {projectRoot}/.understand-anything/knowledge-graph.json
  *
- * Phase 2 will add LLM-driven phases (architecture analysis, tour generation, etc.)
+ * LLM phases are conditional on an API key being configured.
+ * Without a key, the pipeline produces a structure-only graph.
  */
 import { readdirSync, statSync, readFileSync, existsSync } from 'node:fs'
 import { join, relative, extname, basename } from 'node:path'
@@ -21,6 +23,16 @@ let registerAllParsers: any
 let GraphBuilder: any
 let saveGraph: any
 let createIgnoreFilter: any
+
+// LLM enrichment imports (Phase 2)
+let buildFileAnalysisPrompt: any
+let parseFileAnalysisResponse: any
+let buildLayerDetectionPrompt: any
+let parseLayerDetectionResponse: any
+let applyLLMLayers: any
+let buildTourGenerationPrompt: any
+let parseTourGenerationResponse: any
+let generateHeuristicTour: any
 
 async function loadCore(): Promise<void> {
   if (TreeSitterPlugin) return // already loaded
@@ -54,6 +66,16 @@ async function loadCore(): Promise<void> {
   GraphBuilder = core.GraphBuilder
   saveGraph = core.saveGraph
   createIgnoreFilter = core.createIgnoreFilter
+
+  // Phase 2: LLM enrichment functions
+  buildFileAnalysisPrompt = core.buildFileAnalysisPrompt
+  parseFileAnalysisResponse = core.parseFileAnalysisResponse
+  buildLayerDetectionPrompt = core.buildLayerDetectionPrompt
+  parseLayerDetectionResponse = core.parseLayerDetectionResponse
+  applyLLMLayers = core.applyLLMLayers
+  buildTourGenerationPrompt = core.buildTourGenerationPrompt
+  parseTourGenerationResponse = core.parseTourGenerationResponse
+  generateHeuristicTour = core.generateHeuristicTour
 }
 
 // ─── Language detection (subset of UA's scan-project table) ───
@@ -133,12 +155,12 @@ export interface ScanResult {
   scannedAt: string
 }
 
-export async function scanProject(rootPath: string): Promise<ScanResult> {
+export async function scanProject(rootPath: string, changedAfter?: string): Promise<ScanResult> {
   await loadCore()
   const files: ScannedFile[] = []
   const ignoreFilter = createIgnoreFilter?.(rootPath) ?? { ignores: () => false }
 
-  walk(rootPath, rootPath, files, ignoreFilter)
+  walk(rootPath, rootPath, files, ignoreFilter, changedAfter ? new Date(changedAfter) : undefined)
 
   return {
     files: files.sort((a, b) => a.path.localeCompare(b.path)),
@@ -152,6 +174,7 @@ function walk(
   currentDir: string,
   files: ScannedFile[],
   ignoreFilter: { ignores: (p: string) => boolean },
+  since?: Date,
 ): void {
   let entries: string[]
   try {
@@ -179,8 +202,11 @@ function walk(
     }
 
     if (st.isDirectory()) {
-      walk(rootPath, fullPath, files, ignoreFilter)
+      walk(rootPath, fullPath, files, ignoreFilter, since)
     } else if (st.isFile()) {
+      // Incremental: skip files older than `since`
+      if (since && st.mtime <= since) continue
+
       const ext = extname(entry).toLowerCase()
       if (BINARY_EXTS.has(ext)) continue
 
@@ -309,6 +335,174 @@ export interface IndexResult {
   nodeCount: number
   edgeCount: number
   error?: string
+  llmEnriched?: boolean
+}
+
+export interface LLMEnrichConfig {
+  baseUrl: string
+  apiKey: string
+  chatModel: string
+}
+
+/**
+ * Call the configured LLM with a prompt and return the response text.
+ */
+async function callLLM(prompt: string, config: LLMEnrichConfig): Promise<string> {
+  const url = `${config.baseUrl}/v1/chat/completions`
+    .replace(/\/+$/, '')
+    .replace(/\/v1\/chat\/completions\/v1\/chat\/completions/, '/v1/chat/completions')
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: config.chatModel,
+      messages: [
+        { role: 'system', content: 'You are a code analysis assistant. Respond with valid JSON only. Do not include markdown fences or extra commentary.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.3,
+      max_tokens: 4096,
+    }),
+    signal: AbortSignal.timeout(120_000),
+  })
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '')
+    throw new Error(`LLM API error (${resp.status}): ${text.slice(0, 300)}`)
+  }
+
+  const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> }
+  const content = data.choices?.[0]?.message?.content
+  if (!content) throw new Error('LLM returned empty response')
+  return content
+}
+
+/**
+ * Phase 4: LLM enrichment — per-file summaries, architecture layers, tour generation.
+ *
+ * Mutates the graph in-place. Controlled by the presence of llmConfig.
+ */
+async function enrichWithLLM(
+  graph: any,
+  scanResult: ScanResult,
+  extractResult: ExtractResult,
+  rootPath: string,
+  projectName: string,
+  llmConfig: LLMEnrichConfig,
+  onPhase?: (phase: string) => void,
+  onProgress?: (current: number, total: number) => void,
+): Promise<void> {
+  const codeFiles = scanResult.files.filter(f => f.category === 'code')
+  const totalFiles = codeFiles.length
+  let processed = 0
+
+  // Build a lookup: file path → nodes (for summary injection)
+  const nodesByFile = new Map<string, any[]>()
+  for (const node of graph.nodes || []) {
+    const fp = node.filePath || ''
+    if (!nodesByFile.has(fp)) nodesByFile.set(fp, [])
+    nodesByFile.get(fp)!.push(node)
+  }
+
+  // ─── 4a: Per-file summaries ───
+  onPhase?.('analyze')
+
+  // Process files in batches of 3 to respect rate limits
+  const BATCH_SIZE = 3
+  for (let i = 0; i < totalFiles; i += BATCH_SIZE) {
+    const batch = codeFiles.slice(i, i + BATCH_SIZE)
+    const batchPromises = batch.map(async (file) => {
+      const analysis = extractResult.results.find(r => r.path === file.path)
+      if (!analysis) return
+
+      let content: string
+      try {
+        content = readFileSync(join(rootPath, file.path), 'utf-8')
+      } catch {
+        return // skip unreadable files
+      }
+
+      // Limit content size per file to avoid token overflow
+      const maxContentLen = 15_000
+      const truncated = content.length > maxContentLen
+        ? content.slice(0, maxContentLen) + '\n... (truncated)'
+        : content
+
+      try {
+        const prompt = buildFileAnalysisPrompt(file.path, truncated, `Project: ${projectName}`)
+        const response = await callLLM(prompt, llmConfig)
+        const parsed = parseFileAnalysisResponse(response)
+
+        if (parsed) {
+          // Update file-level node
+          const fileNodes = nodesByFile.get(file.path) || []
+          for (const node of fileNodes) {
+            if (node.type === 'file') {
+              if (!node.metadata) node.metadata = {}
+              node.metadata.summary = parsed.fileSummary || node.metadata.summary
+              node.metadata.tags = parsed.tags || node.metadata.tags
+              node.metadata.complexity = parsed.complexity || node.metadata.complexity
+            }
+            // Update function/class child nodes with per-symbol summaries
+            if (node.type === 'function' && parsed.functionSummaries?.[node.label]) {
+              if (!node.metadata) node.metadata = {}
+              node.metadata.summary = parsed.functionSummaries[node.label]
+            }
+            if (node.type === 'class' && parsed.classSummaries?.[node.label]) {
+              if (!node.metadata) node.metadata = {}
+              node.metadata.summary = parsed.classSummaries[node.label]
+            }
+          }
+        }
+      } catch (err) {
+        // Per-file failures are non-fatal; continue with remaining files
+        console.warn(`[ua/client] LLM summary failed for ${file.path}: ${String(err)}`)
+      }
+    })
+
+    await Promise.all(batchPromises)
+
+    processed += batch.length
+    onProgress?.(processed, totalFiles)
+  }
+
+  // ─── 4b: Architecture layer detection ───
+  onPhase?.('review-layers')
+  try {
+    const layerPrompt = buildLayerDetectionPrompt(graph)
+    const layerResponse = await callLLM(layerPrompt, llmConfig)
+    const llmLayers = parseLayerDetectionResponse(layerResponse)
+    if (llmLayers && llmLayers.length > 0) {
+      graph.layers = applyLLMLayers(graph, llmLayers)
+    }
+  } catch (err) {
+    console.warn(`[ua/client] LLM layer detection failed: ${String(err)}`)
+  }
+
+  // ─── 4c: Tour generation ───
+  onPhase?.('review-tour')
+  try {
+    const tourPrompt = buildTourGenerationPrompt(graph)
+    const tourResponse = await callLLM(tourPrompt, llmConfig)
+    const tourSteps = parseTourGenerationResponse(tourResponse)
+    if (tourSteps && tourSteps.length > 0) {
+      graph.tour = tourSteps
+    } else {
+      // Fallback to heuristic tour
+      graph.tour = generateHeuristicTour(graph)
+    }
+  } catch (err) {
+    console.warn(`[ua/client] LLM tour generation failed, using heuristic: ${String(err)}`)
+    try {
+      graph.tour = generateHeuristicTour(graph)
+    } catch {
+      // No tour at all is acceptable
+    }
+  }
 }
 
 export async function indexProject(
@@ -316,12 +510,29 @@ export async function indexProject(
   projectName: string,
   onPhase?: (phase: string) => void,
   onProgress?: (current: number, total: number) => void,
+  incremental?: boolean,
+  llmConfig?: LLMEnrichConfig,
 ): Promise<IndexResult> {
   try {
+    // Determine changedAfter for incremental mode
+    let changedAfter: string | undefined
+    if (incremental) {
+      const graphPath = join(rootPath, '.understand-anything', 'knowledge-graph.json')
+      if (existsSync(graphPath)) {
+        try {
+          const existing = JSON.parse(readFileSync(graphPath, 'utf-8'))
+          changedAfter = existing?.project?.analyzedAt
+        } catch { /* if graph is corrupt, do full index */ }
+      }
+    }
+
     // Phase 1: Scan
     onPhase?.('scan')
-    const scanResult = await scanProject(rootPath)
+    const scanResult = await scanProject(rootPath, changedAfter)
     if (scanResult.files.length === 0) {
+      if (incremental) {
+        return { success: true, graphPath: join(rootPath, '.understand-anything', 'knowledge-graph.json'), nodeCount: 0, edgeCount: 0 }
+      }
       return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: '未发现可解析的文件' }
     }
 
@@ -392,7 +603,32 @@ export async function indexProject(
 
     const graph = builder.build()
 
-    // Phase 4: Save
+    // Phase 4: LLM enrichment (conditional on API key)
+    let llmEnriched = false
+    const hasLLM = llmConfig && llmConfig.apiKey && llmConfig.baseUrl && llmConfig.chatModel
+    if (hasLLM) {
+      try {
+        await enrichWithLLM(
+          graph,
+          scanResult,
+          extractResult,
+          rootPath,
+          projectName,
+          llmConfig!,
+          onPhase,
+          (current, total) => {
+            // Map enrichment progress to overall progress (70% → 95%)
+            onProgress?.(Math.round(70 + (current / total) * 25), 100)
+          },
+        )
+        llmEnriched = true
+      } catch (err) {
+        // LLM enrichment failure is non-fatal — graph still has structure
+        console.error(`[ua/client] LLM enrichment failed: ${String(err)}`)
+      }
+    }
+
+    // Phase 5: Save
     onPhase?.('save')
     saveGraph(rootPath, graph)
 
@@ -401,6 +637,7 @@ export async function indexProject(
       graphPath: join(rootPath, '.understand-anything', 'knowledge-graph.json'),
       nodeCount: graph.nodes.length,
       edgeCount: graph.edges.length,
+      llmEnriched,
     }
   } catch (err) {
     return {

@@ -80,6 +80,7 @@
 | [docs/ui-spec.md](docs/ui-spec.md) | 界面与交互：三栏布局、图谱、Tour、视觉规范 |
 
 | [docs/roadmap.md](docs/roadmap.md) | 分阶段路线图与验收标准 |
+| [docs/todos.md](docs/todos.md) | **工程待办**：下一步任务、优先级与完成状态 |
 
 | [docs/design-review.md](docs/design-review.md) | 设计审视：用户 × 开发者双视角、已决项 |
 
@@ -101,7 +102,7 @@
 
 
 
-**Phase 0 — 设计定稿 ✅**（v0.3：已纳入 Understand-Anything 集成决策）
+**Phase 1 — 完成 ✅** · **Phase 2 — 进行中 🔵**（约 55%）
 
 
 
@@ -111,7 +112,14 @@
 
 - [x] 技术路线：基于 UA 构建代码地图，不自研索引管线
 
-- [ ] Electron 实现（待 Phase 1 启动）
+- [x] Electron 脚手架与 Phase 1 主体（项目库、结构索引、Dashboard 嵌入、Onboarding、graph-reader）
+- [x] Phase 2 LLM 索引（文件摘要、架构层检测、Tour 生成）
+- [x] postMessage 双向通信（Dashboard ↔ 壳层节点高亮/Tour 同步/Ctrl+K 跳转）
+- [x] 桥接 Tab（论文 ↔ 代码概念链接）
+- [x] Vitest 单测基线（32 tests 通过）
+- [ ] Phase 2 剩余（diff 集成、增量索引 UI、LLM 成本提示）
+- [ ] Phase 3 RAG（LanceDB 论文向量检索）
+- [ ] Phase 4 发布（NSIS 安装包）
 
 
 

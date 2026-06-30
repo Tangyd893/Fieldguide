@@ -28,9 +28,9 @@ export async function cloneRepo(
 
   try {
     const git: SimpleGit = simpleGit()
-    const options: Record<string, unknown> = { '--depth': 1 }
+    const options: string[] = ['--depth', '1']
     if (branch) {
-      options['--branch'] = branch
+      options.push('--branch', branch)
     }
     await git.clone(url, targetDir, options)
     return { success: true, path: targetDir }

@@ -35,6 +35,7 @@ doc-index（本文）
     → testing-strategy（怎么测）
     → roadmap（分阶段）
     → design-review（风险与验收）
+    → todos（工程待办，实现期维护）
 ```
 
 ### 2.2 文档职责（单一事实来源）
@@ -46,6 +47,7 @@ doc-index（本文）
 | [architecture.md](./architecture.md) | 进程模型、目录结构、IPC、SQLite 表、Agent 工具表 | Phase 排期 |
 | [ui-spec.md](./ui-spec.md) | 布局、文件树、可分隔面板、面板 Tab 分工 | graph schema |
 | [roadmap.md](./roadmap.md) | Phase 任务 ID、验收、周期 | 架构细节 |
+| [todos.md](./todos.md) | **工程待办**、优先级、完成勾选 | Phase 级排期（见 roadmap） |
 | [onboarding-spec.md](./onboarding-spec.md) | 引导四步、Demo 仓库约定 | — |
 | [testing-strategy.md](./testing-strategy.md) | 测试金字塔、fixture | 产品愿景 |
 | [design-review.md](./design-review.md) | 最终验收 §3.5、风险、已决项 | 任务拆解 |
@@ -242,6 +244,7 @@ flowchart TD
 | architecture | v0.4 |
 | ui-spec | v0.4 |
 | roadmap | v0.3 |
+| todos | 2026-06-30（实现期维护） |
 | design-review | v0.3 |
 | getting-started | v0.3 |
 | testing-strategy | v0.3 |

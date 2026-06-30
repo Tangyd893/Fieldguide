@@ -8,6 +8,8 @@ import { useState } from 'react'
 interface Props {
   t: (key: string) => string
   onComplete: (locale: string, projectsRoot: string) => void
+  /** Called when user picks one of the three start options on the final step */
+  onStartOption?: (option: 'demo' | 'local' | 'skip', locale: string, projectsRoot: string) => void
 }
 
 const STEPS = ['welcome', 'language', 'projectRoot', 'start'] as const
@@ -18,7 +20,7 @@ const LOCALE_OPTIONS = [
   { value: 'en-US', label: 'English' },
 ]
 
-export default function OnboardingWizard({ onComplete }: Props) {
+export default function OnboardingWizard({ onComplete, onStartOption }: Props) {
   const [step, setStep] = useState(0)
   const [locale, setLocale] = useState('zh-CN')
   const [projectsRoot, setProjectsRoot] = useState('')
@@ -35,6 +37,15 @@ export default function OnboardingWizard({ onComplete }: Props) {
 
   function prev() {
     if (step > 0) setStep(step - 1)
+  }
+
+  function handleStartOption(option: 'demo' | 'local' | 'skip') {
+    if (onStartOption) {
+      onStartOption(option, locale, projectsRoot)
+    } else {
+      // Legacy: just complete
+      onComplete(locale, projectsRoot)
+    }
   }
 
   const stepKey = STEPS[step]
@@ -118,21 +129,21 @@ export default function OnboardingWizard({ onComplete }: Props) {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">如何开始？</h3>
               <div className="space-y-3">
                 <button
-                  onClick={next}
+                  onClick={() => handleStartOption('demo')}
                   className="w-full text-left px-4 py-3 rounded-lg border-2 border-blue-500 bg-blue-50 hover:bg-blue-100 transition-colors"
                 >
                   <span className="font-medium text-blue-700 text-sm">🎯 体验 Demo 项目</span>
                   <p className="text-xs text-blue-500 mt-0.5">克隆 fieldguide-demo 仓库，立即浏览示例图谱</p>
                 </button>
                 <button
-                  onClick={next}
+                  onClick={() => handleStartOption('local')}
                   className="w-full text-left px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-colors"
                 >
                   <span className="font-medium text-gray-700 text-sm">📁 打开本地项目</span>
                   <p className="text-xs text-gray-400 mt-0.5">选择已有代码仓库并开始索引</p>
                 </button>
                 <button
-                  onClick={next}
+                  onClick={() => handleStartOption('skip')}
                   className="w-full text-left px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-colors"
                 >
                   <span className="font-medium text-gray-700 text-sm">⏭ 稍后再说</span>

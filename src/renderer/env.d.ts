@@ -7,6 +7,8 @@ interface FileEntry {
   size: number
   children?: FileEntry[]
 }
+
+interface ProjectRow {
   id: string
   name: string
   slug: string
@@ -20,10 +22,22 @@ interface FileEntry {
   indexed_at: string | null
 }
 
+interface PaperRow {
+  id: string; arxiv_id: string; title: string; authors: string
+  summary: string; published: string; pdf_path: string
+  notes: string; tags: string; created_at: string
+}
+
+interface ConceptLinkRow {
+  id: string; paper_id: string; project_id: string
+  node_id: string; anchor_text: string; note: string; created_at: string
+}
+
 interface FieldguideAPI {
   // Config
   configGet(): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: { message: string } }>
   configSet(patch: Record<string, unknown>): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  configTestLlm(): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
 
   // Projects
   projectList(): Promise<{ ok: boolean; data?: ProjectRow[]; error?: { message: string } }>
@@ -33,14 +47,40 @@ interface FieldguideAPI {
 
   // Graph
   graphGet(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  graphGetNode(projectId: string, nodeId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  graphNeighbors(projectId: string, nodeId: string, depth?: number): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  graphSearch(projectId: string, query: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  graphGetSource(projectId: string, opts: { nodeId?: string; path?: string; lineStart?: number; lineEnd?: number }): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  graphStats(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
 
   // Index
-  projectIndex(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  projectIndex(projectId: string, incremental?: boolean): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   onIndexProgress(cb: (data: unknown) => void): () => void
 
   // File tree & code
   fileTree(projectId: string): Promise<{ ok: boolean; data?: FileEntry[]; error?: { message: string } }>
   fileRead(projectId: string, filePath: string): Promise<{ ok: boolean; data?: { path: string; content: string; size: number }; error?: { message: string } }>
+
+  // Shell
+  openInExplorer(projectId: string, filePath: string): Promise<{ ok: boolean; error?: { message: string } }>
+  openFile(filePath: string): Promise<{ ok: boolean; error?: { message: string } }>
+  openFolderDialog(): Promise<{ ok: boolean; data?: string | null; error?: { message: string } }>
+
+  // Chat
+  chatSend(projectId: string, messages: Array<{ role: string; content: string }>): Promise<{ ok: boolean; data?: { content: string }; error?: { message: string } }>
+
+  // Papers
+  paperList(): Promise<{ ok: boolean; data?: PaperRow[]; error?: { message: string } }>
+  paperSave(paper: { arxiv_id: string; title: string; authors: string; summary: string; published: string; pdf_path?: string; tags?: string }): Promise<{ ok: boolean; data?: PaperRow; error?: { message: string } }>
+  paperUpdate(id: string, patch: { notes?: string; tags?: string; pdf_path?: string }): Promise<{ ok: boolean; data?: PaperRow; error?: { message: string } }>
+  paperRemove(id: string): Promise<{ ok: boolean; error?: { message: string } }>
+  paperSearch(query: string): Promise<{ ok: boolean; data?: PaperRow[]; error?: { message: string } }>
+  paperDownloadPdf(id: string): Promise<{ ok: boolean; data?: { pdf_path: string }; error?: { message: string } }>
+
+  // Concept Links
+  conceptList(projectId?: string, paperId?: string): Promise<{ ok: boolean; data?: ConceptLinkRow[]; error?: { message: string } }>
+  conceptAdd(link: { paper_id: string; project_id: string; node_id: string; anchor_text?: string; note?: string }): Promise<{ ok: boolean; data?: ConceptLinkRow; error?: { message: string } }>
+  conceptRemove(id: string): Promise<{ ok: boolean; error?: { message: string } }>
 
   // App
   appVersion(): Promise<string>
