@@ -1,7 +1,7 @@
 /**
  * Fieldguide App Shell — ui-spec v0.4, i18n enabled.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import ProjectLibrary from './views/ProjectLibrary/ProjectLibrary'
 import FileTree from './views/CodeMap/FileTree'
@@ -9,6 +9,7 @@ import SplitPanel from './views/CodeMap/SplitPanel'
 import GraphPanel from './views/CodeMap/GraphPanel'
 import CodeViewer from './views/CodeMap/CodeViewer'
 import ChatPanel from './views/CodeMap/ChatPanel'
+import OnboardingWizard from './views/OnboardingWizard'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
 
@@ -27,12 +28,28 @@ interface Project {
 }
 
 export default function App() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('library')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false)
   const [fileTreeWidth, setFileTreeWidth] = useState(260)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  // Check onboarding status on mount
+  useEffect(() => {
+    window.fieldguide.configGet().then((r) => {
+      if (r.ok && r.data && !(r.data as Record<string, unknown>).onboardingCompleted) {
+        setShowOnboarding(true)
+      }
+    })
+  }, [])
+
+  async function handleOnboardingComplete(locale: string, projectsRoot: string) {
+    await window.fieldguide.configSet({ locale, projectsRoot, onboardingCompleted: true })
+    i18n.changeLanguage(locale)
+    setShowOnboarding(false)
+  }
 
   const noProject = !selectedProject
 
@@ -118,6 +135,11 @@ export default function App() {
       </div>
 
       <StatusBar project={selectedProject} t={t} />
+
+      {/* Onboarding overlay */}
+      {showOnboarding && (
+        <OnboardingWizard t={t} onComplete={handleOnboardingComplete} />
+      )}
     </div>
   )
 }
