@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 
-export type PanelTab = 'graph' | 'code' | 'chat'
+export type PanelTab = 'graph' | 'code' | 'chat' | 'tour'
 export interface PanelState { tabs: PanelTab[]; activeTab: PanelTab }
 
 interface Props {
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function SplitPanel({ renderGraph, renderCode, renderChat, activeFilePath, t }: Props) {
-  const [panels, setPanels] = useState<PanelState[]>([{ tabs: ['graph', 'code', 'chat'], activeTab: 'graph' }])
+  const [panels, setPanels] = useState<PanelState[]>([{ tabs: ['graph', 'code', 'chat', 'tour'], activeTab: 'graph' }])
   const [splitPos, setSplitPos] = useState(50)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -20,7 +20,7 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, active
 
   useEffect(() => {
     if (activeFilePath && panels.length === 1) {
-      setPanels([{ tabs: ['graph', 'code', 'chat'], activeTab: 'graph' }, { tabs: ['graph', 'code', 'chat'], activeTab: 'code' }])
+      setPanels([{ tabs: ['graph', 'code', 'chat', 'tour'], activeTab: 'graph' }, { tabs: ['graph', 'code', 'chat', 'tour'], activeTab: 'code' }])
       setSplitPos(55)
     } else if (activeFilePath && panels.length === 2 && panels[1].activeTab !== 'code') {
       setPanels(prev => { const n = [...prev]; n[1] = { ...n[1], activeTab: 'code' }; return n })
@@ -45,13 +45,14 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, active
     setPanels(prev => { const n = [...prev]; n[i] = { ...n[i], activeTab: tab }; return n })
   }
 
-  const TAB_LABELS: Record<PanelTab, string> = { graph: t('panels.graph'), code: t('panels.code'), chat: t('panels.chat') }
+  const TAB_LABELS: Record<PanelTab, string> = { graph: t('panels.graph'), code: t('panels.code'), chat: t('panels.chat'), tour: 'Tour' }
 
   function renderContent(panel: PanelState, _i: number) {
     switch (panel.activeTab) {
       case 'graph': return renderGraph()
       case 'code': return renderCode(activeFilePath)
       case 'chat': return renderChat()
+      case 'tour': return renderTour?.() ?? <div className="p-4 text-gray-400 text-sm">Tour 不可用</div>
     }
   }
 
@@ -71,7 +72,7 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, active
               ))}
             </div>
             <div className="flex items-center gap-0.5 px-1">
-              {!hasTwo && <button onClick={() => { setPanels([...panels, { tabs: ['graph', 'code', 'chat'], activeTab: 'code' }]); setSplitPos(50) }}
+              {!hasTwo && <button onClick={() => { setPanels([...panels, { tabs: ['graph', 'code', 'chat', 'tour'], activeTab: 'code' }]); setSplitPos(50) }}
                 className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs rounded" title={t('tooltip.addPanel')}>＋</button>}
               {hasTwo && <button onClick={() => setPanels(panels.filter((_, idx) => idx !== i))}
                 className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-500 text-xs rounded" title={t('tooltip.closePanel')}>×</button>}

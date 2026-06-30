@@ -46,6 +46,8 @@ const api = {
     ipcRenderer.invoke('app:version'),
   dashboardUrl: (): Promise<string> =>
     ipcRenderer.invoke('dashboard:url'),
+  dashboardSetProject: (projectRoot: string | null): Promise<void> =>
+    ipcRenderer.invoke('dashboard:setProject', { projectRoot }),
 }
 
 contextBridge.exposeInMainWorld('fieldguide', api)

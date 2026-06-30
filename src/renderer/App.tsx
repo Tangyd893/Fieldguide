@@ -9,6 +9,7 @@ import SplitPanel from './views/CodeMap/SplitPanel'
 import GraphPanel from './views/CodeMap/GraphPanel'
 import CodeViewer from './views/CodeMap/CodeViewer'
 import ChatPanel from './views/CodeMap/ChatPanel'
+import TourPanel from './views/CodeMap/TourPanel'
 import OnboardingWizard from './views/OnboardingWizard'
 import CommandPalette from './views/CommandPalette'
 
@@ -61,6 +62,15 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // Notify Dashboard of project switch
+  useEffect(() => {
+    if (selectedProject) {
+      window.fieldguide.dashboardSetProject?.(selectedProject.root_path)
+    } else {
+      window.fieldguide.dashboardSetProject?.(null)
+    }
+  }, [selectedProject?.id])
 
   async function handleOnboardingComplete(locale: string, projectsRoot: string) {
     await window.fieldguide.configSet({ locale, projectsRoot, onboardingCompleted: true })
@@ -225,6 +235,7 @@ function CodeMapLayout({
       renderGraph={() => <GraphPanel t={t} />}
       renderCode={(path) => <CodeViewer projectId={project.id} filePath={path} t={t} />}
       renderChat={() => <ChatPanel t={t} />}
+      renderTour={() => <TourPanel projectId={project.id} t={t} />}
       activeFilePath={activeFilePath}
       t={t}
     />

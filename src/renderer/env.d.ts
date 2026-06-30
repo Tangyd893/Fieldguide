@@ -45,6 +45,7 @@ interface FieldguideAPI {
   // App
   appVersion(): Promise<string>
   dashboardUrl(): Promise<string>
+  dashboardSetProject(projectRoot: string | null): Promise<void>
 }
 
 declare global {

@@ -18,6 +18,7 @@ import {
 import { readProjectTree } from '../file-tree'
 import { cloneRepo } from '../git'
 import { indexProject } from '../ua/client'
+import { setDashboardGraph } from '../ua/dashboard'
 import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
 import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
@@ -90,6 +91,10 @@ function getLatestMtime(rootPath: string): string | null {
 
 ipcMain.handle('dashboard:url', (): string => {
   return dashboardUrl
+})
+
+ipcMain.handle('dashboard:setProject', (_e, { projectRoot }: { projectRoot: string | null }): void => {
+  setDashboardGraph(projectRoot)
 })
 
 /* ──────────── Projects ──────────── */
