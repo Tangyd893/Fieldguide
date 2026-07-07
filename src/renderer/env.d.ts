@@ -82,6 +82,14 @@ interface FieldguideAPI {
   conceptAdd(link: { paper_id: string; project_id: string; node_id: string; anchor_text?: string; note?: string }): Promise<{ ok: boolean; data?: ConceptLinkRow; error?: { message: string } }>
   conceptRemove(id: string): Promise<{ ok: boolean; error?: { message: string } }>
 
+  // Diff
+  diffAnalyze(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  onDiffResult(cb: (data: unknown) => void): () => void
+
+  // Bridge Tour
+  bridgeGenerateTour(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  onBridgeTourGenerated(cb: (data: unknown) => void): () => void
+
   // App
   appVersion(): Promise<string>
   dashboardUrl(): Promise<string>

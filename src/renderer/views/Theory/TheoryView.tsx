@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react'
 import ConceptBridge from './ConceptBridge'
+import PdfReader from './PdfReader'
 
 interface PaperRow {
   id: string; arxiv_id: string; title: string; authors: string
@@ -42,6 +43,8 @@ export default function TheoryView({ t, projectId }: Props) {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [pdfPath, setPdfPath] = useState<string | null>(null)
+  const [showPdfReader, setShowPdfReader] = useState(false)
+  const [pdfAnchorText, setPdfAnchorText] = useState('')
 
   useEffect(() => { loadPapers() }, [])
 
@@ -137,6 +140,31 @@ export default function TheoryView({ t, projectId }: Props) {
       }
     } catch { /* ignore */ }
     finally { setDownloading(false) }
+  }
+
+  async function openPdfInApp() {
+    if (!selectedPaper) return
+    let path = pdfPath
+    if (!path) {
+      setDownloading(true)
+      try {
+        const r = await window.fieldguide.paperDownloadPdf(selectedPaper.id)
+        if (r.ok && r.data) {
+          const d = r.data as { pdf_path: string }
+          path = d.pdf_path
+          setPdfPath(d.pdf_path)
+        }
+      } catch { /* ignore */ }
+      finally { setDownloading(false) }
+    }
+    if (path) {
+      setShowPdfReader(true)
+    }
+  }
+
+  function handlePdfTextSelected(text: string) {
+    setPdfAnchorText(text)
+    setShowPdfReader(false)
   }
 
   async function openPdf() {
@@ -271,7 +299,7 @@ export default function TheoryView({ t, projectId }: Props) {
                 </div>
                 <div className="flex gap-1.5 shrink-0">
                   {pdfPath ? (
-                    <button onClick={openPdf}
+                    <button onClick={openPdfInApp}
                       className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 border border-green-200">
                       📖 阅读 PDF
                     </button>
@@ -305,7 +333,7 @@ export default function TheoryView({ t, projectId }: Props) {
 
             {/* Concept Bridge */}
             {projectId && (
-              <ConceptBridge paperId={selectedPaper.id} projectId={projectId} t={t} />
+              <ConceptBridge paperId={selectedPaper.id} projectId={projectId} t={t} initialAnchorText={pdfAnchorText} />
             )}
 
             {/* Delete */}
@@ -318,6 +346,17 @@ export default function TheoryView({ t, projectId }: Props) {
           </div>
         )}
       </div>
+
+      {/* PDF Reader overlay */}
+      {showPdfReader && pdfPath && selectedPaper && projectId && (
+        <PdfReader
+          pdfPath={pdfPath}
+          paperId={selectedPaper.id}
+          projectId={projectId}
+          onClose={() => setShowPdfReader(false)}
+          onSelectText={handlePdfTextSelected}
+        />
+      )}
     </div>
   )
 }

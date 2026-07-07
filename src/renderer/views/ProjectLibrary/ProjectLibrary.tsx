@@ -10,10 +10,11 @@ interface Props {
   selected: ProjectRow | null
   onSelect: (p: ProjectRow | null) => void
   onIndex?: (projectId: string) => void
+  onFullReindex?: (projectId: string) => void
   t: (key: string, opts?: Record<string, unknown>) => string
 }
 
-export default function ProjectLibrary({ selected, onSelect, onIndex, t }: Props) {
+export default function ProjectLibrary({ selected, onSelect, onIndex, onFullReindex, t }: Props) {
   const [projects, setProjects] = useState<ProjectRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
@@ -24,6 +25,8 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, t }: Props
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string|null>(null)
   const [deleting, setDeleting] = useState<string|null>(null)
+  const [analyzingDiff, setAnalyzingDiff] = useState<string|null>(null)
+  const [diffResult, setDiffResult] = useState<{ projectId: string; summary: string } | null>(null)
 
   useEffect(() => { loadProjects() }, [])
 
@@ -45,6 +48,24 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, t }: Props
       } else setError(r.error?.message ?? '添加失败')
     } catch (err) { setError(String(err)) }
     finally { setAdding(false) }
+  }
+
+  async function handleDiffAnalyze(projectId: string) {
+    setAnalyzingDiff(projectId)
+    setDiffResult(null)
+    try {
+      const r = await window.fieldguide.diffAnalyze(projectId)
+      if (r.ok && r.data) {
+        const d = r.data as { summary?: string; noChanges?: boolean; message?: string }
+        setDiffResult({ projectId, summary: d.summary ?? d.message ?? (d.noChanges ? '未检测到文件变更。' : '分析完成。') })
+      } else {
+        setDiffResult({ projectId, summary: r.error?.message ?? '分析失败' })
+      }
+    } catch (err) {
+      setDiffResult({ projectId, summary: String(err) })
+    } finally {
+      setAnalyzingDiff(null)
+    }
   }
 
   async function handleDelete(id: string) {
@@ -126,6 +147,21 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, t }: Props
                   title={p.status === 'stale' ? '更新索引' : '开始索引'}
                 >{p.status === 'stale' ? '🔄 更新' : '⚡ 索引'}</button>
               )}
+              {(p.status === 'stale' || p.status === 'ready') && p.node_count > 0 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDiffAnalyze(p.id) }}
+                  disabled={analyzingDiff === p.id}
+                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-purple-500 text-xs px-2 py-0.5 border border-gray-200 rounded hover:border-purple-300 transition-all disabled:opacity-40"
+                  title="分析变更影响"
+                >{analyzingDiff === p.id ? '⏳' : '📊 分析'}</button>
+              )}
+              {(p.status === 'stale' || p.status === 'ready') && p.node_count > 0 && onFullReindex && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); if (window.confirm(`确定对「${p.name}」执行全量重建索引？\n这将忽略已有缓存重新分析所有文件。`)) onFullReindex(p.id) }}
+                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-amber-500 text-xs px-2 py-0.5 border border-gray-200 rounded hover:border-amber-300 transition-all"
+                  title="全量重建索引（忽略已有缓存）"
+                >🔁 全量</button>
+              )}
               <span className="text-gray-300 text-lg">→</span>
             </div>
           </button>
@@ -134,6 +170,7 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, t }: Props
       {showAdd && <AddDialog mode={addMode} localPath={localPath} gitUrl={gitUrl} gitBranch={gitBranch} error={error} adding={adding}
         onLocalPathChange={setLocalPath} onGitUrlChange={setGitUrl} onGitBranchChange={setGitBranch}
         onClose={()=>{setShowAdd(false);setError(null)}} onAdd={handleAdd} t={t} />}
+      {diffResult && <DiffResultDialog result={diffResult} onClose={() => setDiffResult(null)} />}
     </div>
   )
 }
@@ -169,6 +206,24 @@ function AddDialog({ mode, localPath, gitUrl, gitBranch, error, adding, onLocalP
       <div className="flex justify-end gap-3 mt-6">
         <button onClick={onClose} disabled={adding} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">{t('project.cancel')}</button>
         <button onClick={onAdd} disabled={!can||adding} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40">{adding?t('project.processing'):t('project.addProject')}</button>
+      </div>
+    </div>
+  </>
+}
+
+function DiffResultDialog({ result, onClose }: { result: { projectId: string; summary: string }; onClose: () => void }) {
+  return <>
+    <div className="fixed inset-0 bg-black/25 z-40" onClick={onClose} />
+    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[80vh] bg-white rounded-xl shadow-xl z-50 p-6 overflow-auto">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">📊 变更影响分析</h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+      </div>
+      <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
+        {result.summary}
+      </div>
+      <div className="flex justify-end mt-6">
+        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">关闭</button>
       </div>
     </div>
   </>

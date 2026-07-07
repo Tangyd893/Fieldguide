@@ -128,19 +128,19 @@ export default function App() {
     }
   }, [selectedProject?.id])
 
-  async function handleOnboardingComplete(locale: string, projectsRoot: string) {
+  async function handleOnboardingComplete(locale: string, projectsRoot: string, navigateTo?: 'codemap' | 'library') {
     await window.fieldguide.configSet({ locale, projectsRoot, onboardingCompleted: true })
     i18n.changeLanguage(locale)
     setShowOnboarding(false)
+    if (navigateTo === 'codemap') setActiveTab('codemap')
+    else if (navigateTo === 'library') setActiveTab('library')
   }
 
-  async function handleOnboardingStart(option: 'demo' | 'local' | 'skip', locale: string, projectsRoot: string) {
-    // Complete onboarding first
-    await window.fieldguide.configSet({ locale, projectsRoot, onboardingCompleted: true })
+  /** Called from OnboardingWizard Step 5: sets up project without closing wizard. Returns projectId. */
+  async function handleOnboardingSetup(option: 'demo' | 'local', locale: string, projectsRoot: string): Promise<string | null> {
+    await window.fieldguide.configSet({ locale, projectsRoot })
     i18n.changeLanguage(locale)
-    setShowOnboarding(false)
 
-    // Handle the selected option
     switch (option) {
       case 'demo': {
         const demoUrl = 'https://github.com/fieldguide-app/fieldguide-demo'
@@ -148,13 +148,12 @@ export default function App() {
         if (result.ok && result.data) {
           const project = result.data as Project
           setSelectedProject(project)
-          setActiveTab('codemap')
-          // Auto-index the demo project
-          setTimeout(() => doIndex(project.id, project.name), 500)
+          doIndex(project.id, project.name)
+          return project.id
         } else {
           showToast('error', result.error?.message ?? 'Demo 克隆失败，请检查网络后重试')
+          return null
         }
-        break
       }
       case 'local': {
         const folderResult = await window.fieldguide.openFolderDialog?.()
@@ -163,15 +162,20 @@ export default function App() {
           if (result.ok && result.data) {
             const project = result.data as Project
             setSelectedProject(project)
-            setActiveTab('codemap')
+            doIndex(project.id, project.name)
+            return project.id
           }
         }
-        break
+        return null
       }
-      case 'skip':
-        // Just go to library
-        break
     }
+  }
+
+  /** Legacy path: user picks 'skip' on Step 4 — directly complete onboarding. */
+  async function handleOnboardingStart(option: 'demo' | 'local' | 'skip', locale: string, projectsRoot: string) {
+    await window.fieldguide.configSet({ locale, projectsRoot, onboardingCompleted: true })
+    i18n.changeLanguage(locale)
+    setShowOnboarding(false)
   }
 
   async function handleReIndex(incremental = false) {
@@ -344,6 +348,11 @@ export default function App() {
                 const p = list.ok ? (list.data as Project[] | undefined)?.find(x => x.id === projectId) : undefined
                 if (p) doIndex(p.id, p.name, p.status === 'stale')
               }}
+              onFullReindex={async (projectId) => {
+                const list = await window.fieldguide.projectList()
+                const p = list.ok ? (list.data as Project[] | undefined)?.find(x => x.id === projectId) : undefined
+                if (p) doIndex(p.id, p.name, false)
+              }}
               t={t}
             />
           )}
@@ -373,7 +382,7 @@ export default function App() {
 
       {/* Onboarding overlay */}
       {showOnboarding && (
-        <OnboardingWizard t={t} onComplete={handleOnboardingComplete} onStartOption={handleOnboardingStart} />
+        <OnboardingWizard t={t} onComplete={handleOnboardingComplete} onStartOption={handleOnboardingStart} onSetupStart={handleOnboardingSetup} />
       )}
 
       {/* Command palette */}

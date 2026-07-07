@@ -1,18 +1,20 @@
 /**
  * OnboardingWizard — 首次启动引导 (ui-spec §2.4, onboarding-spec.md)
  *
- * 步骤：欢迎 → 语言 → 项目根目录 → 如何开始
+ * 步骤：欢迎 → 语言 → 项目根目录 → 如何开始 → 完成页
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Props {
   t: (key: string) => string
-  onComplete: (locale: string, projectsRoot: string) => void
-  /** Called when user picks one of the three start options on the final step */
+  onComplete: (locale: string, projectsRoot: string, navigateTo?: 'codemap' | 'library') => void
+  /** Called when user picks 'skip' on step 4 — legacy direct-complete path */
   onStartOption?: (option: 'demo' | 'local' | 'skip', locale: string, projectsRoot: string) => void
+  /** Called from step 5 to set up the project (demo clone / local add + index). Returns projectId. */
+  onSetupStart?: (option: 'demo' | 'local', locale: string, projectsRoot: string) => Promise<string | null>
 }
 
-const STEPS = ['welcome', 'language', 'projectRoot', 'start'] as const
+const STEPS = ['welcome', 'language', 'projectRoot', 'start', 'step5'] as const
 
 const LOCALE_OPTIONS = [
   { value: 'zh-CN', label: '简体中文' },
@@ -20,18 +22,25 @@ const LOCALE_OPTIONS = [
   { value: 'en-US', label: 'English' },
 ]
 
-export default function OnboardingWizard({ onComplete, onStartOption }: Props) {
+type Step5Phase = 'setting-up' | 'indexing' | 'complete' | 'error'
+
+export default function OnboardingWizard({ onComplete, onStartOption, onSetupStart }: Props) {
   const [step, setStep] = useState(0)
   const [locale, setLocale] = useState('zh-CN')
   const [projectsRoot, setProjectsRoot] = useState('')
 
+  // Step 5 state
+  const [selectedOption, setSelectedOption] = useState<'demo' | 'local' | null>(null)
+  const [step5Phase, setStep5Phase] = useState<Step5Phase>('setting-up')
+  const [step5Progress, setStep5Progress] = useState('')
+  const [step5NodeCount, setStep5NodeCount] = useState(0)
+  const [step5Error, setStep5Error] = useState('')
+
   const total = STEPS.length
 
   function next() {
-    if (step < total - 1) {
+    if (step < total - 2) { // Step 5 handled via option selection, not "next"
       setStep(step + 1)
-    } else {
-      onComplete(locale, projectsRoot)
     }
   }
 
@@ -40,15 +49,92 @@ export default function OnboardingWizard({ onComplete, onStartOption }: Props) {
   }
 
   function handleStartOption(option: 'demo' | 'local' | 'skip') {
-    if (onStartOption) {
-      onStartOption(option, locale, projectsRoot)
+    if (option === 'skip') {
+      // Legacy: just complete directly, no Step 5
+      if (onStartOption) {
+        onStartOption(option, locale, projectsRoot)
+      } else {
+        onComplete(locale, projectsRoot)
+      }
     } else {
-      // Legacy: just complete
-      onComplete(locale, projectsRoot)
+      setSelectedOption(option)
+      setStep5Phase('setting-up')
+      setStep5Progress('')
+      setStep5NodeCount(0)
+      setStep5Error('')
+      setStep(4) // move to Step 5
     }
   }
 
+  // Step 5: kick off project setup when this step becomes active
+  useEffect(() => {
+    if (step !== 4 || !selectedOption || !onSetupStart) return
+
+    let cancelled = false
+    let unsubProgress: (() => void) | undefined
+
+    async function run() {
+      // Phase 1: project setup (clone / add local)
+      setStep5Phase('setting-up')
+      setStep5Progress('正在准备项目…')
+
+      let projectId: string | null = null
+      try {
+        projectId = await onSetupStart!(selectedOption!, locale, projectsRoot)
+      } catch (err) {
+        if (!cancelled) {
+          setStep5Error(String(err))
+          setStep5Phase('error')
+        }
+        return
+      }
+
+      if (cancelled) return
+      if (!projectId) {
+        // Project setup failed silently (error toast already shown by parent)
+        setStep5Phase('complete')
+        setStep5NodeCount(0)
+        return
+      }
+
+      // Phase 2: monitor index progress
+      setStep5Phase('indexing')
+      setStep5Progress('开始索引…')
+
+      unsubProgress = window.fieldguide.onIndexProgress?.((data: unknown) => {
+        if (cancelled) return
+        const ev = data as { type: string; phase?: string; current?: number; total?: number; error?: string; nodeCount?: number; projectId?: string }
+
+        // Only track events for this project
+        if (ev.projectId && ev.projectId !== projectId) return
+
+        if (ev.type === 'phase') setStep5Progress(ev.phase ?? '')
+        else if (ev.type === 'progress') setStep5Progress(`${ev.phase ?? ''} ${ev.current ?? 0}/${ev.total ?? 0}`)
+        else if (ev.type === 'complete') {
+          setStep5Phase('complete')
+          setStep5NodeCount(ev.nodeCount ?? 0)
+          setStep5Progress('')
+        } else if (ev.type === 'error') {
+          setStep5Error(ev.error ?? '索引失败')
+          setStep5Phase('error')
+        }
+      })
+    }
+
+    run()
+
+    return () => {
+      cancelled = true
+      unsubProgress?.()
+    }
+  }, [step, selectedOption, locale, projectsRoot, onSetupStart])
+
+  function handleFinish(navigateTo: 'codemap' | 'library') {
+    onComplete(locale, projectsRoot, navigateTo)
+  }
+
   const stepKey = STEPS[step]
+  const isStep5 = stepKey === 'step5'
 
   return (
     <>
@@ -152,27 +238,106 @@ export default function OnboardingWizard({ onComplete, onStartOption }: Props) {
               </div>
             </div>
           )}
+
+          {stepKey === 'step5' && (
+            <div>
+              {step5Phase === 'setting-up' && (
+                <div className="text-center py-4">
+                  <div className="text-3xl mb-3 animate-pulse">⏳</div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">正在准备项目…</h3>
+                  <p className="text-sm text-gray-500">{step5Progress || '请稍候…'}</p>
+                </div>
+              )}
+
+              {step5Phase === 'indexing' && (
+                <div className="text-center py-4">
+                  <div className="text-3xl mb-3 animate-pulse">🔍</div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">正在索引项目</h3>
+                  <p className="text-sm text-gray-500 mb-3">{step5Progress}</p>
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '60%' }} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    这可能需要 1–2 分钟，取决于项目大小。
+                  </p>
+                </div>
+              )}
+
+              {step5Phase === 'complete' && (
+                <div className="text-center py-2">
+                  <div className="text-5xl mb-3">🎉</div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">设置完成！</h3>
+                  {step5NodeCount > 0 ? (
+                    <p className="text-sm text-gray-500 mb-4">
+                      索引完成，共 <span className="font-semibold text-blue-600">{step5NodeCount}</span> 个节点。
+                      <br />
+                      建议跟随 <strong>Intro Tour</strong> 了解项目的主链路。
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 mb-4">
+                      项目已就绪。建议在代码地图中跟随 <strong>Intro Tour</strong> 了解项目结构。
+                    </p>
+                  )}
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => handleFinish('codemap')}
+                      className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition-colors"
+                    >
+                      🗺️ 打开代码地图
+                    </button>
+                    <button
+                      onClick={() => handleFinish('library')}
+                      className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      📚 留在项目库
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {step5Phase === 'error' && (
+                <div className="text-center py-4">
+                  <div className="text-5xl mb-3">⚠️</div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">设置遇到问题</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    {step5Error || '项目准备失败，请检查网络或路径后重试。'}
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => handleFinish('library')}
+                      className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition-colors"
+                    >
+                      进入项目库
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-between px-8 pb-6">
-          <button
-            onClick={prev}
-            disabled={step === 0}
-            className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-0 transition-opacity"
-          >
-            ← 上一步
-          </button>
-          <span className="text-xs text-gray-300 self-center">
-            {step + 1} / {total}
-          </span>
-          <button
-            onClick={next}
-            className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            {step === total - 1 ? '完成' : '下一步 →'}
-          </button>
-        </div>
+        {/* Footer — hidden on Step 5 (has its own buttons) */}
+        {!isStep5 && (
+          <div className="flex justify-between px-8 pb-6">
+            <button
+              onClick={prev}
+              disabled={step === 0}
+              className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-0 transition-opacity"
+            >
+              ← 上一步
+            </button>
+            <span className="text-xs text-gray-300 self-center">
+              {step + 1} / {total}
+            </span>
+            <button
+              onClick={next}
+              disabled={step >= total - 2}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-40"
+            >
+              {step === total - 2 ? '—' : '下一步 →'}
+            </button>
+          </div>
+        )}
       </div>
     </>
   )

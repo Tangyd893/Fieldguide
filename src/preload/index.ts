@@ -98,10 +98,24 @@ const api = {
   // Diff
   diffAnalyze: (projectId: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('diff:analyze', { projectId }),
+  onDiffResult: (cb: (data: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => cb(data)
+    ipcRenderer.on('diff:result', handler)
+    return () => {
+      ipcRenderer.removeListener('diff:result', handler)
+    }
+  },
 
   // Bridge Tour
   bridgeGenerateTour: (projectId: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('bridge:generateTour', { projectId }),
+  onBridgeTourGenerated: (cb: (data: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => cb(data)
+    ipcRenderer.on('bridge:tourGenerated', handler)
+    return () => {
+      ipcRenderer.removeListener('bridge:tourGenerated', handler)
+    }
+  },
 
   // App
   appVersion: (): Promise<string> =>

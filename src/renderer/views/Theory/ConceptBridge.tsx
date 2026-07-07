@@ -9,6 +9,7 @@ interface Props {
   paperId: string
   projectId: string
   t: (key: string) => string
+  initialAnchorText?: string
 }
 
 interface LinkRow {
@@ -27,7 +28,7 @@ interface PaperRow {
   notes: string; tags: string; created_at: string
 }
 
-export default function ConceptBridge({ paperId, projectId, t: _t }: Props) {
+export default function ConceptBridge({ paperId, projectId, t: _t, initialAnchorText }: Props) {
   const [links, setLinks] = useState<LinkRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
@@ -38,8 +39,20 @@ export default function ConceptBridge({ paperId, projectId, t: _t }: Props) {
   const [linkNote, setLinkNote] = useState('')
   const [adding, setAdding] = useState(false)
   const [explaining, setExplaining] = useState<string | null>(null)
+  const [suggestingAI, setSuggestingAI] = useState(false)
+  const [aiSuggestedNodes, setAiSuggestedNodes] = useState<GraphNode[]>([])
+  const [aiSuggestError, setAiSuggestError] = useState('')
 
   useEffect(() => { loadLinks() }, [paperId, projectId])
+
+  // When initialAnchorText is provided from PDF reader, auto-open the add form with pre-filled text
+  useEffect(() => {
+    if (initialAnchorText) {
+      setShowAdd(true)
+      setAnchorText(initialAnchorText)
+      loadNodes()
+    }
+  }, [initialAnchorText])
 
   async function loadLinks() {
     setLoading(true)
@@ -102,6 +115,65 @@ export default function ConceptBridge({ paperId, projectId, t: _t }: Props) {
     await loadLinks()
   }
 
+  async function suggestNodes() {
+    setSuggestingAI(true)
+    setAiSuggestError('')
+    setAiSuggestedNodes([])
+    try {
+      // Get paper info
+      const paperR = await window.fieldguide.paperList()
+      const paper = paperR.ok ? (paperR.data as PaperRow[] | undefined)?.find(p => p.id === paperId) : undefined
+      if (!paper) { setAiSuggestError('论文信息加载失败'); return }
+
+      // Load nodes if not already loaded
+      let nodeList = nodes
+      if (nodeList.length === 0) {
+        const r = await window.fieldguide.graphGet(projectId)
+        if (r.ok && r.data) {
+          const g = r.data as { nodes?: GraphNode[] }
+          nodeList = (g.nodes || []).filter(n => n.type === 'function' || n.type === 'class' || n.type === 'file')
+          setNodes(nodeList)
+        }
+      }
+
+      if (nodeList.length === 0) { setAiSuggestError('图谱尚未生成，请先索引项目'); return }
+
+      // Build candidate list (limit to 40 for prompt size)
+      const candidates = nodeList.slice(0, 40)
+      const candidateLines = candidates.map((n, i) =>
+        `${i + 1}. ${n.label || n.id} :: ${n.type || 'unknown'} :: ${n.filePath || ''}${n.metadata?.summary ? ' // ' + n.metadata.summary.slice(0, 80) : ''}`
+      ).join('\n')
+
+      const prompt = `请根据以下论文内容，从代码节点列表中推荐最相关的 3-5 个节点。只返回候选编号（逗号分隔），例如"3,7,12,25,8"。不要返回其他内容。
+
+论文标题：${paper.title}
+摘要：${paper.summary.slice(0, 600)}
+
+候选节点（编号 :: 名称 :: 类型 :: 文件路径）：
+${candidateLines}`
+
+      const r = await window.fieldguide.chatSend(projectId, [{ role: 'user', content: prompt }])
+      if (r.ok && r.data) {
+        const d = r.data as { content: string }
+        // Parse comma-separated numbers
+        const nums = d.content.match(/\d+/g)
+        if (nums) {
+          const indices = nums.map(Number).filter(n => n >= 1 && n <= candidates.length)
+          const suggested = [...new Set(indices)].map(i => candidates[i - 1])
+          setAiSuggestedNodes(suggested)
+        } else {
+          setAiSuggestError('AI 未返回有效推荐，请手动搜索')
+        }
+      } else {
+        setAiSuggestError(r.error?.message ?? 'AI 推荐失败')
+      }
+    } catch (err) {
+      setAiSuggestError(String(err))
+    } finally {
+      setSuggestingAI(false)
+    }
+  }
+
   const filteredNodes = nodeQuery
     ? nodes.filter(n => (n.label || n.id).toLowerCase().includes(nodeQuery.toLowerCase()))
     : nodes.slice(0, 50)
@@ -145,8 +217,18 @@ export default function ConceptBridge({ paperId, projectId, t: _t }: Props) {
       {showAdd && (
         <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">搜索代码节点</label>
-            <input type="text" value={nodeQuery} onChange={(e) => setNodeQuery(e.target.value)}
+            <div className="flex items-center gap-2">
+              <label className="block text-xs font-medium text-gray-500 mb-1">搜索代码节点</label>
+              <button
+                onClick={suggestNodes}
+                disabled={suggestingAI}
+                className="text-xs text-purple-600 hover:text-purple-800 mb-1 disabled:opacity-40"
+                title="AI 根据论文内容推荐最相关的代码节点"
+              >
+                {suggestingAI ? '🤖 分析中…' : '🤖 AI 推荐'}
+              </button>
+            </div>
+            <input type="text" value={nodeQuery} onChange={(e) => { setNodeQuery(e.target.value); if (e.target.value) setAiSuggestedNodes([]) }}
               placeholder="输入函数名或类名…"
               className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
           </div>
@@ -164,8 +246,30 @@ export default function ConceptBridge({ paperId, projectId, t: _t }: Props) {
               ))}
             </div>
           )}
-          {nodeQuery && filteredNodes.length === 0 && (
+          {nodeQuery && filteredNodes.length === 0 && !aiSuggestedNodes.length && (
             <p className="text-xs text-gray-400">未找到匹配节点</p>
+          )}
+
+          {/* AI suggested nodes */}
+          {!nodeQuery && aiSuggestedNodes.length > 0 && (
+            <>
+              <p className="text-xs text-purple-600 font-medium mt-2 mb-1">🤖 AI 推荐 ({aiSuggestedNodes.length})</p>
+              <div className="max-h-28 overflow-auto border border-purple-200 rounded bg-purple-50/30">
+                {aiSuggestedNodes.map((n) => (
+                  <button key={n.id}
+                    onClick={() => { setSelectedNode(n); setNodeQuery(''); setAiSuggestedNodes([]) }}
+                    className={`w-full text-left px-2 py-1.5 text-xs hover:bg-purple-100 transition-colors ${selectedNode?.id === n.id ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}`}>
+                    <span className="font-mono">{n.label || n.id}</span>
+                    <span className="text-gray-400 ml-2">{n.type}</span>
+                    {n.filePath && <span className="text-gray-300 ml-2 truncate">— {n.filePath}</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {aiSuggestError && (
+            <p className="text-xs text-red-500">{aiSuggestError}</p>
           )}
 
           {selectedNode && (
