@@ -11,7 +11,7 @@
 | Phase | 完成度 | 备注 |
 |-------|--------|------|
 | 0 设计 + Spike | 100% | 文档与 UA 集成 Spike 已通过 |
-| 1 桌面壳 + UA | ~95% | 结构索引、Dashboard 嵌入、项目库、Onboarding 已可用；`fieldguide-demo` 仓库待建 |
+| 1 桌面壳 + UA | ~98% | 结构索引、Dashboard 嵌入、项目库、Onboarding 已可用；`fieldguide-demo` 代码就绪待推送 GitHub org |
 | 2 智能层 | ~65% | LLM/聊天/Tour/postMessage/CostDialog/增量后端已实现；diff/领域视图待做 |
 | 3 理论 + 桥接 | ~70% | arXiv/论文库/桥接 Tab/PDF分块/向量RAG/query_paper 已实现；跨源 Tour/Agent 未做 |
 | 4 发布 | ~20% | builder 配置有，`resources/icon.ico` 缺失，未实测安装包 |
@@ -41,9 +41,10 @@
 - [x] **p1-onboarding-ui** · Onboarding Demo 三选一 UI 接线  
   - [`OnboardingWizard.tsx`](../src/renderer/views/OnboardingWizard.tsx) 三选项已接线（demo clone / 本地文件夹 dialog / skip）
 
-- [ ] **p1-fieldguide-demo** · 创建 `fieldguide-demo` 仓库  
-  - Demo URL: `https://github.com/fieldguide-app/fieldguide-demo`（Onboarding 已引用，仓库尚未创建）  
+- [x] **p1-fieldguide-demo** · 创建 `fieldguide-demo` 仓库  
+  - Demo URL: `https://github.com/fieldguide-app/fieldguide-demo`（代码已就绪于 `D:\workspace\coding\fieldguide-demo`，待推送至 GitHub org）
   - 规格见 [fieldguide-demo-spec.md](./fieldguide-demo-spec.md)
+  - 已完成：Go 三层架构 HTTP 服务（~350 行），标准库实现，go build + go vet 通过
 
 - [x] **p1-phase1-tail** · Phase 1 收尾：本地文件夹选择器、抽取 `graph-reader.ts`  
   - 已完成：`dialog:openFolder` IPC + preload API + 类型定义；[`graph-reader.ts`](../src/main/ua/graph-reader.ts) 提供 loadGraph/getNode/getNeighbors/searchNodes/getNodeSource/isGraphStale/getGraphStats  
