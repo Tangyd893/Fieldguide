@@ -41,6 +41,7 @@ import {
 } from '../ua/graph-reader'
 import { indexPaper, queryPaper, countChunks, getChunks, removeChunks, getIndexStats } from '../vector'
 import { analyzeProjectDiff } from '../ua/diff'
+import { generateCrossTour, buildCrossSourceContext } from '../ua/cross-tour'
 import { logInfo, logError, logIndexStart, logIndexComplete, logIndexError, logChatRequest } from '../logger'
 import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
@@ -455,6 +456,17 @@ ipcMain.handle('chat:send', async (_e, {
     }
   } catch { /* RAG is best-effort; ignore failures */ }
 
+  // Cross-source context from concept links (paper ↔ code bridges)
+  let crossContext = ''
+  try {
+    const crossItems = buildCrossSourceContext(projectId)
+    if (crossItems.length > 0) {
+      crossContext = crossItems.slice(0, 10).map(c =>
+        `🔗 ${c.paperTitle} (arxiv:${c.arxivId})\n   📄 "${c.excerpt.slice(0, 200)}"\n   → 💻 ${c.nodeName} (${c.nodeType}) @ ${c.nodeFile}${c.note ? `\n   笔记: ${c.note.slice(0, 150)}` : ''}`
+      ).join('\n\n')
+    }
+  } catch { /* best-effort */ }
+
   const systemPrompt = [
     'You are Fieldguide AI, a code analysis assistant that helps developers understand codebases and research papers.',
     codeContext ? `\n## Project Structure\n\n${codeContext}` : `\nThe project is "${project.name}".`,
@@ -806,6 +818,26 @@ ipcMain.handle('diff:analyze', (_e, { projectId }: { projectId: string }): IpcRe
       changedNodeIds: result.changedNodeIds || [],
       affectedNodeIds: result.affectedNodeIds || [],
     })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Cross-Source Tour ──────────── */
+
+ipcMain.handle('bridge:generateTour', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  try {
+    const result = generateCrossTour(projectId)
+    if (!result) {
+      return ipcOk({ noLinks: true, message: '没有找到桥接关系，请先在「桥接」Tab 中创建论文↔代码关联。' })
+    }
+
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      win.webContents.send('bridge:tourGenerated', { stepCount: result.stepCount, summary: result.summary })
+    }
+
+    return ipcOk(result)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }

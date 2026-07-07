@@ -13,7 +13,7 @@
 | 0 设计 + Spike | 100% | 文档与 UA 集成 Spike 已通过 |
 | 1 桌面壳 + UA | ~98% | 结构索引、Dashboard 嵌入、项目库、Onboarding 已可用；`fieldguide-demo` 代码就绪待推送 GitHub org |
 | 2 智能层 | ~90% | LLM/聊天/Tour/postMessage/CostDialog/增量/变更影响分析/领域视图已实现 |
-| 3 理论 + 桥接 | ~70% | arXiv/论文库/桥接 Tab/PDF分块/向量RAG/query_paper 已实现；跨源 Tour/Agent 未做 |
+| 3 理论 + 桥接 | ~85% | arXiv/论文库/桥接 Tab/PDF分块/向量RAG/query_paper/跨源Tour/Agent已实现 |
 | 4 发布 | ~20% | builder 配置有，`resources/icon.ico` 缺失，未实测安装包 |
 
 ---
@@ -89,8 +89,11 @@
   - 实现：Dashboard 桥接 `drillIntoLayer(layerId)` postMessage；GraphPanel 层导航栏（显示 layer 名称 + 节点数，点击钻入对应层，含「总览」回退按钮）
   - GraphPanel 从 graph:get IPC 获取 layers 列表，自动渲染芯片式层选择器
 
-- [ ] **p3-cross-tour** · 概念桥接 → 对照 Tour 自动生成 + 跨源 Agent  
+- [x] **p3-cross-tour** · 概念桥接 → 对照 Tour 自动生成 + 跨源 Agent  
   - roadmap 3.6–3.8 / F-15
+  - 实现：`src/main/ua/cross-tour.ts`（generateCrossTour — 从 concept_links 生成 paper↔code 交替 Tour；buildCrossSourceContext — 为 chat Agent 提供桥接上下文）
+  - 新增 IPC：`bridge:generateTour`（生成对照 Tour 并写入 knowledge-graph.json）
+  - chat:send 增强：新增 Concept Links 上下文段，让 LLM 引用论文↔代码桥接关系
 
 - [ ] **p4-release** · NSIS 安装包实测 + 设置页日志/诊断入口  
   - [`logger.ts`](../src/main/logger.ts) 已有；[`SettingsPanel.tsx`](../src/renderer/views/SettingsPanel.tsx) 未暴露  

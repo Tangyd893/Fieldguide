@@ -99,6 +99,10 @@ const api = {
   diffAnalyze: (projectId: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('diff:analyze', { projectId }),
 
+  // Bridge Tour
+  bridgeGenerateTour: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('bridge:generateTour', { projectId }),
+
   // App
   appVersion: (): Promise<string> =>
     ipcRenderer.invoke('app:version'),
