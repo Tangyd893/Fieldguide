@@ -28,7 +28,7 @@ import type { PaperRow } from '../db'
 import { readProjectTree } from '../file-tree'
 import { cloneRepo } from '../git'
 import { indexProject } from '../ua/client'
-import { setDashboardGraph } from '../ua/dashboard'
+import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
 import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
 import {
   loadGraph,
@@ -40,6 +40,7 @@ import {
   isGraphStale,
 } from '../ua/graph-reader'
 import { indexPaper, queryPaper, countChunks, getChunks, removeChunks, getIndexStats } from '../vector'
+import { analyzeProjectDiff } from '../ua/diff'
 import { logInfo, logError, logIndexStart, logIndexComplete, logIndexError, logChatRequest } from '../logger'
 import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
@@ -770,6 +771,41 @@ ipcMain.handle('paper:indexStatus', (_e, { id }: { id: string }): IpcResult<unkn
     const stats = getIndexStats()
     const paperChunkCount = countChunks(id)
     return ipcOk({ paperId: id, chunkCount: paperChunkCount, totalStats: stats })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Diff Analysis ──────────── */
+
+ipcMain.handle('diff:analyze', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  try {
+    const result = analyzeProjectDiff(project)
+    if (!result) {
+      return ipcOk({ noChanges: true, message: '未检测到文件变更，或图谱尚未生成。' })
+    }
+
+    // Notify dashboard to refresh diff overlay
+    setDashboardDiffOverlay(project.root_path)
+
+    // Push diff overlay to dashboard via postMessage
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      win.webContents.send('diff:result', {
+        changedNodeIds: result.changedNodeIds || [],
+        affectedNodeIds: result.affectedNodeIds || [],
+        summary: result.summary,
+      })
+    }
+
+    return ipcOk({
+      ...result,
+      changedNodeIds: result.changedNodeIds || [],
+      affectedNodeIds: result.affectedNodeIds || [],
+    })
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }

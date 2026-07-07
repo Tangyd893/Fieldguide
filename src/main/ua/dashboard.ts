@@ -27,14 +27,24 @@ const MIME_TYPES: Record<string, string> = {
 
 /** Path to a project's knowledge-graph.json to serve instead of the sample */
 let projectGraphPath: string | null = null
+/** Path to a project's diff-overlay.json to serve */
+let diffOverlayPath: string | null = null
 
 export function setDashboardGraph(projectRoot: string | null): void {
   if (projectRoot) {
     const p = join(projectRoot, '.understand-anything', 'knowledge-graph.json')
     projectGraphPath = existsSync(p) ? p : null
+    const d = join(projectRoot, '.understand-anything', 'diff-overlay.json')
+    diffOverlayPath = existsSync(d) ? d : null
   } else {
     projectGraphPath = null
+    diffOverlayPath = null
   }
+}
+
+export function setDashboardDiffOverlay(projectRoot: string): void {
+  const d = join(projectRoot, '.understand-anything', 'diff-overlay.json')
+  diffOverlayPath = existsSync(d) ? d : null
 }
 
 function findDashboardDist(): string {
@@ -125,6 +135,12 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
         case 'setViewMode':
           store.setViewMode(data.mode);
           break;
+        case 'setDiffOverlay':
+          store.setDiffOverlay(data.changed || [], data.affected || []);
+          break;
+        case 'clearDiffOverlay':
+          store.clearDiffOverlay();
+          break;
       }
     }
     run();
@@ -185,6 +201,17 @@ export function registerDashboardProtocol(): string {
           headers: { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' },
         })
       } catch { /* fall through to sample */ }
+    }
+
+    // Intercept diff-overlay.json — serve project diff overlay if available
+    if (pathname === 'diff-overlay.json' && diffOverlayPath && existsSync(diffOverlayPath)) {
+      try {
+        const data = readFileSync(diffOverlayPath)
+        return new Response(data, {
+          status: 200,
+          headers: { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' },
+        })
+      } catch { /* fall through */ }
     }
 
     const filePath = join(distDir, pathname)

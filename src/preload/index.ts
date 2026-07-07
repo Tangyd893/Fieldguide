@@ -95,6 +95,10 @@ const api = {
   conceptRemove: (id: string): Promise<IpcResult<null>> =>
     ipcRenderer.invoke('concept:remove', { id }),
 
+  // Diff
+  diffAnalyze: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('diff:analyze', { projectId }),
+
   // App
   appVersion: (): Promise<string> =>
     ipcRenderer.invoke('app:version'),

@@ -12,7 +12,7 @@
 |-------|--------|------|
 | 0 设计 + Spike | 100% | 文档与 UA 集成 Spike 已通过 |
 | 1 桌面壳 + UA | ~98% | 结构索引、Dashboard 嵌入、项目库、Onboarding 已可用；`fieldguide-demo` 代码就绪待推送 GitHub org |
-| 2 智能层 | ~65% | LLM/聊天/Tour/postMessage/CostDialog/增量后端已实现；diff/领域视图待做 |
+| 2 智能层 | ~80% | LLM/聊天/Tour/postMessage/CostDialog/增量/变更影响分析已实现；领域视图待做 |
 | 3 理论 + 桥接 | ~70% | arXiv/论文库/桥接 Tab/PDF分块/向量RAG/query_paper 已实现；跨源 Tour/Agent 未做 |
 | 4 发布 | ~20% | builder 配置有，`resources/icon.ico` 缺失，未实测安装包 |
 
@@ -78,8 +78,11 @@
 
 ### P3 — Phase 2/4 后续
 
-- [ ] **p2-diff** · 集成 UA `/understand-diff`（修改文件后影响节点高亮）  
+- [x] **p2-diff** · 集成变更影响分析（修改文件后受影响节点高亮）  
   - roadmap 2.6 / F-11
+  - 实现：`src/main/ua/diff.ts`（git diff / mtime 变更检测 + 图谱节点映射 + 1-hop 影响分析 + diff-overlay.json 写入）
+  - Dashboard 桥接：`setDiffOverlay`/`clearDiffOverlay` postMessage + diff-overlay.json 自动加载
+  - 新增 IPC：`diff:analyze`
 
 - [ ] **p2-domain-view** · 领域视图（UA domain Tab 或 Dashboard 内切换）  
   - roadmap 2.10
