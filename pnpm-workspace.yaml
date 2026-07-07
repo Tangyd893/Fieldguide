@@ -1,5 +1,4 @@
 packages:
-  - 'src/*'
   - '../Understand-Anything/understand-anything-plugin/packages/*'
 allowBuilds:
   '@tree-sitter-grammars/tree-sitter-kotlin': false

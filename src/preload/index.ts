@@ -80,6 +80,12 @@ const api = {
     ipcRenderer.invoke('paper:search', { query }),
   paperDownloadPdf: (id: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('paper:downloadPdf', { id }),
+  paperIndex: (id: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('paper:index', { id }),
+  paperQuery: (query: string, paperId?: string, topK?: number): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('paper:query', { query, paperId, topK }),
+  paperIndexStatus: (id: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('paper:indexStatus', { id }),
 
   // Concept Links
   conceptList: (projectId?: string, paperId?: string): Promise<IpcResult<unknown[]>> =>

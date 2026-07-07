@@ -11,6 +11,7 @@ export type IpcErrorCode =
   | 'LLM_API_ERROR'
   | 'PARSE_ERROR'
   | 'SOURCE_UNAVAILABLE'
+  | 'EMBED_API_ERROR'
   | 'UNKNOWN';
 
 export interface IpcError {

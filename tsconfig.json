@@ -10,19 +10,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "out",
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/renderer/*"],
       "@shared/*": ["src/shared/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "dist", "tests"],
-  "references": [
-    { "path": "./tsconfig.node.json" }
-  ]
+  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx"],
+  "exclude": ["node_modules", "dist", "tests", "src/**/__tests__/**"]
 }

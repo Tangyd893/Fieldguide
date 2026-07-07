@@ -39,6 +39,7 @@ import {
   getGraphStats,
   isGraphStale,
 } from '../ua/graph-reader'
+import { indexPaper, queryPaper, countChunks, getChunks, removeChunks, getIndexStats } from '../vector'
 import { logInfo, logError, logIndexStart, logIndexComplete, logIndexError, logChatRequest } from '../logger'
 import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
@@ -439,10 +440,25 @@ ipcMain.handle('chat:send', async (_e, {
     }
   } catch { /* ignore */ }
 
+  // Try paper RAG: query chunks relevant to user's latest question
+  let ragContext = ''
+  try {
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
+    if (lastUserMsg && lastUserMsg.content.trim().length > 10) {
+      const ragResults = await queryPaper(lastUserMsg.content, undefined, 3)
+      if (ragResults.length > 0) {
+        ragContext = ragResults.map((r, i) =>
+          `📎 Chunk ${i + 1} (score: ${r.score.toFixed(3)}, arxiv:${getPaper(r.chunk.paper_id)?.arxiv_id ?? '?'})\n${r.chunk.text.slice(0, 600)}`
+        ).join('\n\n')
+      }
+    }
+  } catch { /* RAG is best-effort; ignore failures */ }
+
   const systemPrompt = [
     'You are Fieldguide AI, a code analysis assistant that helps developers understand codebases and research papers.',
     codeContext ? `\n## Project Structure\n\n${codeContext}` : `\nThe project is "${project.name}".`,
-    paperContext ? `\n## Saved Papers\n\n${paperContext}\n\nWhen relevant, reference these papers to connect theory with implementation.` : '',
+    paperContext ? `\n## Saved Papers\n\n${paperContext}` : '',
+    ragContext ? `\n## Relevant Paper Excerpts (RAG)\n\n${ragContext}\n\nUse these excerpts when relevant to the user\'s question. Cite the arxiv ID when referencing.` : '',
     '\nUse all available context to answer precisely. When referencing code, mention specific file names and symbols. When referencing papers, mention the arxiv ID. Keep answers concise and practical. Reply in the same language as the user\'s question.',
   ].filter(Boolean).join('\n')
 
@@ -709,6 +725,51 @@ ipcMain.handle('concept:remove', (_e, { id }: { id: string }): IpcResult<null> =
   try {
     removeConceptLink(id)
     return ipcOk(null)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Paper Vector Index ──────────── */
+
+ipcMain.handle('paper:index', async (_e, { id }: { id: string }): Promise<IpcResult<unknown>> => {
+  const paper = getPaper(id)
+  if (!paper) return ipcErr('UNKNOWN', '论文不存在')
+
+  try {
+    const result = await indexPaper(paper)
+    return ipcOk(result)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('API key')) return ipcErr('LLM_NOT_CONFIGURED', '请先在设置中配置 Embedding 模型', true)
+    return ipcErr('EMBED_API_ERROR', `论文索引失败: ${msg}`)
+  }
+})
+
+ipcMain.handle('paper:query', async (_e, {
+  query,
+  paperId,
+  topK,
+}: {
+  query: string
+  paperId?: string
+  topK?: number
+}): Promise<IpcResult<unknown>> => {
+  try {
+    const results = await queryPaper(query, paperId, topK ?? 5)
+    return ipcOk(results)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('API key')) return ipcErr('LLM_NOT_CONFIGURED', '请先在设置中配置 Embedding 模型', true)
+    return ipcErr('EMBED_API_ERROR', `论文查询失败: ${msg}`)
+  }
+})
+
+ipcMain.handle('paper:indexStatus', (_e, { id }: { id: string }): IpcResult<unknown> => {
+  try {
+    const stats = getIndexStats()
+    const paperChunkCount = countChunks(id)
+    return ipcOk({ paperId: id, chunkCount: paperChunkCount, totalStats: stats })
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }
