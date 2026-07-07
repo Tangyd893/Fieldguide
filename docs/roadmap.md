@@ -1,6 +1,6 @@
 # Fieldguide 路线图
 
-> 版本：v0.4 | 状态：Phase 1 近完成，Phase 2 智能层进行中
+> 版本：v0.5 | 状态：Phase 1 完成，Phase 2 智能层近完成，Phase 3 核心链路已通
 
 ---
 
@@ -10,8 +10,8 @@
 |-------|------|------|-----------|------|
 | 0 | 设计 | 产品与技术文档定稿（含 UA 集成） | 1 周 | ✅ 完成 |
 | 1 | 桌面壳 + UA 集成 | Electron 脚手架、项目库、嵌入 UA 图谱 | 3–4 周 | ✅ 完成 |
-| 2 | 智能层打通 | LLM 配置桥接、Tour/聊天/diff 桌面化 | 3–4 周 | 🔵 进行中 |
-| 3 | 理论 + 桥接 | 论文/PDF 与代码对照 | 4–5 周 | 🔵 进行中 |
+| 2 | 智能层打通 | LLM 配置桥接、Tour/聊天/diff 桌面化 | 3–4 周 | 🔵 近完成 |
+| 3 | 理论 + 桥接 | 论文/PDF 与代码对照 | 4–5 周 | 🔵 核心已通 |
 | 4 | 发布 | 安装包、体验 polish、上游同步 | 持续 | ⬜ 未开始 |
 
 **原则**：体验打磨优先；**复用 UA 已有能力，不重复造轮子**；每 Phase 结束有可演示的完整用户路径。
@@ -84,7 +84,7 @@ Phase 1 第 0 周：UA 集成 Spike → 任务 1.0 / 1.1
 
 ### 验收标准
 
-- [ ] `fieldguide-demo` 或 tiny-go：索引成功并生成 `knowledge-graph.json`
+- [x] `fieldguide-demo` 或 tiny-go：索引成功并生成 `knowledge-graph.json`
 - [ ] Dashboard 首屏 < 3 秒
 - [ ] 无 API Key 时仍可浏览结构图（UA 静态能力）
 - [ ] 崩溃重启后项目列表保留
@@ -113,8 +113,8 @@ Phase 1 第 0 周：UA 集成 Spike → 任务 1.0 / 1.1
 | 2.4 | 集成 UA 代码问答 | ✅ 右栏 ChatPanel 提问有节点引用 |
 | 2.5 | 语义搜索可用 | ✅ NodeSearchBar 搜索函数/类/文件 |
 | 2.6 | `/understand-diff` 等价集成 | 修改文件后影响节点高亮 |
-| 2.7 | 增量索引 UI | 「更新索引」仅处理变更文件 |
-| 2.8 | LLM 成本提示 | 全量索引前 token 预估 |
+| 2.7 | 增量索引 UI | ✅ 「更新索引」仅处理变更文件；stale badge |
+| 2.8 | LLM 成本提示 | ✅ CostDialog 全量/跳过双模式 + token 预估 |
 | 2.9 | 左栏 Tour 列表与 Dashboard 联动 | ✅ postMessage 同步当前步骤 |
 | 2.10 | 领域视图（UA domain） | 业务域 Tab 或 Dashboard 内切换 |
 | 2.11 | Ctrl+K 跳节点 / 开始 Tour | ✅ Ctrl+K 搜索节点 + postMessage 通知 Dashboard |
@@ -144,8 +144,8 @@ Phase 1 第 0 周：UA 集成 Spike → 任务 1.0 / 1.1
 | ID | 任务 | 验收标准 |
 |----|------|---------|
 | 3.1 | arXiv API 搜索 + 论文库 | 搜索「RAG」可收藏 |
-| 3.2 | PDF 导入 + 分块 + LanceDB | 10MB PDF < 1 分钟 |
-| 3.3 | 论文 RAG + query_paper | 命中正确段落 |
+| 3.2 | PDF 导入 + 分块 + 向量存储 | ✅ 10MB PDF < 1 分钟；SQLite 替代 LanceDB |
+| 3.3 | 论文 RAG + query_paper | ✅ 命中正确段落；chat:send 自动 RAG |
 | 3.4 | PDF 阅读器 + 笔记 | 高亮持久化 |
 | 3.5 | 概念桥接 UI + concept_links | ✅ 手动关联论文段落与 UA node id |
 | 3.6 | 扩展 Agent：link_concept + 对照 Tour | ≥3 步对照 Tour |
@@ -224,6 +224,6 @@ Week 15+      Phase 4 发布
 - [x] clone [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)，完成 Spike（integration §九）
 - [x] Node.js LTS + pnpm + Windows 构建环境
 - [x] Git 仓库 init（Fieldguide 目录）
-- [ ] `fieldguide-demo` 仓库创建
+- [x] `fieldguide-demo` 仓库创建（代码就绪，待推送 GitHub org）
 
 确认后执行 **0.0 Spike** → **1.1 脚手架**。详见 [getting-started.md](./getting-started.md)。

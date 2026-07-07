@@ -99,7 +99,7 @@ flowchart TD
 | arXiv / PDF / 论文 RAG | | ✅ | 3 |
 | concept_links / 概念桥接 | | ✅ | 3 |
 | 跨论文+代码 Agent | | ✅ | 3 |
-| LanceDB（论文向量） | | ✅ | 3 |
+| 论文向量 RAG（SQLite） | | ✅ | 3 ✅ |
 
 **禁止**：Fieldguide 自研 parser、FileAnalyzer、独立 `@xyflow/react` 全图画布（除非放弃 Dashboard 嵌入且经设计评审）。
 
@@ -146,8 +146,8 @@ flowchart TD
 
 ### 5.3 外部仓库准备（可与 Spike 并行）
 
-- [ ] 创建 [fieldguide-demo](https://github.com/fieldguide-app/fieldguide-demo)（规格见 [onboarding-spec.md §五](./onboarding-spec.md)）
-- [ ] 创建 `tests/fixtures/tiny-go/`（规格见 [testing-strategy.md §4.1](./testing-strategy.md)）
+- [x] 创建 [fieldguide-demo](https://github.com/fieldguide-app/fieldguide-demo)（代码就绪，待推送 GitHub org）
+- [x] 创建 `tests/fixtures/tiny-go/`（规格见 [testing-strategy.md §4.1](./testing-strategy.md)）
 
 ### 5.4 Spike 记录模板（动工时创建 `docs/spike-ua.md`）
 
@@ -231,7 +231,7 @@ flowchart TD
 | Dashboard iframe 与 Fieldguide 面板视觉割裂 | ui-spec §3.2.3 | Phase 2 主题统一 |
 | 文件树需实时反映项目文件变更 | ui-spec §3.2.1 stale badge | Phase 2 |
 | 面板联动（图谱↔代码↔问答）| ui-spec §3.2.2 | Phase 2 |
-| Demo / fixture 未创建 | fieldguide-demo-spec、fixtures-tiny-go-spec | ✅ Phase 1 已完成 |
+| Demo / fixture | fieldguide-demo-spec、fixtures-tiny-go-spec | ✅ 已完成 |
 
 ---
 

@@ -36,11 +36,12 @@
 | LLM 索引 | 文件摘要、架构层检测、Tour 生成（含 heuristic fallback） | UA + Fieldguide | ✅ Phase 2 |
 | 理论 Tab | arXiv 搜索、PDF 下载与摘要注入聊天 | Fieldguide | ✅ Phase 3 |
 | 概念桥接 | 论文段落 ↔ UA node id 手动关联 | Fieldguide | ✅ Phase 3 |
-| LanceDB 论文 RAG | PDF 分块 + 向量检索 + `query_paper` | Fieldguide | ⏳ Phase 3.2–3.3 |
-| 增量索引 / diff 影响 | 修改文件后高亮受影响节点 | UA + Fieldguide | ⏳ Phase 2.6–2.7 |
+| 论文 RAG | PDF 分块 + SQLite 向量检索 + `query_paper` + 聊天自动引用 | Fieldguide | ✅ Phase 3.2–3.3 |
+| 增量索引 | stale badge + 「更新索引」按钮 | UA + Fieldguide | ✅ Phase 2.7 |
+| diff 影响 | 修改文件后高亮受影响节点 | UA + Fieldguide | ⏳ Phase 2.6 |
 | NSIS 安装包 | 干净机器可一键安装运行 | Fieldguide | ⏳ Phase 4 |
 
-**已通过的基线**：`pnpm test:unit` → 32 tests pass（config-bridge 8 + graph-reader 16 + IPC 8）。
+**已通过的基线**：`pnpm test:unit` → 47 tests pass（config-bridge 10 + graph-reader 16 + IPC 8 + vector 15）。`pnpm typecheck` 三份 tsconfig 均通过。
 
 ---
 
@@ -128,7 +129,7 @@ Fieldguide/
 
 ## 当前状态
 
-**Phase 0 设计** ✅ · **Phase 1 桌面壳 + UA 集成** ✅ · **Phase 2 智能层** 🔵（≈ 55%）· **Phase 3 理论 + 桥接** 🔵（≈ 45%）· **Phase 4 发布** ⬜（≈ 20%）
+**Phase 0 设计** ✅ · **Phase 1 桌面壳 + UA 集成** ✅（≈ 98%）· **Phase 2 智能层** 🔵（≈ 65%）· **Phase 3 理论 + 桥接** 🔵（≈ 70%）· **Phase 4 发布** ⬜（≈ 20%）
 
 ### 已完成
 
@@ -140,14 +141,16 @@ Fieldguide/
 - [x] Phase 2 LLM 索引（文件摘要、架构层检测、Tour 生成，含 heuristic fallback）
 - [x] postMessage 双向通信（节点高亮 / Tour 同步 / Ctrl+K 跳转）
 - [x] 桥接 Tab（论文 ↔ 代码概念链接）
-- [x] Vitest 单测基线（32 tests 通过）
+- [x] Vitest 单测基线（47 tests 通过，含 vector 模块 15 测试）
+- [x] LLM 成本确认对话框（CostDialog）
+- [x] PDF 分块 + SQLite 向量 RAG + `query_paper` + 聊天自动 RAG
+- [x] `fieldguide-demo` 仓库代码就绪（Go 三层架构，~350 行）
 
 ### 进行中 / 待办
 
-- [ ] Phase 2 剩余：diff 集成、增量索引 UI、LLM 成本提示
-- [ ] Phase 3：PDF 分块 + LanceDB 论文 RAG + `query_paper`
-- [ ] Phase 4：NSIS 安装包实测 + 设置页日志 / 诊断入口
-- [ ] `fieldguide-demo` 仓库创建（Phase 1 验收最后一项）
+- [ ] Phase 2 剩余：diff 集成、领域视图
+- [ ] Phase 3 剩余：跨源 Tour + Agent（桥接自动生成）
+- [ ] Phase 4：NSIS 安装包实测 + 设置页日志 / 诊断入口 + `icon.ico`
 
 详见 [docs/todos.md](docs/todos.md) 与 [docs/roadmap.md](docs/roadmap.md)。
 

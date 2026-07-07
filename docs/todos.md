@@ -73,8 +73,8 @@
   - 已完成：移除无效的 `src/*` workspace 条目；新增 `resources/` 占位（待补 `icon.ico`）  
   - UA 依赖：`../Understand-Anything/understand-anything-plugin/packages/*`
 
-- [ ] **eng-docs-sync** · 同步 [`README.md`](../README.md)、[`roadmap.md`](./roadmap.md)、[`doc-index.md`](./doc-index.md) 至实际完成项  
-  - 🔵 进行中：todos.md 已更新；README/roadmap/doc-index 仍有滞后（如 CostDialog、tiny-go fixture、Phase 2 完成度）
+- [x] **eng-docs-sync** · 同步 [`README.md`](../README.md)、[`roadmap.md`](./roadmap.md)、[`doc-index.md`](./doc-index.md) 至实际完成项  
+  - 已完成：更新了 README（状态、测试数、完成/待办列表）、roadmap（Phase 完成度、task 状态标记）、doc-index（demo/fixture 状态）、fieldguide-demo-spec（验收清单）
 
 ### P3 — Phase 2/4 后续
 

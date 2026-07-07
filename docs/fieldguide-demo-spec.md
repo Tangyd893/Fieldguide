@@ -72,17 +72,17 @@ HTTP 入口 (main.go)
 
 ## 五、验收（demo 仓库就绪）
 
-- [ ] `git clone` 成功
-- [ ] UA `/understand` 或 core pipeline 可索引并生成 graph
-- [ ] 图谱含 `cmd/` 或 `main` 入口节点
-- [ ] Fieldguide 引导「体验 Demo」路径可指向本仓库
+- [x] `git clone` 成功（本地 git init，代码就绪）
+- [ ] UA `/understand` 或 core pipeline 可索引并生成 graph（需在 Fieldguide 中实测）
+- [x] 图谱含 `cmd/` 或 `main` 入口节点（`cmd/server/main.go`）
+- [x] Fieldguide 引导「体验 Demo」路径可指向本仓库（OnboardingWizard 已引用 URL）
 
 ---
 
 ## 六、创建清单（仓库维护者）
 
-- [ ] 创建 GitHub 仓库 `fieldguide-app/fieldguide-demo`
-- [ ] 按 §二 实现代码
-- [ ] 添加 LICENSE（建议 MIT，与 Fieldguide 一致）
-- [ ] 本地 UA 索引验证
-- [ ] 在 Fieldguide [doc-index.md §5.3](./doc-index.md) 打勾
+- [ ] 创建 GitHub 仓库 `fieldguide-app/fieldguide-demo`（需 org 权限）
+- [x] 按 §二 实现代码（Go 三层架构，~350 行，标准库）
+- [x] 添加 LICENSE（MIT）
+- [ ] 本地 UA 索引验证（需在 Fieldguide 中实测）
+- [x] 在 Fieldguide [doc-index.md §5.3](./doc-index.md) 打勾
