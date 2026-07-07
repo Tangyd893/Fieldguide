@@ -12,7 +12,7 @@
 |-------|--------|------|
 | 0 设计 + Spike | 100% | 文档与 UA 集成 Spike 已通过 |
 | 1 桌面壳 + UA | ~98% | 结构索引、Dashboard 嵌入、项目库、Onboarding 已可用；`fieldguide-demo` 代码就绪待推送 GitHub org |
-| 2 智能层 | ~80% | LLM/聊天/Tour/postMessage/CostDialog/增量/变更影响分析已实现；领域视图待做 |
+| 2 智能层 | ~90% | LLM/聊天/Tour/postMessage/CostDialog/增量/变更影响分析/领域视图已实现 |
 | 3 理论 + 桥接 | ~70% | arXiv/论文库/桥接 Tab/PDF分块/向量RAG/query_paper 已实现；跨源 Tour/Agent 未做 |
 | 4 发布 | ~20% | builder 配置有，`resources/icon.ico` 缺失，未实测安装包 |
 
@@ -84,8 +84,10 @@
   - Dashboard 桥接：`setDiffOverlay`/`clearDiffOverlay` postMessage + diff-overlay.json 自动加载
   - 新增 IPC：`diff:analyze`
 
-- [ ] **p2-domain-view** · 领域视图（UA domain Tab 或 Dashboard 内切换）  
+- [x] **p2-domain-view** · 领域视图（层导航栏 + Dashboard drillIntoLayer）  
   - roadmap 2.10
+  - 实现：Dashboard 桥接 `drillIntoLayer(layerId)` postMessage；GraphPanel 层导航栏（显示 layer 名称 + 节点数，点击钻入对应层，含「总览」回退按钮）
+  - GraphPanel 从 graph:get IPC 获取 layers 列表，自动渲染芯片式层选择器
 
 - [ ] **p3-cross-tour** · 概念桥接 → 对照 Tour 自动生成 + 跨源 Agent  
   - roadmap 3.6–3.8 / F-15

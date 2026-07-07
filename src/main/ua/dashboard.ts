@@ -141,6 +141,9 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
         case 'clearDiffOverlay':
           store.clearDiffOverlay();
           break;
+        case 'drillIntoLayer':
+          store.drillIntoLayer(data.layerId);
+          break;
       }
     }
     run();

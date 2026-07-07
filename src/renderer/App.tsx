@@ -487,7 +487,7 @@ function CodeMapLayout({
   }
   return (
     <SplitPanel
-      renderGraph={() => <GraphPanel t={t} projectRoot={project.root_path} onDashboardMessage={onDashboardMessage} />}
+      renderGraph={() => <GraphPanel t={t} projectRoot={project.root_path} projectId={project.id} onDashboardMessage={onDashboardMessage} />}
       renderCode={(path) => <CodeViewer projectId={project.id} filePath={path} t={t} />}
       renderChat={() => <ChatPanel projectId={project.id} projectName={project.name} t={t} />}
       renderTour={() => <TourPanel projectId={project.id} t={t} />}
