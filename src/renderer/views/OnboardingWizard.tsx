@@ -2,11 +2,12 @@
  * OnboardingWizard — 首次启动引导 (ui-spec §2.4, onboarding-spec.md)
  *
  * 步骤：欢迎 → 语言 → 项目根目录 → 如何开始 → 完成页
+ * Phase 4: i18n 化 — 所有 UI 文案通过 t() 获取
  */
 import { useState, useEffect } from 'react'
 
 interface Props {
-  t: (key: string) => string
+  t: (key: string, opts?: Record<string, unknown>) => string
   onComplete: (locale: string, projectsRoot: string, navigateTo?: 'codemap' | 'library') => void
   /** Called when user picks 'skip' on step 4 — legacy direct-complete path */
   onStartOption?: (option: 'demo' | 'local' | 'skip', locale: string, projectsRoot: string) => void
@@ -24,7 +25,7 @@ const LOCALE_OPTIONS = [
 
 type Step5Phase = 'setting-up' | 'indexing' | 'complete' | 'error'
 
-export default function OnboardingWizard({ onComplete, onStartOption, onSetupStart }: Props) {
+export default function OnboardingWizard({ t, onComplete, onStartOption, onSetupStart }: Props) {
   const [step, setStep] = useState(0)
   const [locale, setLocale] = useState('zh-CN')
   const [projectsRoot, setProjectsRoot] = useState('')
@@ -74,9 +75,9 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
     let unsubProgress: (() => void) | undefined
 
     async function run() {
-      // Phase 1: project setup (clone / add local)
+      // Phase 1: project setup (builtin demo / add local)
       setStep5Phase('setting-up')
-      setStep5Progress('正在准备项目…')
+      setStep5Progress(t('onboarding.settingUp'))
 
       let projectId: string | null = null
       try {
@@ -97,9 +98,22 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
         return
       }
 
+      // Bundled demo ships with a pre-built graph — skip indexing wait
+      try {
+        const list = await window.fieldguide.projectList()
+        const proj = list.ok
+          ? (list.data as Array<{ id: string; status: string; node_count: number }>)?.find((p) => p.id === projectId)
+          : undefined
+        if (proj?.status === 'ready' && proj.node_count > 0) {
+          setStep5Phase('complete')
+          setStep5NodeCount(proj.node_count)
+          return
+        }
+      } catch { /* fall through to indexing */ }
+
       // Phase 2: monitor index progress
       setStep5Phase('indexing')
-      setStep5Progress('开始索引…')
+      setStep5Progress(t('onboarding.indexing'))
 
       unsubProgress = window.fieldguide.onIndexProgress?.((data: unknown) => {
         if (cancelled) return
@@ -115,7 +129,7 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
           setStep5NodeCount(ev.nodeCount ?? 0)
           setStep5Progress('')
         } else if (ev.type === 'error') {
-          setStep5Error(ev.error ?? '索引失败')
+          setStep5Error(ev.error ?? t('project.status.failed'))
           setStep5Phase('error')
         }
       })
@@ -127,7 +141,7 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
       cancelled = true
       unsubProgress?.()
     }
-  }, [step, selectedOption, locale, projectsRoot, onSetupStart])
+  }, [step, selectedOption, locale, projectsRoot, onSetupStart, t])
 
   function handleFinish(navigateTo: 'codemap' | 'library') {
     onComplete(locale, projectsRoot, navigateTo)
@@ -160,18 +174,17 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
           {stepKey === 'welcome' && (
             <div className="text-center">
               <div className="text-5xl mb-4">🧭</div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">欢迎使用 Fieldguide</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('onboarding.welcomeTitle')}</h2>
               <p className="text-sm text-gray-500 leading-relaxed">
-                Fieldguide 是您的本地学习工作台——把代码库变成可探索的知识地图，
-                并支持论文与代码的对照学习。
+                {t('onboarding.welcomeDesc')}
               </p>
-              <p className="text-sm text-gray-400 mt-3">让我们花 1 分钟完成基础设置。</p>
+              <p className="text-sm text-gray-400 mt-3">{t('onboarding.welcomeHint')}</p>
             </div>
           )}
 
           {stepKey === 'language' && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">选择界面语言</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('onboarding.languageTitle')}</h3>
               <div className="space-y-2">
                 {LOCALE_OPTIONS.map((opt) => (
                   <button
@@ -192,9 +205,9 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
 
           {stepKey === 'projectRoot' && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">设置项目根目录</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('onboarding.projectRootTitle')}</h3>
               <p className="text-sm text-gray-500 mb-4">
-                Git clone 和 Demo 项目将默认存放在此目录下。后续可在设置中修改。
+                {t('onboarding.projectRootDesc')}
               </p>
               <input
                 type="text"
@@ -205,35 +218,35 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
                 autoFocus
               />
               <p className="text-xs text-gray-400 mt-2">
-                可留空，后续添加项目时手动选择目录。
+                {t('onboarding.projectRootHint')}
               </p>
             </div>
           )}
 
           {stepKey === 'start' && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">如何开始？</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('onboarding.startTitle')}</h3>
               <div className="space-y-3">
                 <button
                   onClick={() => handleStartOption('demo')}
                   className="w-full text-left px-4 py-3 rounded-lg border-2 border-blue-500 bg-blue-50 hover:bg-blue-100 transition-colors"
                 >
-                  <span className="font-medium text-blue-700 text-sm">🎯 体验 Demo 项目</span>
-                  <p className="text-xs text-blue-500 mt-0.5">克隆 fieldguide-demo 仓库，立即浏览示例图谱</p>
+                  <span className="font-medium text-blue-700 text-sm">{t('onboarding.demoTitle')}</span>
+                  <p className="text-xs text-blue-500 mt-0.5">{t('onboarding.demoDesc')}</p>
                 </button>
                 <button
                   onClick={() => handleStartOption('local')}
                   className="w-full text-left px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-colors"
                 >
-                  <span className="font-medium text-gray-700 text-sm">📁 打开本地项目</span>
-                  <p className="text-xs text-gray-400 mt-0.5">选择已有代码仓库并开始索引</p>
+                  <span className="font-medium text-gray-700 text-sm">{t('onboarding.localTitle')}</span>
+                  <p className="text-xs text-gray-400 mt-0.5">{t('onboarding.localDesc')}</p>
                 </button>
                 <button
                   onClick={() => handleStartOption('skip')}
                   className="w-full text-left px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-colors"
                 >
-                  <span className="font-medium text-gray-700 text-sm">⏭ 稍后再说</span>
-                  <p className="text-xs text-gray-400 mt-0.5">直接进入项目库，随时可添加项目</p>
+                  <span className="font-medium text-gray-700 text-sm">{t('onboarding.skipTitle')}</span>
+                  <p className="text-xs text-gray-400 mt-0.5">{t('onboarding.skipDesc')}</p>
                 </button>
               </div>
             </div>
@@ -244,21 +257,21 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
               {step5Phase === 'setting-up' && (
                 <div className="text-center py-4">
                   <div className="text-3xl mb-3 animate-pulse">⏳</div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">正在准备项目…</h3>
-                  <p className="text-sm text-gray-500">{step5Progress || '请稍候…'}</p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('onboarding.settingUp')}</h3>
+                  <p className="text-sm text-gray-500">{step5Progress || t('onboarding.pleaseWait')}</p>
                 </div>
               )}
 
               {step5Phase === 'indexing' && (
                 <div className="text-center py-4">
                   <div className="text-3xl mb-3 animate-pulse">🔍</div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">正在索引项目</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('onboarding.indexing')}</h3>
                   <p className="text-sm text-gray-500 mb-3">{step5Progress}</p>
                   <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                     <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '60%' }} />
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
-                    这可能需要 1–2 分钟，取决于项目大小。
+                    {t('onboarding.indexingHint')}
                   </p>
                 </div>
               )}
@@ -266,16 +279,16 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
               {step5Phase === 'complete' && (
                 <div className="text-center py-2">
                   <div className="text-5xl mb-3">🎉</div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">设置完成！</h3>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t('onboarding.complete')}</h3>
                   {step5NodeCount > 0 ? (
                     <p className="text-sm text-gray-500 mb-4">
-                      索引完成，共 <span className="font-semibold text-blue-600">{step5NodeCount}</span> 个节点。
+                      {t('onboarding.completeNodes', { count: step5NodeCount })}
                       <br />
-                      建议跟随 <strong>Intro Tour</strong> 了解项目的主链路。
+                      {t('onboarding.completeTourHint')}
                     </p>
                   ) : (
                     <p className="text-sm text-gray-500 mb-4">
-                      项目已就绪。建议在代码地图中跟随 <strong>Intro Tour</strong> 了解项目结构。
+                      {t('onboarding.completeNoNodes')}
                     </p>
                   )}
                   <div className="flex gap-3 justify-center">
@@ -283,13 +296,13 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
                       onClick={() => handleFinish('codemap')}
                       className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition-colors"
                     >
-                      🗺️ 打开代码地图
+                      {t('onboarding.openCodeMap')}
                     </button>
                     <button
                       onClick={() => handleFinish('library')}
                       className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
                     >
-                      📚 留在项目库
+                      {t('onboarding.stayLibrary')}
                     </button>
                   </div>
                 </div>
@@ -298,16 +311,16 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
               {step5Phase === 'error' && (
                 <div className="text-center py-4">
                   <div className="text-5xl mb-3">⚠️</div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">设置遇到问题</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('onboarding.errorTitle')}</h3>
                   <p className="text-sm text-gray-500 mb-4">
-                    {step5Error || '项目准备失败，请检查网络或路径后重试。'}
+                    {step5Error || t('onboarding.errorHint')}
                   </p>
                   <div className="flex gap-3 justify-center">
                     <button
                       onClick={() => handleFinish('library')}
                       className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition-colors"
                     >
-                      进入项目库
+                      {t('onboarding.enterLibrary')}
                     </button>
                   </div>
                 </div>
@@ -324,7 +337,7 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
               disabled={step === 0}
               className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-0 transition-opacity"
             >
-              ← 上一步
+              {t('onboarding.prev')}
             </button>
             <span className="text-xs text-gray-300 self-center">
               {step + 1} / {total}
@@ -334,7 +347,7 @@ export default function OnboardingWizard({ onComplete, onStartOption, onSetupSta
               disabled={step >= total - 2}
               className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-40"
             >
-              {step === total - 2 ? '—' : '下一步 →'}
+              {step === total - 2 ? '—' : t('onboarding.next')}
             </button>
           </div>
         )}

@@ -19,6 +19,8 @@ const api = {
     ipcRenderer.invoke('project:list'),
   projectAddLocal: (path: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('project:addLocal', { path }),
+  projectInstallDemo: (projectsRoot?: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('project:installDemo', { projectsRoot }),
   projectAddGit: (url: string, branch?: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('project:addGit', { url, branch }),
   projectRemove: (id: string): Promise<IpcResult<null>> =>
@@ -124,6 +126,12 @@ const api = {
     ipcRenderer.invoke('dashboard:url'),
   dashboardSetProject: (projectRoot: string | null): Promise<void> =>
     ipcRenderer.invoke('dashboard:setProject', { projectRoot }),
+
+  // Diagnostics
+  diagnosticsGetLogs: (lines?: number): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('diagnostics:getLogs', { lines }),
+  diagnosticsOpenLogDir: (): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('diagnostics:openLogDir'),
 }
 
 contextBridge.exposeInMainWorld('fieldguide', api)

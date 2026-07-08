@@ -27,6 +27,7 @@ import {
 import type { PaperRow } from '../db'
 import { readProjectTree } from '../file-tree'
 import { cloneRepo } from '../git'
+import { installDemoProject } from '../sample-project'
 import { indexProject } from '../ua/client'
 import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
 import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
@@ -113,7 +114,12 @@ ipcMain.handle('config:testLlm', async (): Promise<IpcResult<unknown>> => {
 /* ──────────── App ──────────── */
 
 ipcMain.handle('app:version', (): string => {
-  return '0.1.0'
+  try {
+    const pkg = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf-8'))
+    return pkg.version || '0.2.0'
+  } catch {
+    return '0.2.0'
+  }
 })
 
 // Dashboard URL is set by main process after protocol registration
@@ -207,6 +213,15 @@ ipcMain.handle('project:addLocal', (_e, { path }: { path: string }): IpcResult<u
     return ipcOk(project)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('project:installDemo', (_e, { projectsRoot }: { projectsRoot?: string }): IpcResult<unknown> => {
+  try {
+    const project = installDemoProject(projectsRoot)
+    return ipcOk(project)
+  } catch (err) {
+    return ipcErr('SOURCE_UNAVAILABLE', String(err))
   }
 })
 
@@ -838,6 +853,45 @@ ipcMain.handle('bridge:generateTour', (_e, { projectId }: { projectId: string })
     }
 
     return ipcOk(result)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Diagnostics ──────────── */
+
+ipcMain.handle('diagnostics:getLogs', (_e, { lines }: { lines?: number }): IpcResult<unknown> => {
+  try {
+    const dir = join(app.getPath('appData'), 'Fieldguide', 'logs')
+    if (!existsSync(dir)) return ipcOk({ files: [], content: '' })
+
+    const logFiles = readdirSync(dir)
+      .filter(f => f.endsWith('.log'))
+      .sort()
+      .reverse()
+      .slice(0, 10)
+
+    let content = ''
+    if (logFiles.length > 0) {
+      const latestPath = join(dir, logFiles[0])
+      const raw = readFileSync(latestPath, 'utf-8')
+      const allLines = raw.split('\n')
+      const maxLines = lines ?? 200
+      content = allLines.slice(-maxLines).join('\n')
+    }
+
+    return ipcOk({ files: logFiles, content, logDir: dir })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('diagnostics:openLogDir', async (): Promise<IpcResult<null>> => {
+  try {
+    const dir = join(app.getPath('appData'), 'Fieldguide', 'logs')
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    await shell.openPath(dir)
+    return ipcOk(null)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }

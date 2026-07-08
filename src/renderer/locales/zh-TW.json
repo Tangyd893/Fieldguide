@@ -93,6 +93,46 @@
     "save": "儲存",
     "saving": "儲存中…",
     "saved": "已儲存",
-    "cancel": "取消"
+    "cancel": "取消",
+    "diagnostics": "診斷",
+    "openLogDir": "打開日誌目錄",
+    "viewLogs": "檢視日誌"
+  },
+  "about": {
+    "title": "關於 Fieldguide",
+    "description": "將程式碼庫變成可探索、可導覽、可提問的知識地圖。支援論文↔程式碼橋接、變更影響分析、AI 驅動的程式碼問答。",
+    "license": "MIT 授權",
+    "uaCredit": "知識圖譜引擎基於 Understand Anything 專案構建"
+  },
+  "onboarding": {
+    "welcomeTitle": "歡迎使用 Fieldguide",
+    "welcomeDesc": "Fieldguide 是您的本地學習工作台——把程式碼庫變成可探索的知識地圖，並支援論文與程式碼的對照學習。",
+    "welcomeHint": "讓我們花 1 分鐘完成基礎設定。",
+    "languageTitle": "選擇介面語言",
+    "projectRootTitle": "設定專案根目錄",
+    "projectRootDesc": "Git clone 和 Demo 專案將預設存放於此目錄下。後續可在設定中修改。",
+    "projectRootHint": "可留空，後續加入專案時手動選擇目錄。",
+    "startTitle": "如何開始？",
+    "demoTitle": "🎯 體驗 Demo 專案",
+    "demoDesc": "使用內建 Go 範例專案，無需網路，立即可瀏覽圖譜",
+    "localTitle": "📁 開啟本機專案",
+    "localDesc": "選擇已有程式碼倉庫並開始索引",
+    "skipTitle": "⏭ 稍後再說",
+    "skipDesc": "直接進入專案庫，隨時可加入專案",
+    "settingUp": "正在準備專案…",
+    "indexing": "正在索引專案",
+    "indexingHint": "這可能需要 1–2 分鐘，取決於專案大小。",
+    "pleaseWait": "請稍候…",
+    "complete": "設定完成！",
+    "completeNodes": "索引完成，共 {{count}} 個節點。",
+    "completeTourHint": "建議跟隨 Intro Tour 了解專案的主鏈路。",
+    "completeNoNodes": "專案已就緒。建議在程式碼地圖中跟隨 Intro Tour 了解專案結構。",
+    "openCodeMap": "🗺️ 開啟程式碼地圖",
+    "stayLibrary": "📚 留在專案庫",
+    "errorTitle": "設定遇到問題",
+    "errorHint": "專案準備失敗，請檢查網路或路徑後重試。",
+    "enterLibrary": "進入專案庫",
+    "prev": "← 上一步",
+    "next": "下一步 →"
   }
 }

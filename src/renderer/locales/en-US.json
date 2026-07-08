@@ -93,6 +93,46 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "diagnostics": "Diagnostics",
+    "openLogDir": "Open Log Folder",
+    "viewLogs": "View Logs"
+  },
+  "about": {
+    "title": "About Fieldguide",
+    "description": "Turn codebases into explorable, navigable, queryable knowledge maps. Supports paper ↔ code bridging, change impact analysis, and AI-powered code Q&A.",
+    "license": "MIT License",
+    "uaCredit": "Knowledge graph engine built on the Understand Anything project"
+  },
+  "onboarding": {
+    "welcomeTitle": "Welcome to Fieldguide",
+    "welcomeDesc": "Fieldguide is your local learning workbench — turn codebases into explorable knowledge maps, with paper ↔ code cross-referencing.",
+    "welcomeHint": "Let's take 1 minute to set up the basics.",
+    "languageTitle": "Choose Language",
+    "projectRootTitle": "Set Projects Root",
+    "projectRootDesc": "Git clones and Demo projects will be stored here by default. You can change this later in settings.",
+    "projectRootHint": "Leave blank to pick a directory manually when adding projects.",
+    "startTitle": "How to start?",
+    "demoTitle": "🎯 Try Demo Project",
+    "demoDesc": "Use the built-in Go sample — no network needed, explore the graph immediately",
+    "localTitle": "📁 Open Local Project",
+    "localDesc": "Pick an existing codebase and start indexing",
+    "skipTitle": "⏭ Later",
+    "skipDesc": "Go straight to the project library, add projects anytime",
+    "settingUp": "Preparing project…",
+    "indexing": "Indexing project",
+    "indexingHint": "This may take 1–2 minutes, depending on project size.",
+    "pleaseWait": "Please wait…",
+    "complete": "Setup complete!",
+    "completeNodes": "Indexing complete, {{count}} nodes.",
+    "completeTourHint": "We recommend following the Intro Tour to understand the main flow.",
+    "completeNoNodes": "Project is ready. We recommend following the Intro Tour in the Code Map.",
+    "openCodeMap": "🗺️ Open Code Map",
+    "stayLibrary": "📚 Stay in Library",
+    "errorTitle": "Setup issue",
+    "errorHint": "Project setup failed. Please check your network or path and try again.",
+    "enterLibrary": "Enter Library",
+    "prev": "← Previous",
+    "next": "Next →"
   }
 }

@@ -16,6 +16,7 @@ import OnboardingWizard from './views/OnboardingWizard'
 import CommandPalette from './views/CommandPalette'
 import SettingsPanel from './views/SettingsPanel'
 import CostDialog from './views/CostDialog'
+import AboutDialog from './views/AboutDialog'
 import TheoryView from './views/Theory/TheoryView'
 import BridgeView from './views/Bridge/BridgeView'
 import { useToast, ToastContainer, showToast } from './views/Toast'
@@ -59,6 +60,7 @@ export default function App() {
   const [indexProgress, setIndexProgress] = useState('')
   const [indexError, setIndexError] = useState<string | null>(null)
   const [showCostDialog, setShowCostDialog] = useState(false)
+  const [showAbout, setShowAbout] = useState(false)
   const [pendingIndex, setPendingIndex] = useState<string | null>(null)
   const { toasts, removeToast } = useToast()
 
@@ -143,15 +145,16 @@ export default function App() {
 
     switch (option) {
       case 'demo': {
-        const demoUrl = 'https://github.com/fieldguide-app/fieldguide-demo'
-        const result = await window.fieldguide.projectAddGit(demoUrl)
+        const result = await window.fieldguide.projectInstallDemo(projectsRoot || undefined)
         if (result.ok && result.data) {
           const project = result.data as Project
           setSelectedProject(project)
-          doIndex(project.id, project.name)
+          if (project.status !== 'ready') {
+            doIndex(project.id, project.name)
+          }
           return project.id
         } else {
-          showToast('error', result.error?.message ?? 'Demo 克隆失败，请检查网络后重试')
+          showToast('error', result.error?.message ?? '内置示例安装失败')
           return null
         }
       }
@@ -447,7 +450,12 @@ export default function App() {
 
       {/* Settings */}
       {showSettings && (
-        <SettingsPanel t={t} onClose={() => setShowSettings(false)} />
+        <SettingsPanel t={t} onClose={() => setShowSettings(false)} onAbout={() => { setShowSettings(false); setShowAbout(true) }} />
+      )}
+
+      {/* About */}
+      {showAbout && (
+        <AboutDialog t={t} onClose={() => setShowAbout(false)} />
       )}
 
       {/* LLM Cost Dialog */}

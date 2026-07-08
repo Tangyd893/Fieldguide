@@ -1,7 +1,7 @@
 # Fieldguide 待办清单
 
-> 最后更新：2026-07-07  
-> 来源：项目检查（相对完整路线图约 **75–80%**；用户可感知闭环约 **70%**；Phase 4 可发布约 **20%**）  
+> 最后更新：2026-07-08  
+> 来源：项目检查（相对完整路线图约 **90–95%**；用户可感知闭环约 **85%**；Phase 4 可发布约 **40%**）  
 > 产品分阶段任务见 [roadmap.md](./roadmap.md)；本文仅跟踪**下一步工程待办**。
 
 ---
@@ -11,21 +11,21 @@
 | Phase | 完成度 | 备注 |
 |-------|--------|------|
 | 0 设计 + Spike | 100% | 文档与 UA 集成 Spike 已通过 |
-| 1 桌面壳 + UA | ~98% | 主链路可用；引导 Step 5 已实现；`fieldguide-demo` 本地就绪但未推 GitHub |
+| 1 桌面壳 + UA | ~98% | 主链路可用；内置 demo（`resources/sample-project`）已接线 |
 | 2 智能层 | ~95% | diff/增量/全量 UI 已接线；仅增量/全量无 LLM cost dialog 集成 |
 | 3 理论 + 桥接 | ~90% | 桥接 + RAG + 对照 Tour + PDF 阅读器 + AI 推荐桥接均已接线 |
-| 4 发布 | ~20% | builder 配置有，`resources/icon.ico` 缺失，未实测安装包 |
+| 4 发布 | ~40% | icon.ico 已生成，设置页日志/诊断 + 关于页已接线；安装包未实测 |
 
-**基线验证**（2026-07-07）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（47 passed / 2 skipped）
+**基线验证**（2026-07-08）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（49 passed / 2 skipped，含 sample-project 2）
 
 ### 用户场景完成度（相对 product-spec）
 
 | 场景 | 完成度 | 主要缺口 |
 |------|--------|----------|
-| A 读懂新项目 | ~85% | Demo 冷启动、引导收尾、30 分钟用户自测未验收 |
+| A 读懂新项目 | ~90% | 内置 demo 已接线；30 分钟用户自测未验收 |
 | B 论文↔实现 | ~85% | 对照 Tour + PDF 内阅读器 + AI 推荐桥接已接线；划词高亮桥接已通 |
 | C 影响评估 | ~90% | diff 一键分析 + 增量/全量选择已接线；Dashboard 高亮需实测
-| 可发布产品 | ~20% | 图标、安装包、日志诊断、关于页 |
+| 可发布产品 | ~40% | 图标已生成，设置页诊断/关于页已接线；安装包未实测，用户自测未验收 |
 
 ---
 
@@ -45,11 +45,12 @@
   - 待做：在 [`ConceptBridge.tsx`](../src/renderer/views/Theory/ConceptBridge.tsx) 或 [`BridgeView.tsx`](../src/renderer/views/Bridge/BridgeView.tsx) 增加「生成对照 Tour」按钮，生成后通知 Dashboard 播放  
   - 验收：≥3 条 concept_links 可一键生成 paper↔code 交替 Tour
 
-- [ ] **p1-demo-push** · 推送 `fieldguide-demo` 至 GitHub org  
-  - Phase 1 / 冷启动  
-  - 本地代码就绪（`../fieldguide-demo`），引导 clone URL：`https://github.com/fieldguide-app/fieldguide-demo`  
-  - 待做：创建 org 仓库并 push，验证 Onboarding「体验 Demo」可 clone + 索引  
-  - 规格见 [fieldguide-demo-spec.md](./fieldguide-demo-spec.md)
+- [x] **p1-bundled-demo** · 内嵌示例项目 + onboarding 复制安装 (2026-07-08)  
+  - `resources/sample-project/` + `project:installDemo` IPC + electron-builder extraResources  
+  - 预置 `knowledge-graph.json`，引导可离线秒开图谱  
+  - 取代原 `fieldguide-demo` 独立 GitHub 仓库方案
+
+- [x] ~~**p1-demo-push**~~ · ~~推送 `fieldguide-demo` 至 GitHub org~~（已取消，改用内嵌 sample）
 
 ### P0 — 已完成
 
@@ -77,9 +78,7 @@
   - 已完成：`OnboardingWizard` 新增 Step 5（索引进度 → 完成页 + 「打开代码地图/留在项目库」按钮）；`App.tsx` 新增 `handleOnboardingSetup`（项目创建+索引，不关闭向导）  
   - 原 `handleOnboardingStart` 简化为 `skip` 的直接完成路径
 
-- [x] **p1-fieldguide-demo** · 创建 `fieldguide-demo` 仓库（本地）  
-  - 已完成：Go 三层架构 HTTP 服务（~350 行），go build + go vet 通过  
-  - 跟进：见 **p1-demo-push**（远程仓库）
+- [x] **p1-fieldguide-demo** · ~~创建 `fieldguide-demo` 仓库~~ → 已合并为 `resources/sample-project/`
 
 - [x] **p1-phase1-tail** · Phase 1 收尾：本地文件夹选择器、抽取 `graph-reader.ts`  
   - 已完成：`dialog:openFolder` IPC + graph-reader + graph:* IPC
@@ -105,14 +104,13 @@
   - UI 显式选择见 **p2-incremental-ui**
 
 - [x] **eng-vitest** · Vitest 单测基线  
-  - 47 passed / 2 skipped（config-bridge 10 + graph-reader 16 + IPC 8 + vector 15）
+  - 49 passed / 2 skipped（config-bridge 10 + graph-reader 16 + IPC 8 + vector 15）
 
 - [x] **eng-tsconfig** · TypeScript 三份 tsconfig 分层，`pnpm typecheck` 通过
 
 - [x] **eng-workspace** · pnpm workspace 与 UA sibling 对齐
 
-- [x] **eng-docs-sync** · 同步 README/roadmap/doc-index（2026-07-05 批次）  
-  - 跟进：README 仍将 diff 标为待办，见 **eng-docs-sync-2**
+- [x] **eng-docs-sync** · 同步 README/roadmap/doc-index（2026-07-05 批次）
 
 - [x] **p2-diff-backend** · 变更影响分析后端 + Dashboard overlay  
   - 实现：[`diff.ts`](../src/main/ua/diff.ts) + IPC `diff:analyze` + `setDiffOverlay` postMessage  
@@ -126,22 +124,22 @@
 
 ### P3 — Phase 4 发布与打磨
 
-- [ ] **p4-release** · NSIS 安装包实测 + 设置页日志/诊断入口  
-  - [`logger.ts`](../src/main/logger.ts) 已有；[`SettingsPanel.tsx`](../src/renderer/views/SettingsPanel.tsx) 未暴露  
-  - 阻塞项：补 `resources/icon.ico` 后跑 `pnpm dist`；干净 Win10/11 机器验收
+- [ ] **p4-release** · NSIS 安装包实测  
+  - 已完成：`resources/icon.ico` 生成（256x256 PNG-in-ICO）+ [`logger.ts`](../src/main/logger.ts) 已有 + [`SettingsPanel.tsx`](../src/renderer/views/SettingsPanel.tsx) 日志诊断入口已接线  
+  - 待做：干净 Win10/11 机器跑 `pnpm dist` 验收安装包
 
-- [ ] **p4-about** · 关于页 + UA 归属说明（MIT）  
-  - roadmap 4.x 验收项
+- [x] **p4-about** · 关于页 + UA 归属说明（MIT） (2026-07-08)  
+  - 已完成：[`AboutDialog.tsx`](../src/renderer/views/AboutDialog.tsx) + 三语 i18n `about.*` 键；设置面板底部 ℹ️ 链接打开
+
+- [x] **eng-docs-sync-2** · 同步 README 与 todos 至实际状态 (2026-07-08)  
+  - README：diff 标记 ✅，测试数 47→49，Phase 完成度更新，已完成列表补全
 
 - [ ] **p4-theme-unify** · Dashboard 与 Fieldguide 壳层视觉统一（可选）  
   - roadmap 4.6；iframe 嵌入割裂感仍在
 
-- [ ] **p4-i18n-polish** · 三语文案补全  
-  - 现状：OnboardingWizard 等仍有硬编码中文
-
-- [ ] **eng-docs-sync-2** · 同步 README 与 todos 至实际状态  
-  - README「diff 影响 ⏳」应改为已完成（后端）/ UI 待补  
-  - 场景完成度、测试数与本文对齐
+- [x] **p4-i18n-polish** · OnboardingWizard i18n 化 (2026-07-08)  
+  - 已完成：[`OnboardingWizard.tsx`](../src/renderer/views/OnboardingWizard.tsx) 全部硬编码中文替换为 `t()` 调用；三语添加 `onboarding.*` 翻译键（25 个键覆盖全部步骤）  
+  - 待续：其他组件（ChatPanel、BridgeView、CostDialog 等）仍有少量硬编码
 
 - [ ] **eng-user-test** · 场景 A「30 分钟口述主链路」用户自测  
   - roadmap Phase 2 验收；功能齐但未经真实用户路径验证
@@ -153,7 +151,7 @@
 ```
 Fieldguide/
 ├── docs/                    设计文档（入口：doc-index.md）
-├── resources/               应用图标、安装包资源（icon.ico 待补）
+├── resources/               应用图标、内置 sample-project（demo）
 ├── scripts/                 Spike 脚本（spike-electron.mjs 等）
 ├── src/
 │   ├── main/                Electron 主进程

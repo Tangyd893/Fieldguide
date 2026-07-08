@@ -42,6 +42,7 @@ interface FieldguideAPI {
   // Projects
   projectList(): Promise<{ ok: boolean; data?: ProjectRow[]; error?: { message: string } }>
   projectAddLocal(path: string): Promise<{ ok: boolean; data?: ProjectRow; error?: { message: string } }>
+  projectInstallDemo(projectsRoot?: string): Promise<{ ok: boolean; data?: ProjectRow; error?: { message: string } }>
   projectAddGit(url: string, branch?: string): Promise<{ ok: boolean; data?: ProjectRow; error?: { message: string } }>
   projectRemove(id: string): Promise<{ ok: boolean; error?: { message: string } }>
 
@@ -94,6 +95,10 @@ interface FieldguideAPI {
   appVersion(): Promise<string>
   dashboardUrl(): Promise<string>
   dashboardSetProject(projectRoot: string | null): Promise<void>
+
+  // Diagnostics
+  diagnosticsGetLogs(lines?: number): Promise<{ ok: boolean; data?: { files: string[]; content: string; logDir: string }; error?: { message: string } }>
+  diagnosticsOpenLogDir(): Promise<{ ok: boolean; error?: { message: string } }>
 }
 
 declare global {

@@ -82,6 +82,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "resources/sample-project",
+        "to": "sample-project",
+        "filter": [
+          "**/*"
+        ]
       }
     ]
   }
