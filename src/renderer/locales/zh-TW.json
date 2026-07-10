@@ -3,6 +3,9 @@
     "name": "Fieldguide",
     "version": "v0.2.0"
   },
+  "common": {
+    "browseFolder": "瀏覽…"
+  },
   "tabs": {
     "library": "專案庫",
     "codemap": "程式碼地圖",
@@ -51,6 +54,15 @@
     "readError": "讀取失敗",
     "nodeSearchPlaceholder": "搜尋函式、類別…"
   },
+  "index": {
+    "phase": {
+      "scan": "正在掃描檔案…",
+      "parse": "正在解析程式碼…",
+      "build": "正在建立圖譜…",
+      "save": "正在儲存圖譜…",
+      "llm": "正在 AI 分析…"
+    }
+  },
   "chat": {
     "title": "AI 問答",
     "placeholder": "輸入問題，基於專案圖譜與論文庫智慧回答"
@@ -86,6 +98,13 @@
     "projectsRootHint": "透過 Git URL 加入專案時，程式碼將複製到此目錄下",
     "language": "介面語言",
     "theme": "主題",
+    "themePreset": "主題預設",
+    "themePreset.parchment": "羊皮紙",
+    "themePreset.forest": "森林",
+    "themePreset.slate": "石板灰",
+    "themePreset.midnight": "午夜藍",
+    "themePreset.paper-dark": "暗紙",
+    "themePreset.none": "無預設",
     "testConnection": "測試連線",
     "testing": "測試中…",
     "testSuccess": "連線成功",

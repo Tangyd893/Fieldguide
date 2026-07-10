@@ -3,6 +3,9 @@
     "name": "Fieldguide",
     "version": "v0.2.0"
   },
+  "common": {
+    "browseFolder": "浏览…"
+  },
   "tabs": {
     "library": "项目库",
     "codemap": "代码地图",
@@ -51,6 +54,15 @@
     "readError": "读取失败",
     "nodeSearchPlaceholder": "搜索函数、类…"
   },
+  "index": {
+    "phase": {
+      "scan": "正在扫描文件…",
+      "parse": "正在解析代码…",
+      "build": "正在构建图谱…",
+      "save": "正在保存图谱…",
+      "llm": "正在 AI 分析…"
+    }
+  },
   "chat": {
     "title": "AI 问答",
     "placeholder": "输入问题，基于项目图谱和论文库智能回答"
@@ -86,6 +98,13 @@
     "projectsRootHint": "通过 Git URL 添加项目时，代码将 clone 到此目录下",
     "language": "界面语言",
     "theme": "主题",
+    "themePreset": "主题预设",
+    "themePreset.parchment": "羊皮纸",
+    "themePreset.forest": "森林",
+    "themePreset.slate": "石板灰",
+    "themePreset.midnight": "午夜蓝",
+    "themePreset.paper-dark": "暗纸",
+    "themePreset.none": "无预设",
     "testConnection": "测试连接",
     "testing": "测试中…",
     "testSuccess": "连接成功",

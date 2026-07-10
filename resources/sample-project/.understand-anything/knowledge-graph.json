@@ -1,0 +1,236 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "tiny-go",
+    "languages": [
+      "go",
+      "json"
+    ],
+    "frameworks": [],
+    "description": "",
+    "analyzedAt": "2026-06-30T04:27:19.710Z",
+    "gitCommitHash": ""
+  },
+  "nodes": [
+    {
+      "id": "file:cmd/main.go",
+      "type": "file",
+      "name": "main.go",
+      "filePath": "cmd/main.go",
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:cmd/main.go:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "cmd/main.go",
+      "lineRange": [
+        12,
+        21
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/service/handler.go",
+      "type": "file",
+      "name": "handler.go",
+      "filePath": "internal/service/handler.go",
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/service/handler.go:NewHandler",
+      "type": "function",
+      "name": "NewHandler",
+      "filePath": "internal/service/handler.go",
+      "lineRange": [
+        17,
+        19
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/service/handler.go:Hello",
+      "type": "function",
+      "name": "Hello",
+      "filePath": "internal/service/handler.go",
+      "lineRange": [
+        22,
+        28
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/service/handler.go:ListItems",
+      "type": "function",
+      "name": "ListItems",
+      "filePath": "internal/service/handler.go",
+      "lineRange": [
+        31,
+        35
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/service/handler.go:Handler",
+      "type": "class",
+      "name": "Handler",
+      "filePath": "internal/service/handler.go",
+      "lineRange": [
+        12,
+        14
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/store/db.go",
+      "type": "file",
+      "name": "db.go",
+      "filePath": "internal/store/db.go",
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/store/db.go:NewDB",
+      "type": "function",
+      "name": "NewDB",
+      "filePath": "internal/store/db.go",
+      "lineRange": [
+        18,
+        25
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/store/db.go:All",
+      "type": "function",
+      "name": "All",
+      "filePath": "internal/store/db.go",
+      "lineRange": [
+        28,
+        34
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/store/db.go:Item",
+      "type": "class",
+      "name": "Item",
+      "filePath": "internal/store/db.go",
+      "lineRange": [
+        6,
+        9
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/store/db.go:DB",
+      "type": "class",
+      "name": "DB",
+      "filePath": "internal/store/db.go",
+      "lineRange": [
+        12,
+        15
+      ],
+      "summary": "",
+      "tags": [],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:scan-result.json",
+      "type": "config",
+      "name": "scan-result.json",
+      "filePath": "scan-result.json",
+      "summary": "",
+      "tags": [],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:cmd/main.go",
+      "target": "function:cmd/main.go:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "function:internal/service/handler.go:NewHandler",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "function:internal/service/handler.go:Hello",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "function:internal/service/handler.go:ListItems",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "class:internal/service/handler.go:Handler",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/store/db.go",
+      "target": "function:internal/store/db.go:NewDB",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/store/db.go",
+      "target": "function:internal/store/db.go:All",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/store/db.go",
+      "target": "class:internal/store/db.go:Item",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:internal/store/db.go",
+      "target": "class:internal/store/db.go:DB",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    }
+  ],
+  "layers": [],
+  "tour": []
+}

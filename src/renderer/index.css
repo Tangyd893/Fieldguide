@@ -2,35 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fieldguide base styles — see ui-spec.md §5 */
-:root {
-  --fg-bg: #fafafa;
-  --fg-card: #ffffff;
-  --fg-border: #e5e7eb;
-  --fg-text-primary: #111827;
-  --fg-text-secondary: #6b7280;
-}
+/* ── Semantic tokens (single source of truth for all colors) ── */
+@import './theme/tokens.css';
 
-/* Explicit dark theme (overrides system preference) */
-:root[data-theme="dark"] {
-  --fg-bg: #0f172a;
-  --fg-card: #1e293b;
-  --fg-border: #334155;
-  --fg-text-primary: #f8fafc;
-  --fg-text-secondary: #94a3b8;
-}
-
-/* System-preference dark (only when no explicit theme set) */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --fg-bg: #0f172a;
-    --fg-card: #1e293b;
-    --fg-border: #334155;
-    --fg-text-primary: #f8fafc;
-    --fg-text-secondary: #94a3b8;
-  }
-}
-
+/* ── Global reset ─────────────────────────────────────── */
 * {
   margin: 0;
   padding: 0;
@@ -38,7 +13,7 @@
 }
 
 body {
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--fg-font-ui, 'Segoe UI', system-ui, sans-serif);
   font-size: 14px;
   background: var(--fg-bg);
   color: var(--fg-text-primary);
@@ -67,4 +42,23 @@ footer {
 
 .animate-slide-up {
   animation: slide-up 0.2s ease-out;
+}
+
+/* ── Input field theming (uses semantic tokens) ──────── */
+.fg-input,
+input.fg-input,
+textarea.fg-input {
+  background-color: var(--fg-input-bg);
+  color: var(--fg-input-text);
+  caret-color: var(--fg-input-text);
+}
+
+.fg-input::placeholder {
+  color: var(--fg-input-placeholder);
+  opacity: 1;
+}
+
+.fg-input:disabled {
+  background-color: var(--fg-input-disabled-bg);
+  color: var(--fg-input-disabled-text);
 }

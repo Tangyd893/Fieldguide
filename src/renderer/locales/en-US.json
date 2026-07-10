@@ -3,6 +3,9 @@
     "name": "Fieldguide",
     "version": "v0.2.0"
   },
+  "common": {
+    "browseFolder": "Browse…"
+  },
   "tabs": {
     "library": "Projects",
     "codemap": "Code Map",
@@ -51,6 +54,15 @@
     "readError": "Read error",
     "nodeSearchPlaceholder": "Search functions, classes…"
   },
+  "index": {
+    "phase": {
+      "scan": "Scanning files…",
+      "parse": "Parsing code…",
+      "build": "Building graph…",
+      "save": "Saving graph…",
+      "llm": "AI analysis…"
+    }
+  },
   "chat": {
     "title": "AI Chat",
     "placeholder": "Ask questions — answers based on project graph and paper library"
@@ -86,6 +98,13 @@
     "projectsRootHint": "Git clones will be placed in this directory",
     "language": "Language",
     "theme": "Theme",
+    "themePreset": "Theme Preset",
+    "themePreset.parchment": "Parchment",
+    "themePreset.forest": "Forest",
+    "themePreset.slate": "Slate",
+    "themePreset.midnight": "Midnight",
+    "themePreset.paper-dark": "Paper Dark",
+    "themePreset.none": "None",
     "testConnection": "Test Connection",
     "testing": "Testing…",
     "testSuccess": "Connected",

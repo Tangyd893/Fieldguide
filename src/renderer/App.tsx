@@ -1,8 +1,9 @@
 /**
  * Fieldguide App Shell — ui-spec v0.4, i18n enabled.
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Search, Settings as SettingsIcon, Folder } from 'lucide-react'
 import ProjectLibrary from './views/ProjectLibrary/ProjectLibrary'
 import FileTree from './views/CodeMap/FileTree'
 import SplitPanel from './views/CodeMap/SplitPanel'
@@ -20,16 +21,35 @@ import AboutDialog from './views/AboutDialog'
 import TheoryView from './views/Theory/TheoryView'
 import BridgeView from './views/Bridge/BridgeView'
 import { useToast, ToastContainer, showToast } from './views/Toast'
+import { useWorkspaceLayout } from './hooks/useWorkspaceLayout'
+import { useIndexProgress, progressPercent } from './hooks/useIndexProgress'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
 
-/** Apply theme to <html> element. Call on mount and after settings save. */
-export function applyTheme(theme: string): void {
+/** Apply theme and preset to <html> element. Call on mount and after settings save. */
+export function applyTheme(theme: string, themePreset?: string): void {
   if (theme === 'light' || theme === 'dark') {
     document.documentElement.dataset.theme = theme
   } else {
     delete document.documentElement.dataset.theme
   }
+  if (themePreset && themePreset !== 'none') {
+    document.documentElement.dataset.themePreset = themePreset
+  } else {
+    delete document.documentElement.dataset.themePreset
+  }
+}
+
+/** Apply zoom level to the root element. Clamped to 50–200. */
+export function applyZoom(zoom: number): void {
+  const clamped = Math.max(50, Math.min(200, zoom))
+  document.documentElement.style.fontSize = `${clamped / 100 * 14}px`
+}
+
+/** Apply font families via CSS custom properties on <body>. */
+export function applyFonts(uiFont: string, monoFont: string): void {
+  document.body.style.setProperty('--fg-font-ui', uiFont)
+  document.body.style.setProperty('--fg-font-mono', `'${monoFont}', monospace`)
 }
 
 interface Project {
@@ -50,18 +70,18 @@ export default function App() {
   const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('library')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
+  const workspaceLayout = useWorkspaceLayout()
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false)
   const [fileTreeWidth, setFileTreeWidth] = useState(260)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [indexing, setIndexing] = useState(false)
-  const [indexProgress, setIndexProgress] = useState('')
-  const [indexError, setIndexError] = useState<string | null>(null)
   const [showCostDialog, setShowCostDialog] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+  const indexProgress = useIndexProgress(selectedProject?.id)
   const [pendingIndex, setPendingIndex] = useState<string | null>(null)
+  const [zoom, setZoomState] = useState(100)
+  const fileTreeWidthRef = useRef(260)
   const { toasts, removeToast } = useToast()
 
   // Apply saved theme on mount
@@ -70,7 +90,22 @@ export default function App() {
       if (r.ok && r.data) {
         const cfg = r.data as Record<string, unknown>
         const theme = cfg.theme as string | undefined
-        applyTheme(theme || 'system')
+        const appearance = cfg.appearance as Record<string, string> | undefined
+        applyTheme(theme || 'system', appearance?.themePreset || 'parchment')
+
+        // Apply saved zoom
+        const zoomVal = appearance?.zoom ? Number(appearance.zoom) : 100
+        setZoomState(zoomVal)
+        applyZoom(zoomVal)
+
+        // Apply saved fonts
+        const uiFont = appearance?.uiFont || 'Segoe UI'
+        const monoFont = appearance?.monoFont || 'Cascadia Code'
+        applyFonts(uiFont, monoFont)
+
+        // Restore sidebar width
+        const sidebarWidthVal = appearance?.sidebarWidth ? Number(appearance.sidebarWidth) : 260
+        setFileTreeWidth(Math.max(160, Math.min(400, sidebarWidthVal)))
 
         // Restore last project and tab
         const lastProjectId = cfg.lastProjectId as string | undefined
@@ -109,6 +144,23 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // Ctrl+= / Ctrl+- / Ctrl+0 — zoom
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      let newZoom = zoom
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); newZoom = Math.min(200, zoom + 10) }
+      else if (e.key === '-') { e.preventDefault(); newZoom = Math.max(50, zoom - 10) }
+      else if (e.key === '0') { e.preventDefault(); newZoom = 100 }
+      else return
+      setZoomState(newZoom)
+      applyZoom(newZoom)
+      showToast('info', `缩放: ${newZoom}%`)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoom])
+
   // Notify Dashboard of project switch
   useEffect(() => {
     if (selectedProject) {
@@ -139,7 +191,12 @@ export default function App() {
   }
 
   /** Called from OnboardingWizard Step 5: sets up project without closing wizard. Returns projectId. */
-  async function handleOnboardingSetup(option: 'demo' | 'local', locale: string, projectsRoot: string): Promise<string | null> {
+  async function handleOnboardingSetup(
+    option: 'demo' | 'local',
+    locale: string,
+    projectsRoot: string,
+    localPath?: string,
+  ): Promise<string | null> {
     await window.fieldguide.configSet({ locale, projectsRoot })
     i18n.changeLanguage(locale)
 
@@ -159,16 +216,19 @@ export default function App() {
         }
       }
       case 'local': {
-        const folderResult = await window.fieldguide.openFolderDialog?.()
-        if (folderResult?.ok && folderResult.data) {
-          const result = await window.fieldguide.projectAddLocal(folderResult.data)
-          if (result.ok && result.data) {
-            const project = result.data as Project
-            setSelectedProject(project)
-            doIndex(project.id, project.name)
-            return project.id
-          }
+        const path = localPath
+        if (!path) {
+          showToast('error', '未选择项目文件夹')
+          return null
         }
+        const result = await window.fieldguide.projectAddLocal(path)
+        if (result.ok && result.data) {
+          const project = result.data as Project
+          setSelectedProject(project)
+          doIndex(project.id, project.name)
+          return project.id
+        }
+        showToast('error', result.error?.message ?? '添加本地项目失败')
         return null
       }
     }
@@ -201,43 +261,22 @@ export default function App() {
   async function doIndex(projectId: string, _projectName: string, incremental = false) {
     setShowCostDialog(false)
     setPendingIndex(null)
-    setIndexing(true)
-    setIndexError(null)
-    setIndexProgress(incremental ? 'scan-changed' : 'scan')
-
-    // Listen for progress events
-    const unsub = window.fieldguide.onIndexProgress?.((data: unknown) => {
-      const ev = data as { type: string; phase?: string; current?: number; total?: number; error?: string; nodeCount?: number }
-      if (ev.type === 'phase') setIndexProgress(ev.phase ?? '')
-      else if (ev.type === 'progress') setIndexProgress(`${ev.phase ?? ''} ${ev.current ?? 0}/${ev.total ?? 0}`)
-      else if (ev.type === 'complete') {
-        setIndexing(false)
-        setIndexProgress('')
-        showToast('success', `索引完成 — ${ev.nodeCount ?? '?'} 个节点`)
-        setSelectedProject((prev) => prev ? { ...prev, status: 'ready', node_count: ev.nodeCount ?? prev.node_count } : null)
-      } else if (ev.type === 'error') {
-        setIndexError(ev.error ?? '索引失败')
-        setIndexing(false)
-        showToast('error', ev.error ?? '索引失败')
-      }
-    })
 
     try {
       const result = await window.fieldguide.projectIndex(projectId, incremental)
       if (!result.ok) {
-        setIndexError(result.error?.message ?? '索引失败')
-        setIndexing(false)
+        showToast('error', result.error?.message ?? '索引失败')
+        return
       }
+      // Refresh project details to get node count
+      const list = await window.fieldguide.projectList()
+      if (list.ok && list.data) {
+        const updated = list.data.find((p: Project) => p.id === projectId) as Project | undefined
+        if (updated) setSelectedProject(updated)
+      }
+      showToast('success', `索引完成 — ${(result.data as Record<string, unknown>)?.nodeCount ?? '?'} 个节点`)
     } catch (err) {
-      setIndexError(String(err))
-      setIndexing(false)
-    }
-    unsub?.()
-    // Refresh
-    const list = await window.fieldguide.projectList()
-    if (list.ok && list.data) {
-      const updated = list.data.find((p: Project) => p.id === projectId) as Project | undefined
-      if (updated) setSelectedProject(updated)
+      showToast('error', String(err))
     }
   }
 
@@ -253,7 +292,10 @@ export default function App() {
     { id: 'toggleTheme', label: '切换主题 (亮/暗)', action: () => {
       const current = document.documentElement.dataset.theme
       const next = current === 'dark' ? 'light' : 'dark'
-      applyTheme(next)
+      const preset = document.documentElement.dataset.themePreset
+      applyTheme(next, preset)
+      // Persist to config
+      window.fieldguide.configSet({ theme: next }).catch(() => {})
     }},
   ]
 
@@ -268,7 +310,7 @@ export default function App() {
               const g = r.data as { nodes?: Array<{ id: string; filePath?: string }> }
               const node = (g.nodes || []).find(n => n.id === msg.nodeId)
               if (node?.filePath) {
-                setActiveFilePath(node.filePath)
+                workspaceLayout.openFile(node.filePath)
               }
             }
           })
@@ -300,8 +342,8 @@ export default function App() {
             <div style={{ width: fileTreeWidth }} className="flex-shrink-0 border-r border-[var(--fg-border)]">
               <FileTree
                 projectId={selectedProject?.id ?? ''}
-                onFileClick={(p) => setActiveFilePath(p)}
-                activeFilePath={activeFilePath}
+                onFileClick={(p) => workspaceLayout.openFile(p)}
+                activeFilePath={workspaceLayout.layout.panels[workspaceLayout.layout.activePanelIndex]?.filePath}
                 t={t}
               />
             </div>
@@ -312,12 +354,22 @@ export default function App() {
                 const startX = e.clientX
                 const startW = fileTreeWidth
                 const onMove = (ev: MouseEvent) => {
-                  setFileTreeWidth(Math.max(160, Math.min(400, startW + ev.clientX - startX)))
+                  const w = Math.max(160, Math.min(400, startW + ev.clientX - startX))
+                  setFileTreeWidth(w)
+                  fileTreeWidthRef.current = w
                 }
                 const onUp = () => {
                   document.removeEventListener('mousemove', onMove)
                   document.removeEventListener('mouseup', onUp)
                   document.body.style.cursor = ''
+                  // Persist sidebar width
+                  window.fieldguide.configGet().then((r) => {
+                    if (r.ok && r.data) {
+                      const cfg = r.data as Record<string, unknown>
+                      const app = (cfg.appearance as Record<string, unknown>) || {}
+                      window.fieldguide.configSet({ appearance: { ...app, sidebarWidth: fileTreeWidthRef.current } }).catch(() => {})
+                    }
+                  }).catch(() => {})
                 }
                 document.body.style.cursor = 'col-resize'
                 document.addEventListener('mousemove', onMove)
@@ -330,10 +382,10 @@ export default function App() {
         {activeTab === 'codemap' && fileTreeCollapsed && (
           <button
             onClick={() => setFileTreeCollapsed(false)}
-            className="w-8 bg-[var(--fg-card)] border-r border-[var(--fg-border)] flex items-start justify-center pt-2 hover:bg-gray-100 transition-colors shrink-0"
+            className="w-8 bg-[var(--fg-card)] border-r border-[var(--fg-border)] flex items-start justify-center pt-2 hover:bg-[var(--fg-tree-hover)] transition-colors shrink-0"
             title={t('tooltip.expandFileTree')}
           >
-            <span className="text-gray-400 text-xs">📁</span>
+            <Folder size={14} className="text-[var(--fg-text-tertiary)]" />
           </button>
         )}
 
@@ -362,12 +414,12 @@ export default function App() {
           {activeTab === 'codemap' && (
             <div className="h-full flex flex-col">
               <NodeSearchBar projectId={selectedProject?.id ?? ''} onNodeSelect={(nodeId, filePath) => {
-                if (filePath) setActiveFilePath(filePath)
+                if (filePath) workspaceLayout.openFile(filePath)
               }} t={t} />
               <div className="flex-1 overflow-hidden">
                 <CodeMapLayout
                   project={selectedProject}
-                  activeFilePath={activeFilePath}
+                  workspaceLayout={workspaceLayout}
                   t={t}
                   onDashboardMessage={handleDashboardMessage}
                 />
@@ -381,7 +433,7 @@ export default function App() {
         </main>
       </div>
 
-      <StatusBar project={selectedProject} t={t} indexing={indexing} indexProgress={indexProgress} indexError={indexError} />
+      <StatusBar project={selectedProject} t={t} indexProgress={indexProgress} />
 
       {/* Onboarding overlay */}
       {showOnboarding && (
@@ -394,7 +446,7 @@ export default function App() {
           commands={commands}
           onClose={() => setShowPalette(false)}
           onFileSelect={(filePath) => {
-            setActiveFilePath(filePath)
+            workspaceLayout.openFile(filePath)
             setActiveTab('codemap')
             setFileTreeCollapsed(false)
           }}
@@ -435,7 +487,7 @@ export default function App() {
                 const g = r.data as { nodes?: Array<{ id: string; filePath?: string }> }
                 const node = (g.nodes || []).find(n => n.id === nodeId)
                 if (node?.filePath) {
-                  setActiveFilePath(node.filePath)
+                  workspaceLayout.openFile(node.filePath)
                   setActiveTab('codemap')
                   setFileTreeCollapsed(false)
                 }
@@ -486,12 +538,12 @@ export default function App() {
 
 function CodeMapLayout({
   project,
-  activeFilePath,
+  workspaceLayout,
   t,
   onDashboardMessage,
 }: {
   project: Project | null
-  activeFilePath?: string
+  workspaceLayout: ReturnType<typeof useWorkspaceLayout>
   t: (key: string) => string
   onDashboardMessage?: (msg: DashboardMessage) => void
 }) {
@@ -508,7 +560,7 @@ function CodeMapLayout({
       renderCode={(path) => <CodeViewer projectId={project.id} filePath={path} t={t} />}
       renderChat={() => <ChatPanel projectId={project.id} projectName={project.name} t={t} />}
       renderTour={() => <TourPanel projectId={project.id} t={t} />}
-      activeFilePath={activeFilePath}
+      layout={workspaceLayout}
       t={t}
     />
   )
@@ -536,42 +588,60 @@ function TopBar({
             disabled={tab.disabled}
             title={tab.disabled ? t('tooltip.addProjectFirst') : undefined}
             className={`relative px-3 text-sm font-medium transition-colors ${
-              tab.disabled ? 'text-gray-300 cursor-not-allowed'
-                : activeTab === tab.id ? 'text-blue-700' : 'text-gray-500 hover:text-gray-700'
+              tab.disabled ? 'text-[var(--fg-text-tertiary)] cursor-not-allowed'
+                : activeTab === tab.id ? 'text-[var(--fg-tab-active)]' : 'text-[var(--fg-tab-hover)] hover:text-[var(--fg-text-primary)]'
             }`}
           >
             {tab.label}
-            {activeTab === tab.id && <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-blue-600 rounded" />}
+            {activeTab === tab.id && <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-[var(--fg-accent)] rounded" />}
           </button>
         ))}
       </nav>
       <div className="flex-1" />
-      <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded" title={t('tooltip.search')}>🔍</button>
-      <button onClick={onSettings} className="p-1.5 text-gray-400 hover:text-gray-600 rounded ml-1" title={t('tooltip.settings')}>⚙</button>
+      <button className="p-1.5 text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-secondary)] rounded" title={t('tooltip.search')}><Search size={16} /></button>
+      <button onClick={onSettings} className="p-1.5 text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-secondary)] rounded ml-1" title={t('tooltip.settings')}><SettingsIcon size={16} /></button>
     </header>
   )
 }
 
-function StatusBar({ project, t, indexing, indexProgress, indexError }: {
+function StatusBar({ project, t, indexProgress }: {
   project: Project | null
   t: (k: string, opts?: Record<string, unknown>) => string
-  indexing?: boolean
-  indexProgress?: string
-  indexError?: string | null
+  indexProgress: ReturnType<typeof useIndexProgress>
 }) {
+  const p = indexProgress.progress
+  const pct = progressPercent(p)
+  const label = p?.phase ? indexProgress.phaseLabel(p.phase, t) : ''
+  const detail = p?.type === 'progress' && p.current !== undefined && p.total ? `${p.current}/${p.total}` : ''
+  const error = p?.type === 'error' ? p.error : null
+
   return (
-    <footer className="h-6 flex items-center px-4 border-t border-[var(--fg-border)] bg-[var(--fg-card)] text-xs text-gray-400 shrink-0 select-none gap-3">
-      {indexing ? (
-        <span className="text-yellow-600">⏳ 索引中… {indexProgress}</span>
-      ) : indexError ? (
-        <span className="text-red-500">❌ {indexError}</span>
-      ) : (
-        <span>{project ? project.status : t('status.ready')}</span>
+    <footer className="shrink-0 select-none border-t border-[var(--fg-border)] bg-[var(--fg-card)]">
+      {indexProgress.isIndexing && pct >= 0 && (
+        <div className="h-[3px] bg-[var(--fg-input-border)]">
+          <div
+            className="h-full bg-[var(--fg-accent)] transition-all duration-300 ease-out"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
       )}
-      {project?.node_count ? <span>· {t('status.nodes', { count: project.node_count })}</span> : null}
-      {project ? <span>· {project.name}</span> : null}
-      <span className="flex-1" />
-      <span>{t('app.name')} {t('app.version')}</span>
+      <div className="h-6 flex items-center px-4 text-xs gap-3">
+        {indexProgress.isIndexing ? (
+          <span className="text-[var(--fg-accent-text)] flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-[var(--fg-accent)] animate-pulse" />
+            {label}
+            {detail && <span className="text-[var(--fg-text-tertiary)]">{detail}</span>}
+          </span>
+        ) : error ? (
+          <span className="text-[var(--fg-status-error)]">❌ {error}</span>
+        ) : (
+          <span className="text-[var(--fg-text-tertiary)]">{project ? project.status : t('status.ready')}</span>
+        )}
+        {project?.node_count ? <span className="text-[var(--fg-text-tertiary)]">· {t('status.nodes', { count: project.node_count })}</span> : null}
+        {project ? <span className="text-[var(--fg-text-tertiary)]">· {project.name}</span> : null}
+        <span className="flex-1" />
+        <span className="text-[var(--fg-text-tertiary)]">{t('app.name')} {t('app.version')}</span>
+      </div>
     </footer>
   )
 }

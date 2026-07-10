@@ -49,6 +49,9 @@ export function setDashboardDiffOverlay(projectRoot: string): void {
 
 function findDashboardDist(): string {
   const candidates = [
+    // Packaged app: electron-builder extraResources → resources/dashboard
+    join(process.resourcesPath, 'dashboard'),
+    join(app.getAppPath(), '..', 'dashboard'),
     join(app.getAppPath(), '..', 'Understand-Anything', 'understand-anything-plugin', 'packages', 'dashboard', 'dist'),
     join(app.getAppPath(), '..', '..', 'Understand-Anything', 'understand-anything-plugin', 'packages', 'dashboard', 'dist'),
     join(process.cwd(), '..', 'Understand-Anything', 'understand-anything-plugin', 'packages', 'dashboard', 'dist'),

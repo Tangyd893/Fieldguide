@@ -18,10 +18,19 @@ export interface UAConfig {
   incremental: boolean
 }
 
+export interface AppearanceConfig {
+  themePreset: 'parchment' | 'forest' | 'slate' | 'midnight' | 'paper-dark' | 'none'
+  zoom: number
+  uiFont: string
+  monoFont: string
+  sidebarWidth: number
+}
+
 export interface AppConfig {
   llm: LLMConfig
   locale: 'zh-CN' | 'zh-TW' | 'en-US'
   theme: 'system' | 'light' | 'dark'
+  appearance: AppearanceConfig
   projectsRoot: string
   onboardingCompleted: boolean
   ua: UAConfig
@@ -36,6 +45,13 @@ const DEFAULT_CONFIG: AppConfig = {
   },
   locale: 'zh-CN',
   theme: 'system',
+  appearance: {
+    themePreset: 'parchment',
+    zoom: 100,
+    uiFont: 'Segoe UI',
+    monoFont: 'Cascadia Code',
+    sidebarWidth: 260,
+  },
   projectsRoot: '',
   onboardingCompleted: false,
   ua: {

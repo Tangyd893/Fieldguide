@@ -2,9 +2,9 @@ packages:
   - '../Understand-Anything/understand-anything-plugin/packages/*'
 allowBuilds:
   '@tree-sitter-grammars/tree-sitter-kotlin': false
-  better-sqlite3: false
-  electron: false
-  esbuild: false
+  better-sqlite3: true
+  electron: true
+  esbuild: true
   tree-sitter-c: false
   tree-sitter-c-sharp: false
   tree-sitter-cpp: false

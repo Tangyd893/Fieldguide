@@ -1,0 +1,286 @@
+/**
+ * Fieldguide Semantic CSS Tokens
+ * 
+ * Single source of truth for all colors used in the UI.
+ * Components must reference these tokens, never hardcoded hex/gray-* values.
+ * 
+ * Layer: tokens.css → index.css (via @import)
+ * See ui-spec.md §5 for theme presets (parchment, forest, slate, midnight, paper-dark).
+ */
+
+/* ── Light (default) ──────────────────────────────────── */
+:root {
+  /* Surfaces */
+  --fg-bg: #fafafa;
+  --fg-card: #ffffff;
+  --fg-border: #e5e7eb;
+
+  /* Text */
+  --fg-text-primary: #111827;
+  --fg-text-secondary: #6b7280;
+  --fg-text-tertiary: #9ca3af;
+
+  /* Accent */
+  --fg-accent: #2563eb;
+  --fg-accent-muted: #dbeafe;
+  --fg-accent-text: #1d4ed8;
+
+  /* Interactive — tree */
+  --fg-tree-selected: #e4e6f1;
+  --fg-tree-hover: #f3f4f6;
+
+  /* Interactive — tabs */
+  --fg-tab-active: #2563eb;
+  --fg-tab-hover: #6b7280;
+
+  /* Scrollbar */
+  --fg-scrollbar-thumb: #d1d5db;
+  --fg-scrollbar-track: transparent;
+
+  /* Input */
+  --fg-input-bg: #ffffff;
+  --fg-input-border: #d1d5db;
+  --fg-input-text: #111827;
+  --fg-input-placeholder: #9ca3af;
+  --fg-input-disabled-bg: #f3f4f6;
+  --fg-input-disabled-text: #6b7280;
+
+  /* Overlay / Dialog */
+  --fg-overlay: rgba(0, 0, 0, 0.3);
+  --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+
+  /* Status colors */
+  --fg-status-success: #16a34a;
+  --fg-status-success-bg: #dcfce7;
+  --fg-status-warning: #d97706;
+  --fg-status-warning-bg: #fef3c7;
+  --fg-status-error: #dc2626;
+  --fg-status-error-bg: #fee2e2;
+  --fg-status-info: #2563eb;
+  --fg-status-info-bg: #dbeafe;
+}
+
+/* ── Explicit dark override ──────────────────────────── */
+:root[data-theme="dark"] {
+  --fg-bg: #0f172a;
+  --fg-card: #1e293b;
+  --fg-border: #334155;
+
+  --fg-text-primary: #f8fafc;
+  --fg-text-secondary: #94a3b8;
+  --fg-text-tertiary: #64748b;
+
+  --fg-accent: #60a5fa;
+  --fg-accent-muted: #1e3a5f;
+  --fg-accent-text: #93bbfd;
+
+  --fg-tree-selected: #1e3a5f;
+  --fg-tree-hover: #1e293b;
+  --fg-tab-active: #60a5fa;
+  --fg-tab-hover: #94a3b8;
+
+  --fg-scrollbar-thumb: #475569;
+  --fg-scrollbar-track: transparent;
+
+  --fg-input-bg: #1e293b;
+  --fg-input-border: #475569;
+  --fg-input-text: #f8fafc;
+  --fg-input-placeholder: #64748b;
+  --fg-input-disabled-bg: #0f172a;
+  --fg-input-disabled-text: #64748b;
+
+  --fg-overlay: rgba(0, 0, 0, 0.5);
+  --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ── System-preference dark (no explicit theme set) ──── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fg-bg: #0f172a;
+    --fg-card: #1e293b;
+    --fg-border: #334155;
+
+    --fg-text-primary: #f8fafc;
+    --fg-text-secondary: #94a3b8;
+    --fg-text-tertiary: #64748b;
+
+    --fg-accent: #60a5fa;
+    --fg-accent-muted: #1e3a5f;
+    --fg-accent-text: #93bbfd;
+
+    --fg-tree-selected: #1e3a5f;
+    --fg-tree-hover: #1e293b;
+    --fg-tab-active: #60a5fa;
+    --fg-tab-hover: #94a3b8;
+
+    --fg-scrollbar-thumb: #475569;
+    --fg-scrollbar-track: transparent;
+
+    --fg-input-bg: #1e293b;
+    --fg-input-border: #475569;
+    --fg-input-text: #f8fafc;
+    --fg-input-placeholder: #64748b;
+    --fg-input-disabled-bg: #0f172a;
+    --fg-input-disabled-text: #64748b;
+
+    --fg-overlay: rgba(0, 0, 0, 0.5);
+    --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* ── Theme Presets (override base light/dark tokens) ──── */
+/* Place AFTER base themes so they take precedence via same-specificity ordering */
+
+/* Parchment — warm paper tones, green accent */
+:root[data-theme-preset="parchment"] {
+  --fg-bg: #F5F0E1;
+  --fg-card: #FAF6EB;
+  --fg-border: #D4C9A8;
+  --fg-text-primary: #3D3529;
+  --fg-text-secondary: #6B6B56;
+  --fg-text-tertiary: #9E9E8E;
+  --fg-accent: #6B8F71;
+  --fg-accent-muted: #E8F0E4;
+  --fg-accent-text: #4A6B52;
+  --fg-tree-selected: #E8F0E4;
+  --fg-tree-hover: #F0EDDD;
+  --fg-tab-active: #6B8F71;
+  --fg-tab-hover: #6B6B56;
+  --fg-scrollbar-thumb: #C4B998;
+  --fg-scrollbar-track: transparent;
+  --fg-input-bg: #FAF6EB;
+  --fg-input-border: #D4C9A8;
+  --fg-input-text: #3D3529;
+  --fg-input-placeholder: #9E9E8E;
+  --fg-input-disabled-bg: #F0EDDD;
+  --fg-input-disabled-text: #9E9E8E;
+  --fg-overlay: rgba(0, 0, 0, 0.25);
+  --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Forest — deep greens, earthy */
+:root[data-theme-preset="forest"] {
+  --fg-bg: #1B2E1E;
+  --fg-card: #263C2A;
+  --fg-border: #3A523E;
+  --fg-text-primary: #E8EDE6;
+  --fg-text-secondary: #A3B8A5;
+  --fg-text-tertiary: #6B806E;
+  --fg-accent: #7DBF6E;
+  --fg-accent-muted: #2A442E;
+  --fg-accent-text: #A8DBA0;
+  --fg-tree-selected: #2A442E;
+  --fg-tree-hover: #223526;
+  --fg-tab-active: #7DBF6E;
+  --fg-tab-hover: #A3B8A5;
+  --fg-scrollbar-thumb: #3A523E;
+  --fg-scrollbar-track: transparent;
+  --fg-input-bg: #263C2A;
+  --fg-input-border: #3A523E;
+  --fg-input-text: #E8EDE6;
+  --fg-input-placeholder: #6B806E;
+  --fg-input-disabled-bg: #1B2E1E;
+  --fg-input-disabled-text: #6B806E;
+  --fg-overlay: rgba(0, 0, 0, 0.5);
+  --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Slate — cool blue-gray */
+:root[data-theme-preset="slate"] {
+  --fg-bg: #F0F2F5;
+  --fg-card: #FFFFFF;
+  --fg-border: #D1D5DB;
+  --fg-text-primary: #1F2937;
+  --fg-text-secondary: #6B7280;
+  --fg-text-tertiary: #9CA3AF;
+  --fg-accent: #6366F1;
+  --fg-accent-muted: #EEF2FF;
+  --fg-accent-text: #4338CA;
+  --fg-tree-selected: #EEF2FF;
+  --fg-tree-hover: #F3F4F6;
+  --fg-tab-active: #6366F1;
+  --fg-tab-hover: #6B7280;
+  --fg-scrollbar-thumb: #D1D5DB;
+  --fg-scrollbar-track: transparent;
+  --fg-input-bg: #FFFFFF;
+  --fg-input-border: #D1D5DB;
+  --fg-input-text: #1F2937;
+  --fg-input-placeholder: #9CA3AF;
+  --fg-input-disabled-bg: #F3F4F6;
+  --fg-input-disabled-text: #9CA3AF;
+  --fg-overlay: rgba(0, 0, 0, 0.3);
+  --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Midnight — deep blue-black (GitHub-dark inspired) */
+:root[data-theme-preset="midnight"] {
+  --fg-bg: #0D1117;
+  --fg-card: #161B22;
+  --fg-border: #30363D;
+  --fg-text-primary: #E6EDF3;
+  --fg-text-secondary: #8B949E;
+  --fg-text-tertiary: #6E7681;
+  --fg-accent: #79C0FF;
+  --fg-accent-muted: #1A2A42;
+  --fg-accent-text: #A5D6FF;
+  --fg-tree-selected: #1A2A42;
+  --fg-tree-hover: #1C2333;
+  --fg-tab-active: #79C0FF;
+  --fg-tab-hover: #8B949E;
+  --fg-scrollbar-thumb: #30363D;
+  --fg-scrollbar-track: transparent;
+  --fg-input-bg: #161B22;
+  --fg-input-border: #30363D;
+  --fg-input-text: #E6EDF3;
+  --fg-input-placeholder: #6E7681;
+  --fg-input-disabled-bg: #0D1117;
+  --fg-input-disabled-text: #6E7681;
+  --fg-overlay: rgba(0, 0, 0, 0.5);
+  --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Paper-dark — soft warm dark tones */
+:root[data-theme-preset="paper-dark"] {
+  --fg-bg: #2D2420;
+  --fg-card: #39322E;
+  --fg-border: #534B45;
+  --fg-text-primary: #EAE0D5;
+  --fg-text-secondary: #A99C8E;
+  --fg-text-tertiary: #7A6E63;
+  --fg-accent: #D4A76A;
+  --fg-accent-muted: #3D3226;
+  --fg-accent-text: #E2C79C;
+  --fg-tree-selected: #3D3226;
+  --fg-tree-hover: #332B26;
+  --fg-tab-active: #D4A76A;
+  --fg-tab-hover: #A99C8E;
+  --fg-scrollbar-thumb: #534B45;
+  --fg-scrollbar-track: transparent;
+  --fg-input-bg: #39322E;
+  --fg-input-border: #534B45;
+  --fg-input-text: #EAE0D5;
+  --fg-input-placeholder: #7A6E63;
+  --fg-input-disabled-bg: #2D2420;
+  --fg-input-disabled-text: #7A6E63;
+  --fg-overlay: rgba(0, 0, 0, 0.5);
+  --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Scrollbar (theme-aware, global) ──────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--fg-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--fg-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-text-tertiary);
+}

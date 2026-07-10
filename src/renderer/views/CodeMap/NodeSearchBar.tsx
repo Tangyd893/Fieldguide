@@ -73,19 +73,19 @@ export default function NodeSearchBar({ projectId, onNodeSelect, t: _t }: Props)
           }
         }}
         placeholder="搜索函数、类… (如: handler, service, main)"
-        className="w-full px-2 py-1 text-xs border border-[var(--fg-border)] rounded bg-[var(--fg-bg)] text-[var(--fg-text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-400"
+        className="w-full px-2 py-1 text-xs border border-[var(--fg-border)] rounded bg-[var(--fg-bg)] text-[var(--fg-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--fg-accent)]"
       />
       {showDropdown && (
-        <div className="absolute left-3 right-3 top-full mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-56 overflow-auto">
+        <div className="absolute left-3 right-3 top-full mt-0.5 bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg shadow-lg z-20 max-h-56 overflow-auto">
           {results.map(n => (
             <button
               key={n.id}
               onClick={() => { onNodeSelect(n.id, n.filePath); dashboardSelectNode(n.id); setShowDropdown(false); setQuery('') }}
-              className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--fg-accent-muted)] transition-colors flex items-center gap-2"
             >
-              <span className="font-mono text-blue-700 truncate flex-1">{n.label || n.id}</span>
-              <span className="text-gray-400 shrink-0">{n.type}</span>
-              {n.filePath && <span className="text-gray-300 truncate shrink-0 max-w-[120px]">{n.filePath.split('/').pop()}</span>}
+              <span className="font-mono text-[var(--fg-accent-text)] truncate flex-1">{n.label || n.id}</span>
+              <span className="text-[var(--fg-text-tertiary)] shrink-0">{n.type}</span>
+              {n.filePath && <span className="text-[var(--fg-text-tertiary)] truncate shrink-0 max-w-[120px]">{n.filePath.split('/').pop()}</span>}
             </button>
           ))}
         </div>

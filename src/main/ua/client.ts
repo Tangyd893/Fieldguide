@@ -14,6 +14,7 @@
 import { readdirSync, statSync, readFileSync, existsSync } from 'node:fs'
 import { join, relative, extname, basename } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { app } from 'electron'
 
 // UA Core imports — loaded dynamically to handle ESM
 let TreeSitterPlugin: any
@@ -39,13 +40,17 @@ async function loadCore(): Promise<void> {
 
   // Try npm resolve first, fall back to direct path
   const { createRequire } = await import('node:module')
-  const require_ = createRequire(join(process.cwd(), 'package.json'))
+  const appRoot = app.isPackaged ? app.getAppPath() : process.cwd()
+  const require_ = createRequire(join(appRoot, 'package.json'))
 
   let core: any
   try {
     core = await import(pathToFileURL(require_.resolve('@understand-anything/core')).href)
   } catch {
-    // Fallback: direct path to UA plugin
+    if (app.isPackaged) {
+      throw new Error('打包环境未找到 @understand-anything/core，请检查 node_modules 是否打入安装包')
+    }
+    // Dev fallback: direct path to UA plugin sibling repo
     const uaCorePath = join(
       process.cwd(),
       '..',

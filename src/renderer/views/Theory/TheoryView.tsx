@@ -206,7 +206,7 @@ export default function TheoryView({ t, projectId }: Props) {
           type="text" value={query} onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && search()}
           placeholder="搜索 arXiv… (RAG, transformer, code generation)"
-          className="w-80 px-3 py-1.5 border border-[var(--fg-border)] rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-80 px-3 py-1.5 border border-[var(--fg-border)] rounded-lg text-xs fg-input focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button onClick={search} disabled={searching}
           className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-40"
@@ -321,7 +321,7 @@ export default function TheoryView({ t, projectId }: Props) {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="记录你的想法、与代码的关联…"
-                className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="fg-input w-full h-32 px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <div className="flex justify-between items-center mt-3">
                 <p className="text-xs text-gray-400">笔记自动保存到此论文</p>

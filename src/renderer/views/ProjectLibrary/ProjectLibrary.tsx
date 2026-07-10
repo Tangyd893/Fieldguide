@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import FolderPathField from '../../components/FolderPathField'
+import { useIndexProgress, progressPercent } from '../../hooks/useIndexProgress'
 
 interface ProjectRow {
   id: string; name: string; slug: string; source_type: string; source_uri: string
@@ -27,6 +29,8 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, onFullRein
   const [deleting, setDeleting] = useState<string|null>(null)
   const [analyzingDiff, setAnalyzingDiff] = useState<string|null>(null)
   const [diffResult, setDiffResult] = useState<{ projectId: string; summary: string } | null>(null)
+  const idxProgress = useIndexProgress()
+  const idxPct = progressPercent(idxProgress.progress)
 
   useEffect(() => { loadProjects() }, [])
 
@@ -126,7 +130,7 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, onFullRein
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-900 truncate">{p.name}</span>
                   {p.language&&<span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-mono">{p.language}</span>}
-                  <StatusBadge status={p.status} t={t} />
+                  <StatusBadge status={p.status} t={t} isIndexing={idxProgress.isIndexing} pct={idxPct} />
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
                   <span className="truncate max-w-[300px]" title={p.root_path}>{p.root_path}</span>
@@ -175,7 +179,21 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, onFullRein
   )
 }
 
-function StatusBadge({ status, t }: { status: ProjectRow['status']; t: (k: string) => string }) {
+function StatusBadge({ status, t, isIndexing, pct }: { status: ProjectRow['status']; t: (k: string) => string; isIndexing?: boolean; pct?: number }) {
+  if (status === 'indexing' && isIndexing && pct !== undefined && pct >= 0) {
+    const r = 10; const circ = 2 * Math.PI * r; const offset = circ - (pct / 100) * circ
+    return (
+      <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">
+        <svg className="w-3.5 h-3.5 -ml-0.5" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeWidth="3" opacity="0.2" />
+          <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeWidth="3"
+            strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+            style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }} />
+        </svg>
+        {pct}%
+      </span>
+    )
+  }
   const map: Record<string, string> = { pending:'bg-gray-100 text-gray-500', indexing:'bg-yellow-100 text-yellow-700', ready:'bg-green-100 text-green-700', failed:'bg-red-100 text-red-600', stale:'bg-orange-100 text-orange-700' }
   return <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${map[status]??map.pending}`}>{t(`project.status.${status}`)}</span>
 }
@@ -191,16 +209,22 @@ function AddDialog({ mode, localPath, gitUrl, gitBranch, error, adding, onLocalP
       <h3 className="text-lg font-semibold mb-4">{mode==='local'?t('project.addLocalTitle'):t('project.addGitTitle')}</h3>
       {mode==='local'?<>
         <label className="block text-sm font-medium text-gray-700 mb-1">{t('project.pathLabel')}</label>
-        <input type="text" value={localPath} onChange={e=>onLocalPathChange(e.target.value)} placeholder="D:\Projects\my-repo"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus disabled={adding} />
+        <FolderPathField
+          value={localPath}
+          onChange={onLocalPathChange}
+          placeholder="D:\Projects\my-repo"
+          browseLabel={t('common.browseFolder')}
+          disabled={adding}
+          autoFocus
+        />
         <p className="text-xs text-gray-400 mt-3">{t('project.localPathHint')}</p>
       </>:<>
         <label className="block text-sm font-medium text-gray-700 mb-1">{t('project.gitUrlLabel')}</label>
         <input type="text" value={gitUrl} onChange={e=>onGitUrlChange(e.target.value)} placeholder="https://github.com/user/repo.git"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus disabled={adding} />
+          className="fg-input w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus disabled={adding} />
         <label className="block text-sm font-medium text-gray-700 mt-3 mb-1">{t('project.branchLabel')}</label>
         <input type="text" value={gitBranch} onChange={e=>onGitBranchChange(e.target.value)} placeholder={t('project.branchPlaceholder')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled={adding} />
+          className="fg-input w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled={adding} />
       </>}
       {error && <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">{error}</div>}
       <div className="flex justify-end gap-3 mt-6">

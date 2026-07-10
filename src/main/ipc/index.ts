@@ -160,12 +160,13 @@ ipcMain.handle('shell:openFile', async (_e, { filePath }: { filePath: string }):
 
 ipcMain.handle('dialog:openFolder', async (): Promise<IpcResult<string | null>> => {
   const { dialog } = await import('electron')
-  const win = BrowserWindow.getAllWindows()[0]
+  const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   if (!win) return ipcErr('UNKNOWN', '没有可用窗口')
   try {
     const result = await dialog.showOpenDialog(win, {
-      properties: ['openDirectory'],
-      title: '选择项目文件夹',
+      properties: ['openDirectory', 'createDirectory'],
+      title: '选择文件夹',
+      buttonLabel: '选择',
     })
     if (result.canceled || result.filePaths.length === 0) {
       return ipcOk(null)

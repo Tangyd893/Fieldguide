@@ -63,21 +63,21 @@ export default function CostDialog({ projectId, projectName, onCancel, onContinu
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/30 z-50" onClick={onCancel} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[460px] bg-white rounded-xl shadow-2xl z-50 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">索引「{projectName}」</h3>
-        <p className="text-sm text-gray-500 mb-4">选择索引模式</p>
+      <div className="fixed inset-0 bg-[var(--fg-overlay)] z-50" onClick={onCancel} />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[460px] bg-[var(--fg-card)] rounded-xl shadow-2xl z-50 p-6">
+        <h3 className="text-lg font-semibold text-[var(--fg-text-primary)] mb-1">索引「{projectName}」</h3>
+        <p className="text-sm text-[var(--fg-text-tertiary)] mb-4">选择索引模式</p>
 
         {loading ? (
-          <div className="text-center py-4 text-gray-400 text-sm">加载项目统计…</div>
+          <div className="text-center py-4 text-[var(--fg-text-tertiary)] text-sm">加载项目统计…</div>
         ) : (
           <>
             {/* Stats */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               {fileCount !== null && (
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-gray-800">{fileCount}</p>
-                  <p className="text-xs text-gray-500">源文件</p>
+                <div className="bg-[var(--fg-tree-hover)] rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-[var(--fg-text-primary)]">{fileCount}</p>
+                  <p className="text-xs text-[var(--fg-text-tertiary)]">源文件</p>
                 </div>
               )}
               {nodeCount !== null && (
@@ -104,23 +104,23 @@ export default function CostDialog({ projectId, projectName, onCancel, onContinu
         <div className="space-y-3 mb-6">
           <button
             onClick={onContinue}
-            className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="w-full px-4 py-2.5 bg-[var(--fg-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors"
           >
             🤖 完整索引（含 LLM 分析）
           </button>
           <button
             onClick={onSkipLLM}
-            className="w-full px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            className="w-full px-4 py-2.5 border border-[var(--fg-input-border)] text-[var(--fg-text-secondary)] rounded-lg text-sm font-medium hover:bg-[var(--fg-tree-hover)] transition-colors"
           >
             📊 仅静态索引（跳过摘要与 Tour）
-            {estStructureTokens && <span className="text-gray-400 ml-1">~{estStructureTokens.toLocaleString()} tokens</span>}
+            {estStructureTokens && <span className="text-[var(--fg-text-tertiary)] ml-1">~{estStructureTokens.toLocaleString()} tokens</span>}
           </button>
         </div>
 
         <div className="flex justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
+            className="px-4 py-2 text-sm text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-primary)]"
           >
             取消
           </button>

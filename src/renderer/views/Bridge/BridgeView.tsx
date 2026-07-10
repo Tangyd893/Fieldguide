@@ -85,7 +85,7 @@ export default function BridgeView({ t, projectId }: Props) {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+      <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">
         {t('codeMap.loading')}
       </div>
     )
@@ -94,7 +94,7 @@ export default function BridgeView({ t, projectId }: Props) {
   if (!projectId) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="border-2 border-dashed border-gray-200 rounded-lg p-12 text-center text-gray-300">
+        <div className="border-2 border-dashed border-[var(--fg-border)] rounded-lg p-12 text-center text-[var(--fg-text-tertiary)]">
           <p className="text-lg mb-2">📎 概念桥接</p>
           <p className="text-sm">请先在项目库中选择一个项目，以浏览和创建论文与代码的桥接关联。</p>
         </div>
@@ -105,7 +105,7 @@ export default function BridgeView({ t, projectId }: Props) {
   if (papers.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="border-2 border-dashed border-gray-200 rounded-lg p-12 text-center text-gray-300">
+        <div className="border-2 border-dashed border-[var(--fg-border)] rounded-lg p-12 text-center text-[var(--fg-text-tertiary)]">
           <p className="text-lg mb-2">📄 暂无论文</p>
           <p className="text-sm">请先在「理论」Tab 中搜索并保存 arXiv 论文，然后回到此处建立桥接。</p>
         </div>
@@ -120,8 +120,8 @@ export default function BridgeView({ t, projectId }: Props) {
       {/* Left sidebar: paper list */}
       <div className="w-64 border-r border-[var(--fg-border)] bg-[var(--fg-card)] overflow-auto shrink-0">
         <div className="px-3 py-3 border-b border-[var(--fg-border)]">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">论文列表</h3>
-          <p className="text-[10px] text-gray-400 mt-0.5">
+          <h3 className="text-xs font-semibold text-[var(--fg-text-tertiary)] uppercase tracking-wider">论文列表</h3>
+          <p className="text-[10px] text-[var(--fg-text-tertiary)] mt-0.5">
             {allLinks.length} 条关联 · {papers.length} 篇论文
           </p>
           {allLinks.length > 0 && (
@@ -143,11 +143,11 @@ export default function BridgeView({ t, projectId }: Props) {
               key={paper.id}
               onClick={() => setSelectedPaperId(paper.id)}
               className={`w-full text-left px-3 py-2.5 border-b border-[var(--fg-border)] transition-colors ${
-                isSelected ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-50'
+                isSelected ? 'bg-[var(--fg-accent-muted)] border-l-2 border-l-[var(--fg-accent)]' : 'hover:bg-[var(--fg-tree-hover)]'
               }`}
             >
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-medium text-gray-800 line-clamp-1 flex-1">
+                <span className="text-xs font-medium text-[var(--fg-text-primary)] line-clamp-1 flex-1">
                   {paper.title}
                 </span>
                 {linkCount > 0 && (
@@ -156,11 +156,11 @@ export default function BridgeView({ t, projectId }: Props) {
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-gray-400 mt-0.5">
+              <p className="text-[10px] text-[var(--fg-text-tertiary)] mt-0.5">
                 {paper.authors?.split(',').slice(0, 2).join(', ') || '未知作者'}
               </p>
               {paper.arxiv_id && (
-                <p className="text-[10px] text-gray-300 font-mono mt-0.5">{paper.arxiv_id}</p>
+                <p className="text-[10px] text-[var(--fg-text-tertiary)] font-mono mt-0.5">{paper.arxiv_id}</p>
               )}
             </button>
           )
@@ -177,7 +177,7 @@ export default function BridgeView({ t, projectId }: Props) {
           />
         ) : (
           <div className="h-full flex items-center justify-center">
-            <div className="text-center text-gray-400">
+            <div className="text-center text-[var(--fg-text-tertiary)]">
               <p className="text-5xl mb-4">🔗</p>
               <p className="text-lg mb-2">概念桥接</p>
               <p className="text-sm">从左侧选择一篇论文，查看和创建它与代码节点之间的关联。</p>
@@ -193,22 +193,22 @@ export default function BridgeView({ t, projectId }: Props) {
 
 function TourResultDialog({ result, onClose, t: _t }: { result: { stepCount: number; summary: string }; onClose: () => void; t: (key: string) => string }) {
   return <>
-    <div className="fixed inset-0 bg-black/25 z-40" onClick={onClose} />
-    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[80vh] bg-white rounded-xl shadow-xl z-50 p-6 overflow-auto">
+    <div className="fixed inset-0 bg-[var(--fg-overlay)] z-40" onClick={onClose} />
+    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[80vh] bg-[var(--fg-card)] rounded-xl shadow-xl z-50 p-6 overflow-auto">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">🔮 对照 Tour{result.stepCount > 0 ? ` (${result.stepCount} 步)` : ''}</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+        <button onClick={onClose} className="text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-secondary)] text-lg leading-none">×</button>
       </div>
-      <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
+      <div className="prose prose-sm max-w-none text-[var(--fg-text-secondary)] whitespace-pre-wrap text-sm leading-relaxed">
         {result.summary}
       </div>
       {result.stepCount > 0 && (
-        <p className="mt-3 text-xs text-gray-400">
+        <p className="mt-3 text-xs text-[var(--fg-text-tertiary)]">
           💡 Tour 已写入图谱。切换到「代码地图」Tab，点击 Tour 面板即可跟随导览。
         </p>
       )}
       <div className="flex justify-end mt-6">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">关闭</button>
+        <button onClick={onClose} className="px-4 py-2 text-sm text-[var(--fg-text-secondary)] hover:text-[var(--fg-text-primary)]">关闭</button>
       </div>
     </div>
   </>

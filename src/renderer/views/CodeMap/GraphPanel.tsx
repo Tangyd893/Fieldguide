@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useIndexProgress } from '../../hooks/useIndexProgress'
 
 interface LayerInfo {
   id: string
@@ -101,6 +102,22 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
   const [iframeKey, setIframeKey] = useState(0)
   const [layers, setLayers] = useState<LayerInfo[]>([])
   const [activeLayer, setActiveLayer] = useState<string | null>(null)
+  const [iframeLoading, setIframeLoading] = useState(true)
+
+  // Auto-refresh when index completes
+  const idxProgress = useIndexProgress(projectId)
+  const prevComplete = useRef(false)
+  useEffect(() => {
+    if (idxProgress.progress?.type === 'complete') {
+      if (!prevComplete.current) {
+        prevComplete.current = true
+        setIframeKey(k => k + 1)
+        setIframeLoading(true)
+      }
+    } else {
+      prevComplete.current = false
+    }
+  }, [idxProgress.progress?.type])
 
   useEffect(() => {
     window.fieldguide.dashboardUrl?.().then(setDashboardUrl).catch(() => {}).finally(() => setLoading(false))
@@ -124,12 +141,13 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
     return () => window.removeEventListener('message', handleMessage)
   }, [onDashboardMessage])
 
-  // Reload iframe when project changes (so Dashboard picks up new knowledge-graph.json)
+  // Reload iframe when project changes
   const prevRoot = useRef(projectRoot)
   useEffect(() => {
     if (projectRoot && projectRoot !== prevRoot.current) {
       prevRoot.current = projectRoot
       setIframeKey(k => k + 1)
+      setIframeLoading(true)
       setActiveLayer(null)
     }
   }, [projectRoot])
@@ -151,18 +169,18 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
     }).catch(() => { /* layers are optional */ })
   }, [projectId, iframeKey])
 
-  if (loading) return <div className="h-full flex items-center justify-center text-gray-400 text-sm">{t('codeMap.dashboardLoading')}</div>
-  if (!dashboardUrl) return <div className="h-full flex items-center justify-center text-gray-400 text-sm">{t('codeMap.dashboardUnavailable')}</div>
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.dashboardLoading')}</div>
+  if (!dashboardUrl) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.dashboardUnavailable')}</div>
 
   return (
     <div className="h-full flex flex-col">
-      {/* Layer bar — quick domain/layer navigation */}
+      {/* Layer bar */}
       {layers.length > 0 && (
         <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0 overflow-x-auto">
           <button
             onClick={() => { dashboardNavigateToOverview(); setActiveLayer(null) }}
             className={`px-2 py-0.5 text-xs rounded-full whitespace-nowrap transition-colors ${
-              !activeLayer ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-100'
+              !activeLayer ? 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] font-medium' : 'text-[var(--fg-text-secondary)] hover:bg-[var(--fg-tree-hover)]'
             }`}
           >
             📐 总览
@@ -173,16 +191,49 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
               onClick={() => { dashboardDrillIntoLayer(l.id); setActiveLayer(l.id) }}
               title={`${l.description} (${l.nodeCount} nodes)`}
               className={`px-2 py-0.5 text-xs rounded-full whitespace-nowrap transition-colors ${
-                activeLayer === l.id ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-100'
+                activeLayer === l.id ? 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] font-medium' : 'text-[var(--fg-text-secondary)] hover:bg-[var(--fg-tree-hover)]'
               }`}
             >
               {l.name}
-              <span className="ml-1 text-gray-400">{l.nodeCount}</span>
+              <span className="ml-1 text-[var(--fg-text-tertiary)]">{l.nodeCount}</span>
             </button>
           ))}
         </div>
       )}
-      <iframe ref={iframeRef} key={iframeKey} src={dashboardUrl} className="w-full flex-1 border-0" title="UA Dashboard" />
+      
+      {/* Skeleton while iframe loads */}
+      {iframeLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[var(--fg-bg)] mt-8 pointer-events-none">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-[var(--fg-accent)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-[var(--fg-text-tertiary)]">加载图谱…</span>
+          </div>
+        </div>
+      )}
+
+      <iframe
+        ref={iframeRef}
+        key={iframeKey}
+        src={dashboardUrl}
+        className="w-full flex-1 border-0"
+        title="UA Dashboard"
+        onLoad={() => {
+          setIframeLoading(false)
+          const rootStyle = getComputedStyle(document.documentElement)
+          postToDashboard({
+            type: 'setTheme',
+            colors: {
+              background: rootStyle.getPropertyValue('--fg-bg').trim(),
+              accent: rootStyle.getPropertyValue('--fg-accent').trim(),
+              text: rootStyle.getPropertyValue('--fg-text-primary').trim(),
+              muted: rootStyle.getPropertyValue('--fg-text-secondary').trim(),
+              card: rootStyle.getPropertyValue('--fg-card').trim(),
+              border: rootStyle.getPropertyValue('--fg-border').trim(),
+            },
+          })
+        }}
+        style={iframeLoading ? { visibility: 'hidden', position: 'absolute' } : undefined}
+      />
     </div>
   )
 }

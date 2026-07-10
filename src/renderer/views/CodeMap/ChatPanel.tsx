@@ -92,13 +92,13 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
                   ? 'bg-blue-600 text-white'
                   : msg.role === 'system'
                     ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
-                    : 'bg-white border border-gray-200 text-gray-800'
+                    : 'bg-[var(--fg-card)] border border-[var(--fg-border)] text-[var(--fg-text-primary)]'
               }`}
             >
               {msg.content}
               <div
                 className={`text-xs mt-1 ${
-                  msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'
+                  msg.role === 'user' ? 'text-blue-200' : 'text-[var(--fg-text-tertiary)]'
                 }`}
               >
                 {new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
@@ -111,11 +111,11 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5">
+            <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-xl px-4 py-2.5">
               <div className="flex gap-1">
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-2 h-2 bg-[var(--fg-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-[var(--fg-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-[var(--fg-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>

@@ -7,7 +7,6 @@
  *   - Chunk boundaries respect paragraph breaks when possible
  */
 import { readFileSync } from 'node:fs'
-import { PDFParse } from 'pdf-parse'
 
 export interface PaperChunk {
   /** 0-based chunk index within the paper */
@@ -32,6 +31,7 @@ const OVERLAP_CHARS = OVERLAP_TOKENS * CHARS_PER_TOKEN // ~256
  * Extract raw text from a PDF file buffer.
  */
 export async function extractPdfText(pdfPath: string): Promise<string> {
+  const { PDFParse } = await import('pdf-parse')
   const buffer = readFileSync(pdfPath)
   const parser = new PDFParse({ data: buffer })
   try {

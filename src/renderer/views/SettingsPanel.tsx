@@ -4,7 +4,9 @@
  * Phase 4: 诊断日志查看
  */
 import { useState, useEffect } from 'react'
-import { applyTheme } from '../App'
+import { Cpu, FolderOpen, Globe, Palette, Wrench, ZoomIn } from 'lucide-react'
+import { applyTheme, applyZoom, applyFonts } from '../App'
+import FolderPathField from '../components/FolderPathField'
 
 interface Props {
   t: (key: string) => string
@@ -19,6 +21,10 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
   const [projectsRoot, setProjectsRoot] = useState('')
   const [locale, setLocale] = useState('zh-CN')
   const [theme, setTheme] = useState('system')
+  const [themePreset, setThemePreset] = useState('parchment')
+  const [zoom, setZoom] = useState(100)
+  const [uiFont, setUiFont] = useState('Segoe UI')
+  const [monoFont, setMonoFont] = useState('Cascadia Code')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -38,6 +44,11 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
         setProjectsRoot((c.projectsRoot as string) || '')
         setLocale((c.locale as string) || 'zh-CN')
         setTheme((c.theme as string) || 'system')
+        const appearance = c.appearance as Record<string, string> | undefined
+        setThemePreset(appearance?.themePreset || 'parchment')
+        setZoom(appearance?.zoom ? Number(appearance.zoom) : 100)
+        setUiFont(appearance?.uiFont || 'Segoe UI')
+        setMonoFont(appearance?.monoFont || 'Cascadia Code')
       }
     })
   }, [])
@@ -49,9 +60,10 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
       projectsRoot,
       locale,
       theme,
+      appearance: { themePreset, zoom, uiFont, monoFont },
     })
-    // Apply theme immediately
-    applyTheme(theme)
+    // Apply theme immediately (keep current preset)
+    applyTheme(theme, themePreset === 'none' ? undefined : themePreset)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -99,62 +111,65 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[80vh] bg-white rounded-xl shadow-2xl z-50 overflow-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div className="fixed inset-0 bg-[var(--fg-overlay)] z-50" onClick={onClose} />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[80vh] bg-[var(--fg-card)] rounded-xl shadow-2xl z-50 overflow-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--fg-border)]">
           <h2 className="text-lg font-semibold">{t('settings.title')}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
+          <button onClick={onClose} className="text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-secondary)] text-lg">×</button>
         </div>
 
         <div className="px-6 py-4 space-y-6">
           {/* LLM */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">🤖 {t('settings.llm')}</h3>
+            <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><Cpu size={14} /> {t('settings.llm')}</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Base URL</label>
+                <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">Base URL</label>
                 <input type="text" value={baseUrl} onChange={e => setBaseUrl(e.target.value)}
                   placeholder="https://api.deepseek.com/v1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="fg-input w-full px-3 py-2 border border-[var(--fg-input-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">API Key</label>
+                <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">API Key</label>
                 <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
                   placeholder="sk-..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="fg-input w-full px-3 py-2 border border-[var(--fg-input-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Chat Model</label>
+                <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">Chat Model</label>
                 <input type="text" value={chatModel} onChange={e => setChatModel(e.target.value)}
                   placeholder="deepseek-chat"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="fg-input w-full px-3 py-2 border border-[var(--fg-input-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]" />
               </div>
               <div className="flex items-center gap-3">
                 <button onClick={testConnection} disabled={testing}
-                  className="px-4 py-1.5 border border-blue-300 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-50 disabled:opacity-40 transition-colors">
+                  className="px-4 py-1.5 border border-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] rounded-lg text-xs font-medium hover:bg-[var(--fg-accent-muted)] disabled:opacity-40 transition-colors">
                   {testing ? t('settings.testing') : '🔌 ' + t('settings.testConnection')}
                 </button>
-                {testResult === 'success' && <span className="text-xs text-green-600">✅ {t('settings.testSuccess')}</span>}
-                {testResult === 'fail' && <span className="text-xs text-red-500">❌ {t('settings.testFail')}</span>}
+                {testResult === 'success' && <span className="text-xs text-[var(--fg-status-success)]">✅ {t('settings.testSuccess')}</span>}
+                {testResult === 'fail' && <span className="text-xs text-[var(--fg-status-error)]">❌ {t('settings.testFail')}</span>}
               </div>
             </div>
           </section>
 
           {/* Projects Root */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">📁 {t('settings.projectsRoot')}</h3>
+            <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><FolderOpen size={14} /> {t('settings.projectsRoot')}</h3>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Git clone 目标路径</label>
-              <input type="text" value={projectsRoot} onChange={e => setProjectsRoot(e.target.value)}
+              <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">Git clone 目标路径</label>
+              <FolderPathField
+                value={projectsRoot}
+                onChange={setProjectsRoot}
                 placeholder="D:\Projects"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <p className="text-xs text-gray-400 mt-1.5">{t('settings.projectsRootHint')}</p>
+                browseLabel={t('common.browseFolder')}
+              />
+              <p className="text-xs text-[var(--fg-text-tertiary)] mt-1.5">{t('settings.projectsRootHint')}</p>
             </div>
           </section>
 
           {/* Language */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">🌐 {t('settings.language')}</h3>
+            <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><Globe size={14} /> {t('settings.language')}</h3>
             <div className="flex gap-2">
               {[
                 { v: 'zh-CN', l: '简体中文' },
@@ -163,7 +178,7 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
               ].map((opt) => (
                 <button key={opt.v} onClick={() => setLocale(opt.v)}
                   className={`px-4 py-2 rounded-lg text-sm border-2 transition-all ${
-                    locale === opt.v ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                    locale === opt.v ? 'border-[var(--fg-accent)] bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] font-medium' : 'border-[var(--fg-border)] text-[var(--fg-text-secondary)] hover:border-[var(--fg-text-tertiary)]'
                   }`}>{opt.l}</button>
               ))}
             </div>
@@ -171,27 +186,134 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
 
           {/* Theme */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">🎨 {t('settings.theme')}</h3>
+            <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><Palette size={14} /> {t('settings.theme')}</h3>
             <div className="flex gap-2">
               {[
                 { v: 'system', l: '跟随系统' },
                 { v: 'light', l: '浅色' },
                 { v: 'dark', l: '深色' },
               ].map((opt) => (
-                <button key={opt.v} onClick={() => { setTheme(opt.v); applyTheme(opt.v) }}
+                <button key={opt.v} onClick={() => { setTheme(opt.v); applyTheme(opt.v, themePreset === 'none' ? undefined : themePreset) }}
                   className={`px-4 py-2 rounded-lg text-sm border-2 transition-all ${
-                    theme === opt.v ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                    theme === opt.v ? 'border-[var(--fg-accent)] bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] font-medium' : 'border-[var(--fg-border)] text-[var(--fg-text-secondary)] hover:border-[var(--fg-text-tertiary)]'
                   }`}>{opt.l}</button>
               ))}
             </div>
           </section>
 
+          {/* Theme Presets */}
+          <section>
+            <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><Palette size={14} /> {t('settings.themePreset')}</h3>
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { v: 'parchment', l: t('settings.themePreset.parchment'), bg: '#F5F0E1', accent: '#6B8F71' },
+                { v: 'forest', l: t('settings.themePreset.forest'), bg: '#1B2E1E', accent: '#7DBF6E' },
+                { v: 'slate', l: t('settings.themePreset.slate'), bg: '#F0F2F5', accent: '#6366F1' },
+                { v: 'midnight', l: t('settings.themePreset.midnight'), bg: '#0D1117', accent: '#79C0FF' },
+                { v: 'paper-dark', l: t('settings.themePreset.paper-dark'), bg: '#2D2420', accent: '#D4A76A' },
+                { v: 'none', l: t('settings.themePreset.none'), bg: '#fafafa', accent: '#2563eb' },
+              ] as const).map((opt) => {
+                const isActive = themePreset === opt.v
+                return (
+                  <button key={opt.v}
+                    onClick={() => {
+                      setThemePreset(opt.v)
+                      applyTheme(theme, opt.v === 'none' ? undefined : opt.v)
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border-2 transition-all ${
+                      isActive ? 'border-[var(--fg-accent)] bg-[var(--fg-accent-muted)] font-medium' : 'border-[var(--fg-border)] hover:border-[var(--fg-text-tertiary)]'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full border border-[var(--fg-border)] shrink-0" style={{ background: opt.accent }} />
+                    <span className="w-3 h-3 rounded-sm shrink-0 border border-[var(--fg-border)]" style={{ background: opt.bg }} />
+                    <span>{opt.l}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          {/* Zoom */}
+          <section>
+            <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><ZoomIn size={14} /> 界面缩放</h3>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={50}
+                max={200}
+                step={10}
+                value={zoom}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  setZoom(v)
+                  applyZoom(v)
+                }}
+                className="flex-1 h-1.5 rounded-full appearance-none bg-[var(--fg-input-border)] cursor-pointer
+                  [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--fg-accent)]"
+              />
+              <input
+                type="number"
+                min={50}
+                max={200}
+                step={10}
+                value={zoom}
+                onChange={(e) => {
+                  const v = Math.max(50, Math.min(200, Number(e.target.value) || 100))
+                  setZoom(v)
+                  applyZoom(v)
+                }}
+                className="w-16 px-2 py-1 text-xs text-center border border-[var(--fg-input-border)] rounded bg-[var(--fg-input-bg)] text-[var(--fg-input-text)] focus:outline-none focus:ring-1 focus:ring-[var(--fg-accent)]"
+              />
+              <span className="text-xs text-[var(--fg-text-tertiary)] min-w-[2.5rem]">{zoom}%</span>
+            </div>
+          </section>
+
+          {/* Fonts */}
+          <section>
+            <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><ZoomIn size={14} /> 字体</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">UI 字体</label>
+                <select
+                  value={uiFont}
+                  onChange={(e) => {
+                    setUiFont(e.target.value)
+                    applyFonts(e.target.value, monoFont)
+                  }}
+                  className="w-full px-2 py-1.5 text-xs border border-[var(--fg-input-border)] rounded bg-[var(--fg-input-bg)] text-[var(--fg-input-text)] focus:outline-none focus:ring-1 focus:ring-[var(--fg-accent)]"
+                >
+                  <option>Segoe UI</option>
+                  <option>Inter</option>
+                  <option>System UI</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">代码字体</label>
+                <select
+                  value={monoFont}
+                  onChange={(e) => {
+                    setMonoFont(e.target.value)
+                    applyFonts(uiFont, e.target.value)
+                  }}
+                  className="w-full px-2 py-1.5 text-xs border border-[var(--fg-input-border)] rounded bg-[var(--fg-input-bg)] text-[var(--fg-input-text)] focus:outline-none focus:ring-1 focus:ring-[var(--fg-accent)]"
+                >
+                  <option>Cascadia Code</option>
+                  <option>Consolas</option>
+                  <option>Fira Code</option>
+                  <option>JetBrains Mono</option>
+                  <option>Source Code Pro</option>
+                  <option>monospace</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
           {/* Diagnostics */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">🩺 {t('settings.diagnostics')}</h3>
+            <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><Wrench size={14} /> {t('settings.diagnostics')}</h3>
             <div className="flex gap-2 mb-2">
               <button onClick={loadLogs} disabled={logLoading}
-                className="px-4 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-40 transition-colors">
+                className="px-4 py-1.5 border border-[var(--fg-input-border)] text-[var(--fg-text-secondary)] rounded-lg text-xs font-medium hover:bg-[var(--fg-tree-hover)] disabled:opacity-40 transition-colors">
                 {logLoading ? '…' : t('settings.viewLogs')}
               </button>
               <button onClick={openLogDir}
@@ -200,26 +322,26 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
               </button>
             </div>
             {showLogs && (
-              <pre className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 max-h-48 overflow-auto border border-gray-200 whitespace-pre-wrap break-all font-mono">
+              <pre className="text-xs text-[var(--fg-text-secondary)] bg-[var(--fg-tree-hover)] rounded-lg p-3 max-h-48 overflow-auto border border-[var(--fg-border)] whitespace-pre-wrap break-all font-mono">
                 {logContent || '(empty)'}
               </pre>
             )}
           </section>
         </div>
 
-        <div className="flex justify-between gap-3 px-6 py-4 border-t border-gray-200">
+        <div className="flex justify-between gap-3 px-6 py-4 border-t border-[var(--fg-border)]">
           <div className="flex gap-2">
             {onAbout && (
-              <button onClick={onAbout} className="px-3 py-2 text-xs text-gray-400 hover:text-blue-600 transition-colors">
+              <button onClick={onAbout} className="px-3 py-2 text-xs text-[var(--fg-text-tertiary)] hover:text-[var(--fg-accent)] transition-colors">
                 ℹ️ {t('about.title')}
               </button>
             )}
           </div>
           <div className="flex gap-3">
-            {saved && <span className="text-xs text-green-600 self-center mr-2">✅ {t('settings.saved')}</span>}
-            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">{t('settings.cancel')}</button>
+            {saved && <span className="text-xs text-[var(--fg-status-success)] self-center mr-2">✅ {t('settings.saved')}</span>}
+            <button onClick={onClose} className="px-4 py-2 text-sm text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-primary)]">{t('settings.cancel')}</button>
             <button onClick={save} disabled={saving}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 transition-colors">
+              className="px-5 py-2 bg-[var(--fg-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-colors">
               {saving ? t('settings.saving') : t('settings.save')}
             </button>
           </div>

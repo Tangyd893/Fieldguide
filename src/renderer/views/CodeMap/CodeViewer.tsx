@@ -21,8 +21,8 @@ export default function CodeViewer({ projectId, filePath, t }: Props) {
     finally { setLoading(false) }
   }
 
-  if (!filePath) return <div className="h-full flex items-center justify-center text-gray-400 text-sm">{t('codeMap.clickToOpen')}</div>
-  if (loading) return <div className="h-full flex items-center justify-center text-gray-400 text-sm">{t('codeMap.loading')}</div>
+  if (!filePath) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.clickToOpen')}</div>
+  if (loading) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.loading')}</div>
   if (error) return <div className="h-full flex items-center justify-center text-red-500 text-sm">{error}</div>
 
   const lines = content.split('\n')
@@ -31,16 +31,16 @@ export default function CodeViewer({ projectId, filePath, t }: Props) {
 
   return (
     <div className="h-full overflow-auto bg-[var(--fg-bg)]">
-      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 bg-[var(--fg-card)] border-b border-[var(--fg-border)] text-xs text-gray-400 font-mono">
-        <span className="text-gray-500">{filePath}</span>
-        <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[11px] font-medium">{langLabel}</span>
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 bg-[var(--fg-card)] border-b border-[var(--fg-border)] text-xs text-[var(--fg-text-tertiary)] font-mono">
+        <span className="text-[var(--fg-text-secondary)]">{filePath}</span>
+        <span className="px-1.5 py-0.5 rounded bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] text-[11px] font-medium">{langLabel}</span>
         <span className="flex-1" />
         <span>{t('codeMap.lines', { count: lines.length })}</span>
       </div>
-      <div className="font-mono text-[13px] leading-5">
+      <div className="font-mono text-[13px] leading-5" style={{ fontFamily: 'var(--fg-font-mono)' }}>
         {lines.map((line, i) => (
           <div key={i} className="flex hover:bg-blue-50/30 group">
-            <span className="w-12 flex-shrink-0 text-right pr-3 text-gray-300 select-none text-xs leading-5 py-px border-r border-[var(--fg-border)]">
+            <span className="w-12 flex-shrink-0 text-right pr-3 text-[var(--fg-text-tertiary)] select-none text-xs leading-5 py-px border-r border-[var(--fg-border)]">
               {i + 1}
             </span>
             <span className="flex-1 pl-3 whitespace-pre text-[var(--fg-text-primary)] py-px min-w-0 overflow-x-auto">

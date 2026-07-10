@@ -102,10 +102,10 @@ export default function CommandPalette({ commands, onClose, searchFiles, searchN
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
-      <div className="fixed top-[20%] left-1/2 -translate-x-1/2 w-[560px] bg-white rounded-xl shadow-2xl z-50 overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200">
-          <span className="text-gray-400">🔍</span>
+      <div className="fixed inset-0 bg-[var(--fg-overlay)] z-50" onClick={onClose} />
+      <div className="fixed top-[20%] left-1/2 -translate-x-1/2 w-[560px] bg-[var(--fg-card)] rounded-xl shadow-2xl z-50 overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--fg-border)]">
+          <span className="text-[var(--fg-text-tertiary)]">🔍</span>
           <input
             ref={inputRef}
             type="text"
@@ -116,24 +116,24 @@ export default function CommandPalette({ commands, onClose, searchFiles, searchN
             }}
             onKeyDown={onKeyDown}
             placeholder="搜索命令、文件或节点…"
-            className="flex-1 text-sm outline-none text-gray-800"
+            className="flex-1 text-sm outline-none fg-input bg-transparent border-0 focus:ring-0 px-0"
           />
-          <kbd className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Esc</kbd>
+          <kbd className="text-xs text-[var(--fg-text-tertiary)] bg-[var(--fg-tree-hover)] px-1.5 py-0.5 rounded">Esc</kbd>
         </div>
         <div className="max-h-72 overflow-auto">
           {combined.length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-400 text-sm">无匹配命令</div>
+            <div className="px-4 py-8 text-center text-[var(--fg-text-tertiary)] text-sm">无匹配命令</div>
           ) : (
             combined.map((item, i) => (
               <button
                 key={item.id}
                 onClick={() => { item.action(); onClose() }}
                 className={`w-full text-left px-4 py-2.5 flex items-center gap-3 text-sm transition-colors ${
-                  i === selected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  i === selected ? 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)]' : 'text-[var(--fg-text-secondary)] hover:bg-[var(--fg-tree-hover)]'
                 }`}
               >
                 <span className="flex-1">{item.label}</span>
-                {item.kind === 'file' && <span className="text-xs text-gray-400">跳转</span>}
+                {item.kind === 'file' && <span className="text-xs text-[var(--fg-text-tertiary)]">跳转</span>}
               </button>
             ))
           )}

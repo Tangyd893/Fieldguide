@@ -75,7 +75,7 @@ export default function TourPanel({ projectId, t }: Props) {
 
   if (loading) {
     return (
-      <div className="p-3 text-xs text-gray-400">{t('codeMap.loading')}</div>
+      <div className="p-3 text-xs text-[var(--fg-text-tertiary)]">{t('codeMap.loading')}</div>
     )
   }
 

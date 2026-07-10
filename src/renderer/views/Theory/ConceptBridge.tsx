@@ -230,7 +230,7 @@ ${candidateLines}`
             </div>
             <input type="text" value={nodeQuery} onChange={(e) => { setNodeQuery(e.target.value); if (e.target.value) setAiSuggestedNodes([]) }}
               placeholder="输入函数名或类名…"
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              className="fg-input w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
           </div>
 
           {filteredNodes.length > 0 && (
@@ -278,13 +278,13 @@ ${candidateLines}`
                 <label className="block text-xs font-medium text-gray-500 mb-1">关联的论文段落</label>
                 <input type="text" value={anchorText} onChange={(e) => setAnchorText(e.target.value)}
                   placeholder="如: Section 3.2 介绍了 splitter 算法…"
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                  className="fg-input w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">备注</label>
                 <input type="text" value={linkNote} onChange={(e) => setLinkNote(e.target.value)}
                   placeholder="如: 该函数实现了论文中的 splitter"
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                  className="fg-input w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
               </div>
               <button onClick={addLink} disabled={adding}
                 className="w-full py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-40">

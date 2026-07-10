@@ -19,6 +19,18 @@ export function createWindow(): BrowserWindow {
 
   win.on('ready-to-show', () => {
     win.show()
+    win.focus()
+  })
+
+  // Fallback: ensure window becomes visible even if ready-to-show is delayed
+  win.webContents.once('did-finish-load', () => {
+    setTimeout(() => {
+      if (!win.isDestroyed() && !win.isVisible()) win.show()
+    }, 1500)
+  })
+
+  win.webContents.on('did-fail-load', (_event, code, description, url) => {
+    console.error('[Fieldguide] did-fail-load', code, description, url)
   })
 
   win.webContents.setWindowOpenHandler((details) => {

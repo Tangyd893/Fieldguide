@@ -5,14 +5,21 @@
  * Phase 4: i18n 化 — 所有 UI 文案通过 t() 获取
  */
 import { useState, useEffect } from 'react'
+import FolderPathField from '../components/FolderPathField'
+import { useIndexProgress, progressPercent } from '../hooks/useIndexProgress'
 
 interface Props {
   t: (key: string, opts?: Record<string, unknown>) => string
   onComplete: (locale: string, projectsRoot: string, navigateTo?: 'codemap' | 'library') => void
   /** Called when user picks 'skip' on step 4 — legacy direct-complete path */
   onStartOption?: (option: 'demo' | 'local' | 'skip', locale: string, projectsRoot: string) => void
-  /** Called from step 5 to set up the project (demo clone / local add + index). Returns projectId. */
-  onSetupStart?: (option: 'demo' | 'local', locale: string, projectsRoot: string) => Promise<string | null>
+  /** Called from step 5 to set up the project (demo / local add + index). Returns projectId. */
+  onSetupStart?: (
+    option: 'demo' | 'local',
+    locale: string,
+    projectsRoot: string,
+    localPath?: string,
+  ) => Promise<string | null>
 }
 
 const STEPS = ['welcome', 'language', 'projectRoot', 'start', 'step5'] as const
@@ -29,6 +36,7 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
   const [step, setStep] = useState(0)
   const [locale, setLocale] = useState('zh-CN')
   const [projectsRoot, setProjectsRoot] = useState('')
+  const [localProjectPath, setLocalProjectPath] = useState<string | null>(null)
 
   // Step 5 state
   const [selectedOption, setSelectedOption] = useState<'demo' | 'local' | null>(null)
@@ -36,6 +44,11 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
   const [step5Progress, setStep5Progress] = useState('')
   const [step5NodeCount, setStep5NodeCount] = useState(0)
   const [step5Error, setStep5Error] = useState('')
+  const [step5ProjectId, setStep5ProjectId] = useState<string | null>(null)
+
+  // Use global indexing progress, filtered to our project
+  const idxProgress = useIndexProgress(step5ProjectId ?? undefined)
+  const idxPct = progressPercent(idxProgress.progress)
 
   const total = STEPS.length
 
@@ -49,22 +62,34 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
     if (step > 0) setStep(step - 1)
   }
 
-  function handleStartOption(option: 'demo' | 'local' | 'skip') {
+  async function handleStartOption(option: 'demo' | 'local' | 'skip') {
     if (option === 'skip') {
-      // Legacy: just complete directly, no Step 5
       if (onStartOption) {
         onStartOption(option, locale, projectsRoot)
       } else {
         onComplete(locale, projectsRoot)
       }
-    } else {
-      setSelectedOption(option)
-      setStep5Phase('setting-up')
-      setStep5Progress('')
-      setStep5NodeCount(0)
-      setStep5Error('')
-      setStep(4) // move to Step 5
+      return
     }
+
+    if (option === 'local') {
+      try {
+        const folderResult = await window.fieldguide.openFolderDialog()
+        if (!folderResult?.ok || !folderResult.data) return
+        setLocalProjectPath(folderResult.data)
+      } catch {
+        return
+      }
+    } else {
+      setLocalProjectPath(null)
+    }
+
+    setSelectedOption(option)
+    setStep5Phase('setting-up')
+    setStep5Progress('')
+    setStep5NodeCount(0)
+    setStep5Error('')
+    setStep(4)
   }
 
   // Step 5: kick off project setup when this step becomes active
@@ -75,13 +100,9 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
     let unsubProgress: (() => void) | undefined
 
     async function run() {
-      // Phase 1: project setup (builtin demo / add local)
-      setStep5Phase('setting-up')
-      setStep5Progress(t('onboarding.settingUp'))
-
       let projectId: string | null = null
       try {
-        projectId = await onSetupStart!(selectedOption!, locale, projectsRoot)
+        projectId = await onSetupStart!(selectedOption!, locale, projectsRoot, localProjectPath ?? undefined)
       } catch (err) {
         if (!cancelled) {
           setStep5Error(String(err))
@@ -92,13 +113,12 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
 
       if (cancelled) return
       if (!projectId) {
-        // Project setup failed silently (error toast already shown by parent)
         setStep5Phase('complete')
         setStep5NodeCount(0)
         return
       }
 
-      // Bundled demo ships with a pre-built graph — skip indexing wait
+      // Bundled demo ships with a pre-built graph
       try {
         const list = await window.fieldguide.projectList()
         const proj = list.ok
@@ -109,39 +129,32 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
           setStep5NodeCount(proj.node_count)
           return
         }
-      } catch { /* fall through to indexing */ }
+      } catch { /* fall through */ }
 
-      // Phase 2: monitor index progress
+      // Phase 2: monitor index progress via shared hook
       setStep5Phase('indexing')
-      setStep5Progress(t('onboarding.indexing'))
-
-      unsubProgress = window.fieldguide.onIndexProgress?.((data: unknown) => {
-        if (cancelled) return
-        const ev = data as { type: string; phase?: string; current?: number; total?: number; error?: string; nodeCount?: number; projectId?: string }
-
-        // Only track events for this project
-        if (ev.projectId && ev.projectId !== projectId) return
-
-        if (ev.type === 'phase') setStep5Progress(ev.phase ?? '')
-        else if (ev.type === 'progress') setStep5Progress(`${ev.phase ?? ''} ${ev.current ?? 0}/${ev.total ?? 0}`)
-        else if (ev.type === 'complete') {
-          setStep5Phase('complete')
-          setStep5NodeCount(ev.nodeCount ?? 0)
-          setStep5Progress('')
-        } else if (ev.type === 'error') {
-          setStep5Error(ev.error ?? t('project.status.failed'))
-          setStep5Phase('error')
-        }
-      })
+      setStep5ProjectId(projectId)
     }
 
     run()
 
     return () => {
       cancelled = true
-      unsubProgress?.()
     }
-  }, [step, selectedOption, locale, projectsRoot, onSetupStart, t])
+  }, [step, selectedOption, locale, projectsRoot, localProjectPath, onSetupStart, t])
+
+  // Watch global index progress for complete/error
+  useEffect(() => {
+    if (step5Phase !== 'indexing' || !idxProgress.progress) return
+    const p = idxProgress.progress
+    if (p.type === 'complete') {
+      setStep5Phase('complete')
+      setStep5NodeCount(p.nodeCount ?? step5NodeCount)
+    } else if (p.type === 'error') {
+      setStep5Error(p.error ?? t('project.status.failed'))
+      setStep5Phase('error')
+    }
+  }, [idxProgress.progress])
 
   function handleFinish(navigateTo: 'codemap' | 'library') {
     onComplete(locale, projectsRoot, navigateTo)
@@ -209,12 +222,11 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
               <p className="text-sm text-gray-500 mb-4">
                 {t('onboarding.projectRootDesc')}
               </p>
-              <input
-                type="text"
+              <FolderPathField
                 value={projectsRoot}
-                onChange={(e) => setProjectsRoot(e.target.value)}
+                onChange={setProjectsRoot}
                 placeholder="D:\Projects\Fieldguide"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                browseLabel={t('common.browseFolder')}
                 autoFocus
               />
               <p className="text-xs text-gray-400 mt-2">
@@ -258,19 +270,29 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
                 <div className="text-center py-4">
                   <div className="text-3xl mb-3 animate-pulse">⏳</div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('onboarding.settingUp')}</h3>
-                  <p className="text-sm text-gray-500">{step5Progress || t('onboarding.pleaseWait')}</p>
+                  {selectedOption === 'local' && localProjectPath && (
+                    <p className="text-xs text-gray-500 mb-2 font-mono break-all px-4">{localProjectPath}</p>
+                  )}
+                  <p className="text-sm text-[var(--fg-text-secondary)]">{t('onboarding.settingUp')}</p>
                 </div>
               )}
 
               {step5Phase === 'indexing' && (
                 <div className="text-center py-4">
                   <div className="text-3xl mb-3 animate-pulse">🔍</div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('onboarding.indexing')}</h3>
-                  <p className="text-sm text-gray-500 mb-3">{step5Progress}</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '60%' }} />
+                  <h3 className="text-lg font-semibold text-[var(--fg-text-primary)] mb-2">{t('onboarding.indexing')}</h3>
+                  <p className="text-sm text-[var(--fg-text-secondary)] mb-3">
+                    {idxProgress.progress?.phase ? idxProgress.phaseLabel(idxProgress.progress.phase, t) : ''}
+                    {idxProgress.progress?.type === 'progress' && idxProgress.progress.current !== undefined && idxProgress.progress.total
+                      ? ` ${idxProgress.progress.current}/${idxProgress.progress.total}` : ''}
+                  </p>
+                  <div className="w-full bg-[var(--fg-input-border)] rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-[var(--fg-accent)] transition-all duration-300"
+                      style={{ width: `${idxPct >= 0 ? idxPct : 0}%` }}
+                    />
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-[var(--fg-text-tertiary)] mt-2">
                     {t('onboarding.indexingHint')}
                   </p>
                 </div>
