@@ -2,9 +2,12 @@
  * CostDialog — LLM 分析成本确认 (ui-spec §3.6, roadmap 2.8)
  */
 import { useState, useEffect } from 'react'
+import { Dialog, DialogContent, DialogTitle, DialogCloseButton } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 
 interface Props {
-  t: (key: string) => string
+  open: boolean
+  t: (key: string, opts?: Record<string, unknown>) => string
   projectId: string
   projectName: string
   onCancel: () => void
@@ -12,18 +15,19 @@ interface Props {
   onSkipLLM: () => void
 }
 
-export default function CostDialog({ projectId, projectName, onCancel, onContinue, onSkipLLM }: Props) {
+export default function CostDialog({ open, t, projectId, projectName, onCancel, onContinue, onSkipLLM }: Props) {
   const [fileCount, setFileCount] = useState<number | null>(null)
   const [nodeCount, setNodeCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!open) return
     loadStats()
-  }, [projectId])
+  }, [projectId, open])
 
   async function loadStats() {
+    setLoading(true)
     try {
-      // Try to get existing graph stats first
       const graphResult = await window.fieldguide.graphGet(projectId)
       if (graphResult.ok && graphResult.data) {
         const g = graphResult.data as Record<string, unknown>
@@ -36,7 +40,6 @@ export default function CostDialog({ projectId, projectName, onCancel, onContinu
       }
     } catch { /* ignore */ }
 
-    // Fallback: count files from file tree
     try {
       const treeResult = await window.fieldguide.fileTree(projectId)
       if (treeResult.ok && treeResult.data) {
@@ -55,46 +58,43 @@ export default function CostDialog({ projectId, projectName, onCancel, onContinu
     setLoading(false)
   }
 
-  // Rough token estimate: ~200 tokens per file for structural analysis, ~500 for LLM summaries
   const estStructureTokens = fileCount ? fileCount * 200 : null
   const estLLMTokens = fileCount ? fileCount * 500 : null
-  // DeepSeek pricing: ~¥1/1M tokens input, ~¥2/1M tokens output (rough)
   const estCost = estLLMTokens ? (estLLMTokens / 1_000_000 * 3).toFixed(2) : null
 
   return (
-    <>
-      <div className="fixed inset-0 bg-[var(--fg-overlay)] z-50" onClick={onCancel} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[460px] bg-[var(--fg-card)] rounded-xl shadow-2xl z-50 p-6">
-        <h3 className="text-lg font-semibold text-[var(--fg-text-primary)] mb-1">索引「{projectName}」</h3>
-        <p className="text-sm text-[var(--fg-text-tertiary)] mb-4">选择索引模式</p>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel() }}>
+      <DialogContent className="w-[460px] max-w-[95vw] p-6 bg-[var(--fg-card)]">
+        <div className="flex items-start justify-between mb-1">
+          <DialogTitle className="pr-8">{t('cost.title', { name: projectName })}</DialogTitle>
+          <DialogCloseButton />
+        </div>
+        <p className="text-sm text-[var(--fg-text-tertiary)] mb-4">{t('cost.modeSelect')}</p>
 
         {loading ? (
-          <div className="text-center py-4 text-[var(--fg-text-tertiary)] text-sm">加载项目统计…</div>
+          <div className="text-center py-4 text-[var(--fg-text-tertiary)] text-sm">{t('cost.loading')}</div>
         ) : (
           <>
-            {/* Stats */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               {fileCount !== null && (
                 <div className="bg-[var(--fg-tree-hover)] rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold text-[var(--fg-text-primary)]">{fileCount}</p>
-                  <p className="text-xs text-[var(--fg-text-tertiary)]">源文件</p>
+                  <p className="text-xs text-[var(--fg-text-tertiary)]">{t('cost.sourceFiles')}</p>
                 </div>
               )}
               {nodeCount !== null && (
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-gray-800">{nodeCount}</p>
-                  <p className="text-xs text-gray-500">结构节点（已有）</p>
+                <div className="bg-[var(--fg-tree-hover)] rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-[var(--fg-text-primary)]">{nodeCount}</p>
+                  <p className="text-xs text-[var(--fg-text-tertiary)]">{t('cost.structNodes')}</p>
                 </div>
               )}
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-yellow-800">
-                LLM 分析将为代码节点生成摘要、架构分层和引导 Tour。
-              </p>
-              {estCost && (
-                <p className="text-xs text-yellow-600 mt-2">
-                  ⚡ 预估消耗 ~{estLLMTokens?.toLocaleString()} tokens（约 ¥{estCost}）
+            <div className="bg-[var(--fg-status-warning-bg)] border border-[var(--fg-status-warning)] rounded-lg p-3 mb-4">
+              <p className="text-sm text-[var(--fg-status-warning)]">{t('cost.llmHint')}</p>
+              {estCost && estLLMTokens && (
+                <p className="text-xs text-[var(--fg-status-warning)] mt-2">
+                  {t('cost.estTokens', { tokens: estLLMTokens.toLocaleString(), cost: estCost })}
                 </p>
               )}
             </div>
@@ -102,30 +102,19 @@ export default function CostDialog({ projectId, projectName, onCancel, onContinu
         )}
 
         <div className="space-y-3 mb-6">
-          <button
-            onClick={onContinue}
-            className="w-full px-4 py-2.5 bg-[var(--fg-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors"
-          >
-            🤖 完整索引（含 LLM 分析）
-          </button>
-          <button
-            onClick={onSkipLLM}
-            className="w-full px-4 py-2.5 border border-[var(--fg-input-border)] text-[var(--fg-text-secondary)] rounded-lg text-sm font-medium hover:bg-[var(--fg-tree-hover)] transition-colors"
-          >
-            📊 仅静态索引（跳过摘要与 Tour）
+          <Button onClick={onContinue} className="w-full">
+            {t('cost.fullIndex')}
+          </Button>
+          <Button variant="outline" onClick={onSkipLLM} className="w-full">
+            {t('cost.staticOnly')}
             {estStructureTokens && <span className="text-[var(--fg-text-tertiary)] ml-1">~{estStructureTokens.toLocaleString()} tokens</span>}
-          </button>
+          </Button>
         </div>
 
         <div className="flex justify-end">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-primary)]"
-          >
-            取消
-          </button>
+          <Button variant="ghost" onClick={onCancel}>{t('cost.cancel')}</Button>
         </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   )
 }

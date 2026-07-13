@@ -23,7 +23,7 @@ export default function CodeViewer({ projectId, filePath, t }: Props) {
 
   if (!filePath) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.clickToOpen')}</div>
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.loading')}</div>
-  if (error) return <div className="h-full flex items-center justify-center text-red-500 text-sm">{error}</div>
+  if (error) return <div className="h-full flex items-center justify-center text-[var(--fg-status-error)] text-sm">{error}</div>
 
   const lines = content.split('\n')
   const lang = detectLanguage(filePath)
@@ -39,7 +39,7 @@ export default function CodeViewer({ projectId, filePath, t }: Props) {
       </div>
       <div className="font-mono text-[13px] leading-5" style={{ fontFamily: 'var(--fg-font-mono)' }}>
         {lines.map((line, i) => (
-          <div key={i} className="flex hover:bg-blue-50/30 group">
+          <div key={i} className="flex hover:bg-[var(--fg-accent-muted)]/30 group">
             <span className="w-12 flex-shrink-0 text-right pr-3 text-[var(--fg-text-tertiary)] select-none text-xs leading-5 py-px border-r border-[var(--fg-border)]">
               {i + 1}
             </span>

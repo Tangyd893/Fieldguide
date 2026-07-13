@@ -44,7 +44,7 @@ export function highlightLine(line: string, language: string): React.ReactNode {
       }
       if (j < line.length) j++
       tokens.push(
-        <span key={i} className="text-green-600">{line.slice(i, j)}</span>
+        <span key={i} className="text-[var(--fg-syntax-string)]">{line.slice(i, j)}</span>
       )
       i = j
       continue
@@ -58,7 +58,7 @@ export function highlightLine(line: string, language: string): React.ReactNode {
       }
       if (j < line.length) j++
       tokens.push(
-        <span key={i} className="text-green-600">{line.slice(i, j)}</span>
+        <span key={i} className="text-[var(--fg-syntax-string)]">{line.slice(i, j)}</span>
       )
       i = j
       continue
@@ -66,14 +66,14 @@ export function highlightLine(line: string, language: string): React.ReactNode {
     // Line comment
     if (line[i] === '/' && line[i + 1] === '/') {
       tokens.push(
-        <span key={i} className="text-gray-400 italic">{line.slice(i)}</span>
+        <span key={i} className="text-[var(--fg-syntax-comment)] italic">{line.slice(i)}</span>
       )
       break
     }
     // Python comment
     if (line[i] === '#') {
       tokens.push(
-        <span key={i} className="text-gray-400 italic">{line.slice(i)}</span>
+        <span key={i} className="text-[var(--fg-syntax-comment)] italic">{line.slice(i)}</span>
       )
       break
     }
@@ -82,7 +82,7 @@ export function highlightLine(line: string, language: string): React.ReactNode {
       let j = i
       while (j < line.length && /[0-9.xXa-fA-F_]/.test(line[j])) j++
       tokens.push(
-        <span key={i} className="text-orange-500">{line.slice(i, j)}</span>
+        <span key={i} className="text-[var(--fg-syntax-number)]">{line.slice(i, j)}</span>
       )
       i = j
       continue
@@ -94,7 +94,7 @@ export function highlightLine(line: string, language: string): React.ReactNode {
       const word = line.slice(i, j)
       if (keywordSet.has(word)) {
         tokens.push(
-          <span key={i} className="text-purple-600 font-medium">{word}</span>
+          <span key={i} className="text-[var(--fg-syntax-keyword)] font-medium">{word}</span>
         )
       } else {
         tokens.push(<span key={i}>{word}</span>)

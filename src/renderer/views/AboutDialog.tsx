@@ -2,13 +2,17 @@
  * AboutDialog — 关于 Fieldguide (Phase 4)
  */
 import { useState, useEffect } from 'react'
+import { Compass } from 'lucide-react'
+import { Dialog, DialogContent, DialogTitle, DialogCloseButton } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 
 interface Props {
+  open: boolean
   t: (key: string) => string
   onClose: () => void
 }
 
-export default function AboutDialog({ t, onClose }: Props) {
+export default function AboutDialog({ open, t, onClose }: Props) {
   const [version, setVersion] = useState('0.2.0')
 
   useEffect(() => {
@@ -16,16 +20,19 @@ export default function AboutDialog({ t, onClose }: Props) {
   }, [])
 
   return (
-    <>
-      <div className="fixed inset-0 bg-[var(--fg-overlay)] z-50" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] bg-[var(--fg-card)] rounded-xl shadow-2xl z-50 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--fg-border)]">
-          <h2 className="text-lg font-semibold">{t('about.title')}</h2>
-          <button onClick={onClose} className="text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-secondary)] text-lg">×</button>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+      <DialogContent className="w-[420px] max-w-[95vw] p-0 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--fg-border)] bg-[var(--fg-card)]">
+          <DialogTitle>{t('about.title')}</DialogTitle>
+          <DialogCloseButton />
         </div>
 
-        <div className="px-6 py-6 space-y-4 text-center">
-          <div className="text-4xl mb-2">🧭</div>
+        <div className="px-6 py-6 space-y-4 text-center bg-[var(--fg-card)]">
+          <div className="flex justify-center mb-2">
+            <div className="w-14 h-14 rounded-2xl bg-[var(--fg-accent-muted)] flex items-center justify-center">
+              <Compass size={28} className="text-[var(--fg-accent)]" />
+            </div>
+          </div>
           <h3 className="text-xl font-bold text-[var(--fg-text-primary)]">{t('app.name')}</h3>
           <p className="text-sm text-[var(--fg-text-tertiary)]">v{version}</p>
 
@@ -39,13 +46,10 @@ export default function AboutDialog({ t, onClose }: Props) {
           </div>
         </div>
 
-        <div className="flex justify-end px-6 py-4 border-t border-[var(--fg-border)]">
-          <button onClick={onClose}
-            className="px-5 py-2 bg-[var(--fg-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors">
-            {t('settings.cancel')}
-          </button>
+        <div className="flex justify-end px-6 py-4 border-t border-[var(--fg-border)] bg-[var(--fg-card)]">
+          <Button onClick={onClose}>{t('settings.cancel')}</Button>
         </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   )
 }

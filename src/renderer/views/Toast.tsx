@@ -38,10 +38,10 @@ export function useToast() {
 }
 
 const typeStyles: Record<string, string> = {
-  success: 'bg-green-600 text-white',
-  error: 'bg-red-600 text-white',
-  info: 'bg-blue-600 text-white',
-  warning: 'bg-orange-500 text-white',
+  success: 'bg-[var(--fg-status-success)] text-white',
+  error: 'bg-[var(--fg-status-error)] text-white',
+  info: 'bg-[var(--fg-accent)] text-white',
+  warning: 'bg-[var(--fg-status-warning)] text-white',
 }
 
 interface ToastContainerProps {

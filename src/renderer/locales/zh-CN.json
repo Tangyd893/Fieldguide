@@ -4,7 +4,8 @@
     "version": "v0.2.0"
   },
   "common": {
-    "browseFolder": "浏览…"
+    "browseFolder": "浏览…",
+    "close": "关闭"
   },
   "tabs": {
     "library": "项目库",
@@ -40,7 +41,20 @@
       "stale": "源码已更新"
     },
     "nodes": "{{count}} 个节点",
-    "indexedAt": "索引于 {{date}}"
+    "indexedAt": "索引于 {{date}}",
+    "updateIndex": "更新",
+    "indexBtn": "索引",
+    "analyzeDiff": "分析",
+    "fullReindex": "全量",
+    "analyzing": "分析中…",
+    "diffTitle": "变更影响分析",
+    "deleteConfirm": "确定删除项目「{{name}}」？\n此操作仅删除记录，不会删除源代码文件。",
+    "fullReindexConfirm": "确定对「{{name}}」执行全量重建索引？\n这将忽略已有缓存重新分析所有文件。",
+    "addFailed": "添加失败",
+    "analyzeFailed": "分析失败",
+    "deleteFailed": "删除失败",
+    "noChanges": "未检测到文件变更。",
+    "analyzeDone": "分析完成。"
   },
   "codeMap": {
     "noProject": "请先在项目库中添加项目",
@@ -54,6 +68,11 @@
     "readError": "读取失败",
     "nodeSearchPlaceholder": "搜索函数、类…"
   },
+  "fileTree": {
+    "openFile": "打开文件",
+    "copyPath": "复制路径",
+    "revealInExplorer": "在资源管理器打开"
+  },
   "index": {
     "phase": {
       "scan": "正在扫描文件…",
@@ -65,15 +84,122 @@
   },
   "chat": {
     "title": "AI 问答",
-    "placeholder": "输入问题，基于项目图谱和论文库智能回答"
+    "placeholder": "输入问题，基于项目图谱和论文库智能回答",
+    "send": "发送",
+    "welcome": "你好！我是 Fieldguide AI 助手。我可以帮你理解代码结构。",
+    "welcomeWithProject": "你好！我是 Fieldguide AI 助手。我可以帮你理解「{{name}}」的代码结构。\n\n试试问我：\n- 这个项目的入口在哪里？\n- 认证逻辑是怎么实现的？\n- 有哪些核心模块？",
+    "noProject": "你好！请先在项目库中选择一个项目，然后我可以帮你分析代码。",
+    "noReply": "（未获得回复）",
+    "close": "关闭",
+    "requestFailed": "请求失败"
+  },
+  "commandPalette": {
+    "placeholder": "搜索命令、文件或节点…",
+    "noMatch": "无匹配命令",
+    "jump": "跳转"
   },
   "theory": {
     "title": "理论学习",
-    "desc": "搜索 arXiv 论文，收藏到本地论文库，与代码对照学习"
+    "desc": "搜索 arXiv 论文，收藏到本地论文库，与代码对照学习",
+    "myPapers": "我的论文",
+    "search": "搜索",
+    "searchBtn": "搜索",
+    "searchPlaceholder": "搜索 arXiv… (RAG, transformer, code generation)",
+    "searching": "搜索中…",
+    "noResults": "未找到相关论文",
+    "libraryEmpty": "论文库为空",
+    "libraryEmptyHint": "搜索 arXiv 并收藏感兴趣的论文",
+    "saved": "已收藏",
+    "save": "收藏",
+    "hasNotes": "有笔记",
+    "backToLibrary": "← 返回论文库",
+    "readPdf": "阅读 PDF",
+    "downloadPdf": "下载 PDF",
+    "downloading": "下载中…",
+    "notes": "笔记",
+    "notesPlaceholder": "记录你的想法、与代码的关联…",
+    "notesAutoSave": "笔记自动保存到此论文",
+    "saveNotes": "保存笔记",
+    "deletePaper": "删除此论文"
   },
   "bridge": {
     "title": "概念桥接",
-    "desc": "论文段落 ↔ 代码节点，AI 辅助解释关联"
+    "desc": "论文段落 ↔ 代码节点，AI 辅助解释关联",
+    "conceptBridge": "概念桥接",
+    "paperList": "论文列表",
+    "linksSummary": "{{links}} 条关联 · {{papers}} 篇论文",
+    "generateTour": "生成对照 Tour",
+    "generating": "生成中…",
+    "generateTourHint": "建议至少 3 条桥接关系以生成有意义的对照 Tour",
+    "generateTourTitle": "生成论文↔代码交替对照 Tour",
+    "noLinksFound": "没有找到桥接关系。",
+    "tourGenerated": "Tour 已生成，请在代码地图中查看。",
+    "generateFailed": "生成失败",
+    "aiExplainPrefix": "AI 解释:",
+    "aiExplainTitle": "AI 解释关联",
+    "unknownAuthor": "未知作者",
+    "noPapers": "暂无论文",
+    "noPapersHint": "请先在「理论」Tab 中搜索并保存 arXiv 论文，然后回到此处建立桥接。",
+    "noProject": "概念桥接",
+    "noProjectHint": "请先在项目库中选择一个项目，以浏览和创建论文与代码的桥接关联。",
+    "selectPaper": "选择论文",
+    "selectPaperTitle": "概念桥接",
+    "selectPaperHint": "从左侧选择一篇论文，查看和创建它与代码节点之间的关联。",
+    "tourResult": "对照 Tour",
+    "tourResultSteps": "对照 Tour ({{count}} 步)",
+    "tourResultHint": "Tour 已写入图谱。切换到「代码地图」Tab，点击 Tour 面板即可跟随导览。",
+    "close": "关闭",
+    "addLink": "+ 关联代码节点",
+    "cancel": "取消",
+    "loading": "加载中…",
+    "noLinks": "尚未关联代码节点。点击上方按钮建立关联。",
+    "searchNodes": "搜索代码节点",
+    "aiSuggest": "AI 推荐",
+    "analyzing": "分析中…",
+    "noMatch": "未找到匹配节点",
+    "aiRecommended": "AI 推荐",
+    "anchorLabel": "关联的论文段落",
+    "anchorPlaceholder": "如: Section 3.2 介绍了 splitter 算法…",
+    "noteLabel": "备注",
+    "notePlaceholder": "如: 该函数实现了论文中的 splitter",
+    "linking": "关联中…",
+    "linkTo": "关联到「{{name}}」"
+  },
+  "graph": {
+    "overview": "总览"
+  },
+  "tour": {
+    "noTours": "暂无导览",
+    "noToursHint": "索引项目并启用 LLM 分析后可生成 Tour",
+    "steps": "{{count}} 步",
+    "nodesCount": "{{count}} 个节点",
+    "playInDashboard": "在 Dashboard 中播放 Tour"
+  },
+  "pdf": {
+    "title": "PDF 阅读器",
+    "bridgeAsText": "作为桥接文本",
+    "bridge": "桥接",
+    "pageOf": "第 {{current}} / {{total}} 页",
+    "prevPage": "上一页",
+    "nextPage": "下一页",
+    "goTo": "跳转",
+    "selectedText": "已选中文本:",
+    "cancelSelection": "取消选择",
+    "closeReader": "关闭阅读器",
+    "loading": "加载 PDF…",
+    "loadFailed": "PDF 加载失败"
+  },
+  "cost": {
+    "title": "索引「{{name}}」",
+    "modeSelect": "选择索引模式",
+    "loading": "加载项目统计…",
+    "sourceFiles": "源文件",
+    "structNodes": "结构节点（已有）",
+    "llmHint": "LLM 分析将为代码节点生成摘要、架构分层和引导 Tour。",
+    "estTokens": "预估消耗 ~{{tokens}} tokens（约 ¥{{cost}}）",
+    "fullIndex": "完整索引（含 LLM 分析）",
+    "staticOnly": "仅静态索引（跳过摘要与 Tour）",
+    "cancel": "取消"
   },
   "status": {
     "ready": "就绪",
@@ -132,11 +258,11 @@
     "projectRootDesc": "Git clone 和 Demo 项目将默认存放在此目录下。后续可在设置中修改。",
     "projectRootHint": "可留空，后续添加项目时手动选择目录。",
     "startTitle": "如何开始？",
-    "demoTitle": "🎯 体验 Demo 项目",
+    "demoTitle": "体验 Demo 项目",
     "demoDesc": "使用内置 Go 示例项目，无需网络，立即可浏览图谱",
-    "localTitle": "📁 打开本地项目",
+    "localTitle": "打开本地项目",
     "localDesc": "选择已有代码仓库并开始索引",
-    "skipTitle": "⏭ 稍后再说",
+    "skipTitle": "稍后再说",
     "skipDesc": "直接进入项目库，随时可添加项目",
     "settingUp": "正在准备项目…",
     "indexing": "正在索引项目",
@@ -146,8 +272,8 @@
     "completeNodes": "索引完成，共 {{count}} 个节点。",
     "completeTourHint": "建议跟随 Intro Tour 了解项目的主链路。",
     "completeNoNodes": "项目已就绪。建议在代码地图中跟随 Intro Tour 了解项目结构。",
-    "openCodeMap": "🗺️ 打开代码地图",
-    "stayLibrary": "📚 留在项目库",
+    "openCodeMap": "打开代码地图",
+    "stayLibrary": "留在项目库",
     "errorTitle": "设置遇到问题",
     "errorHint": "项目准备失败，请检查网络或路径后重试。",
     "enterLibrary": "进入项目库",

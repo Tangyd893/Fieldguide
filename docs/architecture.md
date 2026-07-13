@@ -64,7 +64,7 @@ flowchart TB
 | 桌面框架 | Electron 33+ | Windows 首发 |
 | 构建 | electron-vite + pnpm workspace | main / preload / renderer；可 vendor UA submodule |
 | UI 壳 | React 18 + TypeScript | 项目库、理论、桥接、设置 |
-| 样式 | Tailwind CSS + shadcn/ui | Fieldguide 壳；Dashboard 主题 Phase 2 统一 |
+| 样式 | Tailwind CSS + Radix/shadcn 风格组件（绑定 `--fg-*` token） | Fieldguide 壳；Dashboard 主题经 postMessage 同步 |
 | i18n | i18next + react-i18next | 简中 / 繁中 / en-US；与 UA language 映射 |
 | 主进程 | Node.js + TypeScript | |
 | 关系库 | better-sqlite3 | **Fieldguide 扩展数据**（projects、papers、concept_links、chat） |

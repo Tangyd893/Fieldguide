@@ -129,7 +129,16 @@ Fieldguide/
 
 ## 当前状态
 
-**Phase 0 设计** ✅ · **Phase 1 桌面壳 + UA 集成** ✅（≈ 98%）· **Phase 2 智能层** ✅（≈ 95%）· **Phase 3 理论 + 桥接** ✅（≈ 90%）· **Phase 4 发布** 🔵（≈ 40%）
+**Phase 0 设计** ✅ · **Phase 1 桌面壳 + UA 集成** ✅ · **Phase 2 智能层** ✅（≈ 95%）· **Phase 3 理论 + 桥接** ✅（≈ 90%）· **Phase 4 发布** 🔵（≈ 55%）
+
+### 外观与主题（Obsidian UX · 2026-07-12）
+
+- 默认 **parchment v2** 主题：米白网格底 `#FDFCF8`、鼠尾草绿强调 `#4A8B71`（参考 `sampleTheme.png`）
+- 5 套主题预设：parchment / forest / slate / midnight / paper-dark
+- 界面缩放 50%–200%（`Ctrl+=` / `Ctrl+-` / `Ctrl+0`）
+- UI / 代码字体分开配置；侧栏宽度持久化
+- 双面板默认左代码右图谱，布局与 Tab 持久化
+- 设置 → 外观 可切换预设与缩放
 
 ### 已完成
 
@@ -149,11 +158,12 @@ Fieldguide/
 - [x] 跨源对照 Tour + AI 推荐桥接 + PDF 应用内阅读器
 - [x] 设置页日志诊断入口 + 关于页
 
+- [x] Obsidian UX：主题 v2 + 分屏 + 索引进度 + Lucide 图标 + 全应用 token 化
+- [x] 三语 i18n 收尾（ChatPanel / TourPanel / Theory / Bridge / ProjectLibrary 等）
+
 ### 待办
 
-- [ ] Phase 4：NSIS 安装包实测（`pnpm dist`）+ 场景 A 用户自测
-- [ ] 三语文案补全（OnboardingWizard 等仍有硬编码）
-- [ ] Dashboard 与壳层视觉统一（可选）
+- [ ] Phase 4：NSIS 安装包干净机器实测 + 场景 A 用户自测（见 `docs/todos.md` → `ux-visual-regression`）
 
 详见 [docs/todos.md](docs/todos.md) 与 [docs/roadmap.md](docs/roadmap.md)。
 

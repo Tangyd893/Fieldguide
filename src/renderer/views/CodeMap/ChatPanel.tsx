@@ -12,26 +12,28 @@ interface Message {
 }
 
 interface Props {
-  t: (key: string) => string
+  t: (key: string, opts?: Record<string, unknown>) => string
   projectId?: string
   projectName?: string
 }
 
 export default function ChatPanel({ t, projectId, projectName }: Props) {
-  const [messages, setMessages] = useState<Message[]>(() => [
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: projectName
-        ? `你好！我是 Fieldguide AI 助手。我可以帮你理解「${projectName}」的代码结构。\n\n试试问我：\n- 这个项目的入口在哪里？\n- 认证逻辑是怎么实现的？\n- 有哪些核心模块？`
-        : '你好！请先在项目库中选择一个项目，然后我可以帮你分析代码。',
-      timestamp: new Date().toISOString(),
-    },
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const messagesEnd = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setMessages([{
+      id: 'welcome',
+      role: 'assistant',
+      content: projectName
+        ? t('chat.welcomeWithProject', { name: projectName })
+        : t('chat.noProject'),
+      timestamp: new Date().toISOString(),
+    }])
+  }, [projectId, projectName, t])
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' })
@@ -63,12 +65,12 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
         const assistantMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: data.content || '（未获得回复）',
+          content: data.content || t('chat.noReply'),
           timestamp: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, assistantMsg])
       } else {
-        setError(result.error?.message ?? '请求失败')
+        setError(result.error?.message ?? t('chat.requestFailed'))
       }
     } catch (err) {
       setError(String(err))
@@ -79,7 +81,6 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
 
   return (
     <div className="h-full flex flex-col bg-[var(--fg-bg)]">
-      {/* Messages */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {messages.map((msg) => (
           <div
@@ -89,19 +90,19 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
             <div
               className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[var(--fg-accent)] text-white'
                   : msg.role === 'system'
-                    ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+                    ? 'bg-[var(--fg-status-warning-bg)] border border-[var(--fg-status-warning)] text-[var(--fg-status-warning)]'
                     : 'bg-[var(--fg-card)] border border-[var(--fg-border)] text-[var(--fg-text-primary)]'
               }`}
             >
               {msg.content}
               <div
                 className={`text-xs mt-1 ${
-                  msg.role === 'user' ? 'text-blue-200' : 'text-[var(--fg-text-tertiary)]'
+                  msg.role === 'user' ? 'text-white/70' : 'text-[var(--fg-text-tertiary)]'
                 }`}
               >
-                {new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
+                {new Date(msg.timestamp).toLocaleTimeString(undefined, {
                   hour: '2-digit',
                   minute: '2-digit',
                 })}
@@ -123,12 +124,11 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
         <div ref={messagesEnd} />
       </div>
 
-      {/* Input */}
       <div className="p-3 border-t border-[var(--fg-border)] bg-[var(--fg-card)]">
         {error && (
-          <div className="mb-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+          <div className="mb-2 px-3 py-1.5 bg-[var(--fg-status-error-bg)] border border-[var(--fg-status-error)] rounded text-xs text-[var(--fg-status-error)]">
             {error}
-            <button onClick={() => setError(null)} className="ml-2 underline hover:text-red-800">关闭</button>
+            <button onClick={() => setError(null)} className="ml-2 underline hover:opacity-80">{t('chat.close')}</button>
           </div>
         )}
         <div className="flex gap-2">
@@ -142,16 +142,16 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
                 send()
               }
             }}
-            placeholder={projectId ? '输入问题… (Enter 发送)' : '请先选择项目'}
+            placeholder={projectId ? t('chat.placeholder') : t('chat.noProject')}
             disabled={sending || !projectId}
-            className="flex-1 px-3 py-2 border border-[var(--fg-border)] rounded-lg text-sm bg-[var(--fg-bg)] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            className="flex-1 px-3 py-2 border border-[var(--fg-border)] rounded-lg text-sm bg-[var(--fg-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)] disabled:opacity-50"
           />
           <button
             onClick={send}
             disabled={!input.trim() || sending || !projectId}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 transition-colors"
+            className="px-4 py-2 bg-[var(--fg-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-colors"
           >
-            发送
+            {t('chat.send')}
           </button>
         </div>
       </div>

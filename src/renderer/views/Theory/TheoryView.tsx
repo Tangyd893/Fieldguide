@@ -3,6 +3,7 @@
  * Phase 3: full paper management.
  */
 import { useState, useEffect } from 'react'
+import { Library, Search, BookOpen, Download, StickyNote } from 'lucide-react'
 import ConceptBridge from './ConceptBridge'
 import PdfReader from './PdfReader'
 
@@ -85,7 +86,7 @@ export default function TheoryView({ t, projectId }: Props) {
       const text = await response.text()
       const entries = parseArxivXML(text)
       setResults(entries)
-      if (entries.length === 0) setError('未找到相关论文')
+      if (entries.length === 0) setError(t('theory.noResults'))
       setView('search')
     } catch (err) { setError(String(err)) }
     finally { setSearching(false) }
@@ -195,50 +196,50 @@ export default function TheoryView({ t, projectId }: Props) {
       <div className="flex gap-2 p-3 border-b border-[var(--fg-border)] bg-[var(--fg-card)]">
         <button
           onClick={() => { setView('library'); setSelectedPaper(null) }}
-          className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${view === 'library' && !selectedPaper ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
-        >📚 我的论文</button>
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${view === 'library' && !selectedPaper ? 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)]' : 'text-[var(--fg-text-secondary)] hover:bg-[var(--fg-tree-hover)]'}`}
+        ><Library size={13} />{t('theory.myPapers')}</button>
         <button
           onClick={() => setView('search')}
-          className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${view === 'search' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
-        >🔍 搜索</button>
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${view === 'search' ? 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)]' : 'text-[var(--fg-text-secondary)] hover:bg-[var(--fg-tree-hover)]'}`}
+        ><Search size={13} />{t('theory.search')}</button>
         <div className="flex-1" />
         <input
           type="text" value={query} onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && search()}
-          placeholder="搜索 arXiv… (RAG, transformer, code generation)"
-          className="w-80 px-3 py-1.5 border border-[var(--fg-border)] rounded-lg text-xs fg-input focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder={t('theory.searchPlaceholder')}
+          className="w-80 px-3 py-1.5 border border-[var(--fg-border)] rounded-lg text-xs fg-input focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]"
         />
         <button onClick={search} disabled={searching}
-          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-40"
-        >{searching ? '…' : '搜索'}</button>
+          className="px-3 py-1.5 bg-[var(--fg-accent)] text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-40"
+        >{searching ? '…' : t('theory.searchBtn')}</button>
       </div>
 
       <div className="flex-1 overflow-auto">
         {/* Search results */}
         {view === 'search' && (
           <div className="max-w-3xl mx-auto p-4">
-            {error && <div className="text-center text-red-500 text-sm py-8">{error}</div>}
-            {searching && <div className="text-center text-gray-400 py-8 text-sm">搜索中…</div>}
+            {error && <div className="text-center text-[var(--fg-status-error)] text-sm py-8">{error}</div>}
+            {searching && <div className="text-center text-[var(--fg-text-tertiary)] py-8 text-sm">{t('theory.searching')}</div>}
             <div className="space-y-3">
               {results.map((entry) => (
-                <div key={entry.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300">
+                <div key={entry.id} className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg p-4 hover:border-[var(--fg-text-tertiary)]">
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <a href={entry.link} target="_blank" rel="noopener noreferrer"
-                        className="text-sm font-medium text-blue-700 hover:text-blue-900 line-clamp-2">{entry.title}</a>
-                      <p className="text-xs text-gray-500 mt-1">
+                        className="text-sm font-medium text-[var(--fg-accent-text)] hover:text-[var(--fg-accent)] line-clamp-2">{entry.title}</a>
+                      <p className="text-xs text-[var(--fg-text-secondary)] mt-1">
                         {entry.authors.slice(0, 3).join(', ')}{entry.authors.length > 3 && ' et al.'}
                         {' · '}{entry.published.slice(0, 10)}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1.5 line-clamp-2">{entry.summary}</p>
+                      <p className="text-xs text-[var(--fg-text-tertiary)] mt-1.5 line-clamp-2">{entry.summary}</p>
                     </div>
                     <button
                       onClick={() => savePaper(entry)}
                       disabled={isSaved(entry.id) || saving}
                       className={`shrink-0 px-3 py-1 rounded text-xs font-medium transition-colors ${
-                        isSaved(entry.id) ? 'bg-green-50 text-green-600 cursor-default' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                        isSaved(entry.id) ? 'bg-[var(--fg-status-success-bg)] text-[var(--fg-status-success)] cursor-default' : 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] hover:bg-[var(--fg-accent-muted)]/70'
                       }`}
-                    >{isSaved(entry.id) ? '已收藏' : '收藏'}</button>
+                    >{isSaved(entry.id) ? t('theory.saved') : t('theory.save')}</button>
                   </div>
                 </div>
               ))}
@@ -250,29 +251,29 @@ export default function TheoryView({ t, projectId }: Props) {
         {view === 'library' && (
           <div className="max-w-3xl mx-auto p-4">
             {papers.length === 0 ? (
-              <div className="text-center text-gray-400 py-16">
-                <div className="text-4xl mb-4">📚</div>
-                <p className="text-lg font-medium mb-2">论文库为空</p>
-                <p className="text-sm">搜索 arXiv 并收藏感兴趣的论文</p>
+              <div className="text-center text-[var(--fg-text-tertiary)] py-16">
+                <Library size={40} className="mx-auto mb-4 text-[var(--fg-text-tertiary)]" />
+                <p className="text-lg font-medium mb-2">{t('theory.libraryEmpty')}</p>
+                <p className="text-sm">{t('theory.libraryEmptyHint')}</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {papers.map((p) => (
                   <div key={p.id}
                     onClick={() => openPaper(p)}
-                    className="flex items-start gap-3 bg-white border border-gray-200 rounded-lg p-3 hover:border-gray-300 cursor-pointer group">
+                    className="flex items-start gap-3 bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg p-3 hover:border-[var(--fg-text-tertiary)] cursor-pointer group">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 line-clamp-1">{p.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-sm font-medium text-[var(--fg-text-primary)] line-clamp-1">{p.title}</p>
+                      <p className="text-xs text-[var(--fg-text-tertiary)] mt-0.5">
                         {p.authors.split(', ').slice(0, 2).join(', ')}
                         {p.published ? ` · ${p.published.slice(0, 10)}` : ''}
-                        {p.notes ? ' · 📝 有笔记' : ''}
+                        {p.notes ? ` · ${t('theory.hasNotes')}` : ''}
                       </p>
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); deletePaper(p.id) }}
                       disabled={deleting === p.id}
-                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 text-sm px-1 transition-opacity"
+                      className="opacity-0 group-hover:opacity-100 text-[var(--fg-text-tertiary)] hover:text-[var(--fg-status-error)] text-sm px-1 transition-opacity"
                     >×</button>
                   </div>
                 ))}
@@ -285,14 +286,14 @@ export default function TheoryView({ t, projectId }: Props) {
         {view === 'detail' && selectedPaper && (
           <div className="max-w-3xl mx-auto p-4 space-y-4">
             <button onClick={() => { setView('library'); setSelectedPaper(null) }}
-              className="text-xs text-gray-400 hover:text-gray-600">← 返回论文库</button>
+              className="text-xs text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-secondary)]">{t('theory.backToLibrary')}</button>
 
-            <div className="bg-white border border-gray-200 rounded-lg p-5">
+            <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-gray-900 leading-snug">{selectedPaper.title}</h2>
-                  <p className="text-sm text-gray-500 mt-2">{selectedPaper.authors}</p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <h2 className="text-lg font-semibold text-[var(--fg-text-primary)] leading-snug">{selectedPaper.title}</h2>
+                  <p className="text-sm text-[var(--fg-text-secondary)] mt-2">{selectedPaper.authors}</p>
+                  <p className="text-xs text-[var(--fg-text-tertiary)] mt-1">
                     arXiv: {selectedPaper.arxiv_id}
                     {selectedPaper.published ? ` · ${selectedPaper.published.slice(0, 10)}` : ''}
                   </p>
@@ -300,34 +301,35 @@ export default function TheoryView({ t, projectId }: Props) {
                 <div className="flex gap-1.5 shrink-0">
                   {pdfPath ? (
                     <button onClick={openPdfInApp}
-                      className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 border border-green-200">
-                      📖 阅读 PDF
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--fg-status-success-bg)] text-[var(--fg-status-success)] rounded-lg text-xs font-medium hover:bg-[var(--fg-status-success-bg)]/70 border border-[var(--fg-status-success)]">
+                      <BookOpen size={13} />{t('theory.readPdf')}
                     </button>
                   ) : (
                     <button onClick={downloadPdf} disabled={downloading}
-                      className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 border border-blue-200 disabled:opacity-50">
-                      {downloading ? '下载中…' : '📥 下载 PDF'}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] rounded-lg text-xs font-medium hover:bg-[var(--fg-accent-muted)]/70 border border-[var(--fg-accent)] disabled:opacity-50">
+                      <Download size={13} />
+                      {downloading ? t('theory.downloading') : t('theory.downloadPdf')}
                     </button>
                   )}
                 </div>
               </div>
-              <p className="text-sm text-gray-600 mt-4 leading-relaxed">{selectedPaper.summary}</p>
+              <p className="text-sm text-[var(--fg-text-secondary)] mt-4 leading-relaxed">{selectedPaper.summary}</p>
             </div>
 
             {/* Notes */}
-            <div className="bg-white border border-gray-200 rounded-lg p-5">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">📝 笔记</h3>
+            <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg p-5">
+              <h3 className="text-sm font-semibold text-[var(--fg-text-primary)] mb-3 inline-flex items-center gap-1.5"><StickyNote size={14} />{t('theory.notes')}</h3>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="记录你的想法、与代码的关联…"
-                className="fg-input w-full h-32 px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder={t('theory.notesPlaceholder')}
+                className="fg-input w-full h-32 px-3 py-2 border border-[var(--fg-input-border)] rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]"
               />
               <div className="flex justify-between items-center mt-3">
-                <p className="text-xs text-gray-400">笔记自动保存到此论文</p>
+                <p className="text-xs text-[var(--fg-text-tertiary)]">{t('theory.notesAutoSave')}</p>
                 <button onClick={saveNotes}
-                  className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700"
-                >保存笔记</button>
+                  className="px-4 py-1.5 bg-[var(--fg-accent)] text-white rounded-lg text-xs font-medium hover:opacity-90"
+                >{t('theory.saveNotes')}</button>
               </div>
             </div>
 
@@ -340,8 +342,8 @@ export default function TheoryView({ t, projectId }: Props) {
             <div className="text-right">
               <button
                 onClick={() => deletePaper(selectedPaper.id)}
-                className="text-xs text-red-400 hover:text-red-600 underline"
-              >删除此论文</button>
+                className="text-xs text-[var(--fg-status-error)] hover:opacity-70 underline"
+              >{t('theory.deletePaper')}</button>
             </div>
           </div>
         )}
@@ -353,6 +355,7 @@ export default function TheoryView({ t, projectId }: Props) {
           pdfPath={pdfPath}
           paperId={selectedPaper.id}
           projectId={projectId}
+          t={t}
           onClose={() => setShowPdfReader(false)}
           onSelectText={handlePdfTextSelected}
         />

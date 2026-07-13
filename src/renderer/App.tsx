@@ -23,6 +23,11 @@ import BridgeView from './views/Bridge/BridgeView'
 import { useToast, ToastContainer, showToast } from './views/Toast'
 import { useWorkspaceLayout } from './hooks/useWorkspaceLayout'
 import { useIndexProgress, progressPercent } from './hooks/useIndexProgress'
+import { useDashboardThemeSync } from './hooks/useDashboardThemeSync'
+import { syncDashboardTheme } from './lib/dashboard-theme'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export type Tab = 'library' | 'codemap' | 'theory' | 'bridge'
 
@@ -83,6 +88,8 @@ export default function App() {
   const [zoom, setZoomState] = useState(100)
   const fileTreeWidthRef = useRef(260)
   const { toasts, removeToast } = useToast()
+
+  useDashboardThemeSync()
 
   // Apply saved theme on mount
   useEffect(() => {
@@ -294,6 +301,7 @@ export default function App() {
       const next = current === 'dark' ? 'light' : 'dark'
       const preset = document.documentElement.dataset.themePreset
       applyTheme(next, preset)
+      syncDashboardTheme()
       // Persist to config
       window.fieldguide.configSet({ theme: next }).catch(() => {})
     }},
@@ -333,13 +341,23 @@ export default function App() {
   ]
 
   return (
-    <div className="flex flex-col h-screen bg-[var(--fg-bg)] text-[var(--fg-text-primary)]">
-      <TopBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} onSettings={() => setShowSettings(true)} t={t} />
+    <div className="flex flex-col h-screen bg-[var(--fg-bg)] text-[var(--fg-text-primary)]" data-fg-surface>
+      <TopBar
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onSettings={() => setShowSettings(true)}
+        onSearch={() => setShowPalette(true)}
+        t={t}
+      />
 
       <div className="flex-1 flex overflow-hidden">
         {activeTab === 'codemap' && !fileTreeCollapsed && (
           <>
-            <div style={{ width: fileTreeWidth }} className="flex-shrink-0 border-r border-[var(--fg-border)]">
+            <div
+              style={{ width: fileTreeWidth }}
+              className="flex-shrink-0 border-r border-[var(--fg-border)] bg-[var(--fg-sidebar-bg,var(--fg-bg))] transition-[width] duration-200 ease-out"
+            >
               <FileTree
                 projectId={selectedProject?.id ?? ''}
                 onFileClick={(p) => workspaceLayout.openFile(p)}
@@ -348,7 +366,7 @@ export default function App() {
               />
             </div>
             <div
-              className="w-1 bg-[var(--fg-border)] hover:bg-blue-400 cursor-col-resize shrink-0 transition-colors"
+              className="group w-1.5 bg-[var(--fg-border)] hover:bg-[var(--fg-accent-muted)] cursor-col-resize shrink-0 transition-colors duration-150 flex items-center justify-center"
               title={t('tooltip.collapseFileTree')}
               onMouseDown={(e) => {
                 const startX = e.clientX
@@ -375,7 +393,9 @@ export default function App() {
                 document.addEventListener('mousemove', onMove)
                 document.addEventListener('mouseup', onUp)
               }}
-            />
+            >
+              <div className="w-0.5 h-8 rounded-full bg-[var(--fg-text-tertiary)] opacity-0 group-hover:opacity-60 transition-opacity" />
+            </div>
           </>
         )}
 
@@ -441,97 +461,87 @@ export default function App() {
       )}
 
       {/* Command palette */}
-      {showPalette && selectedProject && (
-        <CommandPalette
-          commands={commands}
-          onClose={() => setShowPalette(false)}
-          onFileSelect={(filePath) => {
-            workspaceLayout.openFile(filePath)
-            setActiveTab('codemap')
-            setFileTreeCollapsed(false)
-          }}
-          searchFiles={async (q: string) => {
-            const r = await window.fieldguide.fileTree(selectedProject.id)
-            if (!r.ok || !r.data) return []
-            const results: Array<{ path: string; name: string }> = []
-            const walk = (entries: unknown[], depth = 0) => {
-              for (const e of entries) {
-                const entry = e as Record<string, unknown>
-                const name = entry.name as string
-                const path = entry.path as string
-                if (!entry.isDirectory && name.toLowerCase().includes(q.toLowerCase())) {
-                  results.push({ path, name })
-                }
-                if (Array.isArray(entry.children) && depth < 5) walk(entry.children as unknown[], depth + 1)
+      <CommandPalette
+        open={showPalette}
+        commands={commands}
+        t={t}
+        onClose={() => setShowPalette(false)}
+        onFileSelect={selectedProject ? (filePath) => {
+          workspaceLayout.openFile(filePath)
+          setActiveTab('codemap')
+          setFileTreeCollapsed(false)
+        } : undefined}
+        searchFiles={selectedProject ? async (q: string) => {
+          const r = await window.fieldguide.fileTree(selectedProject.id)
+          if (!r.ok || !r.data) return []
+          const results: Array<{ path: string; name: string }> = []
+          const walk = (entries: unknown[], depth = 0) => {
+            for (const e of entries) {
+              const entry = e as Record<string, unknown>
+              const name = entry.name as string
+              const path = entry.path as string
+              if (!entry.isDirectory && name.toLowerCase().includes(q.toLowerCase())) {
+                results.push({ path, name })
+              }
+              if (Array.isArray(entry.children) && depth < 5) walk(entry.children as unknown[], depth + 1)
+            }
+          }
+          walk(r.data as unknown[])
+          return results.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)
+        } : undefined}
+        searchNodes={selectedProject ? async (q: string) => {
+          const r = await window.fieldguide.graphGet(selectedProject.id)
+          if (!r.ok || !r.data) return []
+          const g = r.data as { nodes?: Array<{ id: string; label?: string; type?: string; filePath?: string }> }
+          const ql = q.toLowerCase()
+          return (g.nodes || [])
+            .filter(n => (n.label || n.id).toLowerCase().includes(ql))
+            .slice(0, 8)
+            .map(n => ({ id: n.id, label: n.label || n.id, type: n.type || 'unknown', filePath: n.filePath }))
+        } : undefined}
+        onNodeSelect={selectedProject ? (nodeId: string) => {
+          dashboardSelectNode(nodeId)
+          window.fieldguide.graphGet(selectedProject.id).then(r => {
+            if (r.ok && r.data) {
+              const g = r.data as { nodes?: Array<{ id: string; filePath?: string }> }
+              const node = (g.nodes || []).find(n => n.id === nodeId)
+              if (node?.filePath) {
+                workspaceLayout.openFile(node.filePath)
+                setActiveTab('codemap')
+                setFileTreeCollapsed(false)
               }
             }
-            walk(r.data as unknown[])
-            return results.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)
-          }}
-          searchNodes={async (q: string) => {
-            const r = await window.fieldguide.graphGet(selectedProject.id)
-            if (!r.ok || !r.data) return []
-            const g = r.data as { nodes?: Array<{ id: string; label?: string; type?: string; filePath?: string }> }
-            const ql = q.toLowerCase()
-            return (g.nodes || [])
-              .filter(n => (n.label || n.id).toLowerCase().includes(ql))
-              .slice(0, 8)
-              .map(n => ({ id: n.id, label: n.label || n.id, type: n.type || 'unknown', filePath: n.filePath }))
-          }}
-          onNodeSelect={(nodeId: string) => {
-            // Highlight node in Dashboard via postMessage
-            dashboardSelectNode(nodeId)
-            // Also open the node's file in the code viewer
-            window.fieldguide.graphGet(selectedProject.id).then(r => {
-              if (r.ok && r.data) {
-                const g = r.data as { nodes?: Array<{ id: string; filePath?: string }> }
-                const node = (g.nodes || []).find(n => n.id === nodeId)
-                if (node?.filePath) {
-                  workspaceLayout.openFile(node.filePath)
-                  setActiveTab('codemap')
-                  setFileTreeCollapsed(false)
-                }
-              }
-            })
-          }}
-        />
-      )}
-      {showPalette && !selectedProject && (
-        <CommandPalette commands={commands} onClose={() => setShowPalette(false)} />
-      )}
+          })
+        } : undefined}
+      />
 
       {/* Settings */}
-      {showSettings && (
-        <SettingsPanel t={t} onClose={() => setShowSettings(false)} onAbout={() => { setShowSettings(false); setShowAbout(true) }} />
-      )}
+      <SettingsPanel open={showSettings} t={t} onClose={() => setShowSettings(false)} onAbout={() => { setShowSettings(false); setShowAbout(true) }} />
 
       {/* About */}
-      {showAbout && (
-        <AboutDialog t={t} onClose={() => setShowAbout(false)} />
-      )}
+      <AboutDialog open={showAbout} t={t} onClose={() => setShowAbout(false)} />
 
       {/* LLM Cost Dialog */}
-      {showCostDialog && selectedProject && (
-        <CostDialog
-          t={t}
-          projectId={selectedProject.id}
-          projectName={selectedProject.name}
-          onCancel={() => { setShowCostDialog(false); setPendingIndex(null) }}
-          onContinue={() => {
-            if (pendingIndex) {
-              const p = selectedProject
-              if (p) doIndex(p.id, p.name)
-            }
-          }}
-          onSkipLLM={() => {
-            // Skip LLM phases, do structural-only index
-            if (pendingIndex) {
-              const p = selectedProject
-              if (p) doIndex(p.id, p.name)
-            }
-          }}
-        />
-      )}
+      <CostDialog
+        open={showCostDialog && !!selectedProject}
+        t={t}
+        projectId={selectedProject?.id ?? ''}
+        projectName={selectedProject?.name ?? ''}
+        onCancel={() => { setShowCostDialog(false); setPendingIndex(null) }}
+        onContinue={() => {
+          if (pendingIndex) {
+            const p = selectedProject
+            if (p) doIndex(p.id, p.name)
+          }
+        }}
+        onSkipLLM={() => {
+          // Skip LLM phases, do structural-only index
+          if (pendingIndex) {
+            const p = selectedProject
+            if (p) doIndex(p.id, p.name)
+          }
+        }}
+      />
     </div>
   )
 }
@@ -549,7 +559,7 @@ function CodeMapLayout({
 }) {
   if (!project) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400">
+      <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)]">
         <p>{t('codeMap.noProject')}</p>
       </div>
     )
@@ -567,39 +577,52 @@ function CodeMapLayout({
 }
 
 function TopBar({
-  tabs, activeTab, onTabChange, onSettings, t,
+  tabs, activeTab, onTabChange, onSettings, onSearch, t,
 }: {
   tabs: { id: Tab; label: string; disabled?: boolean }[]
   activeTab: Tab
   onTabChange: (t: Tab) => void
   onSettings: () => void
+  onSearch: () => void
   t: (k: string) => string
 }) {
   return (
-    <header className="h-12 flex items-center px-4 border-b border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0 select-none">
-      <button onClick={() => onTabChange('library')} className="font-bold text-lg mr-8 hover:opacity-80">
+    <header className="h-11 flex items-center px-3 border-b border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0 select-none shadow-sm" data-fg-surface>
+      <Button variant="ghost" size="sm" onClick={() => onTabChange('library')} className="font-bold text-lg mr-6 px-0 hover:bg-transparent">
         {t('app.name')}
-      </button>
-      <nav className="flex gap-0.5 h-full items-stretch">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => !tab.disabled && onTabChange(tab.id)}
-            disabled={tab.disabled}
-            title={tab.disabled ? t('tooltip.addProjectFirst') : undefined}
-            className={`relative px-3 text-sm font-medium transition-colors ${
-              tab.disabled ? 'text-[var(--fg-text-tertiary)] cursor-not-allowed'
-                : activeTab === tab.id ? 'text-[var(--fg-tab-active)]' : 'text-[var(--fg-tab-hover)] hover:text-[var(--fg-text-primary)]'
-            }`}
-          >
-            {tab.label}
-            {activeTab === tab.id && <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-[var(--fg-accent)] rounded" />}
-          </button>
-        ))}
-      </nav>
+      </Button>
+      <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as Tab)} className="h-full flex items-stretch">
+        <TabsList className="h-full bg-transparent p-0 gap-0">
+          {tabs.map((tab) => (
+            <TabsTrigger
+              key={tab.id}
+              value={tab.id}
+              disabled={tab.disabled}
+              title={tab.disabled ? t('tooltip.addProjectFirst') : undefined}
+              className="h-full rounded-none px-3 text-sm font-medium disabled:opacity-40 data-[state=active]:font-semibold"
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       <div className="flex-1" />
-      <button className="p-1.5 text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-secondary)] rounded" title={t('tooltip.search')}><Search size={16} /></button>
-      <button onClick={onSettings} className="p-1.5 text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-secondary)] rounded ml-1" title={t('tooltip.settings')}><SettingsIcon size={16} /></button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="icon" size="icon-sm" onClick={onSearch} aria-label={t('tooltip.search')}>
+            <Search size={16} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Ctrl+K</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="icon" size="icon-sm" onClick={onSettings} className="ml-1" aria-label={t('tooltip.settings')}>
+            <SettingsIcon size={16} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t('tooltip.settings')}</TooltipContent>
+      </Tooltip>
     </header>
   )
 }
@@ -633,7 +656,7 @@ function StatusBar({ project, t, indexProgress }: {
             {detail && <span className="text-[var(--fg-text-tertiary)]">{detail}</span>}
           </span>
         ) : error ? (
-          <span className="text-[var(--fg-status-error)]">❌ {error}</span>
+          <span className="text-[var(--fg-status-error)]">{error}</span>
         ) : (
           <span className="text-[var(--fg-text-tertiary)]">{project ? project.status : t('status.ready')}</span>
         )}

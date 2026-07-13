@@ -4,17 +4,22 @@
  * Phase 4: 诊断日志查看
  */
 import { useState, useEffect } from 'react'
-import { Cpu, FolderOpen, Globe, Palette, Wrench, ZoomIn } from 'lucide-react'
+import { Cpu, FolderOpen, Globe, Palette, Wrench, ZoomIn, Plug, Check, X } from 'lucide-react'
 import { applyTheme, applyZoom, applyFonts } from '../App'
 import FolderPathField from '../components/FolderPathField'
+import { syncDashboardTheme } from '@/lib/dashboard-theme'
+import { Dialog, DialogContent, DialogTitle, DialogCloseButton, DialogBody } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 interface Props {
+  open: boolean
   t: (key: string) => string
   onClose: () => void
   onAbout?: () => void
 }
 
-export default function SettingsPanel({ t, onClose, onAbout }: Props) {
+export default function SettingsPanel({ open, t, onClose, onAbout }: Props) {
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [chatModel, setChatModel] = useState('')
@@ -64,6 +69,7 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
     })
     // Apply theme immediately (keep current preset)
     applyTheme(theme, themePreset === 'none' ? undefined : themePreset)
+    syncDashboardTheme()
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -110,44 +116,40 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
   }
 
   return (
-    <>
-      <div className="fixed inset-0 bg-[var(--fg-overlay)] z-50" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[80vh] bg-[var(--fg-card)] rounded-xl shadow-2xl z-50 overflow-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--fg-border)]">
-          <h2 className="text-lg font-semibold">{t('settings.title')}</h2>
-          <button onClick={onClose} className="text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-secondary)] text-lg">×</button>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+      <DialogContent className="flex flex-col w-[520px] max-w-[95vw] max-h-[80vh] p-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--fg-border)] shrink-0 bg-[var(--fg-card)]">
+          <DialogTitle>{t('settings.title')}</DialogTitle>
+          <DialogCloseButton />
         </div>
 
-        <div className="px-6 py-4 space-y-6">
+        <DialogBody className="px-6 py-4 space-y-6">
           {/* LLM */}
           <section>
             <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><Cpu size={14} /> {t('settings.llm')}</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">Base URL</label>
-                <input type="text" value={baseUrl} onChange={e => setBaseUrl(e.target.value)}
-                  placeholder="https://api.deepseek.com/v1"
-                  className="fg-input w-full px-3 py-2 border border-[var(--fg-input-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]" />
+                <Input type="text" value={baseUrl} onChange={e => setBaseUrl(e.target.value)}
+                  placeholder="https://api.deepseek.com/v1" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">API Key</label>
-                <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
-                  placeholder="sk-..."
-                  className="fg-input w-full px-3 py-2 border border-[var(--fg-input-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]" />
+                <Input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
+                  placeholder="sk-..." />
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">Chat Model</label>
-                <input type="text" value={chatModel} onChange={e => setChatModel(e.target.value)}
-                  placeholder="deepseek-chat"
-                  className="fg-input w-full px-3 py-2 border border-[var(--fg-input-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]" />
+                <Input type="text" value={chatModel} onChange={e => setChatModel(e.target.value)}
+                  placeholder="deepseek-chat" />
               </div>
               <div className="flex items-center gap-3">
-                <button onClick={testConnection} disabled={testing}
-                  className="px-4 py-1.5 border border-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] rounded-lg text-xs font-medium hover:bg-[var(--fg-accent-muted)] disabled:opacity-40 transition-colors">
-                  {testing ? t('settings.testing') : '🔌 ' + t('settings.testConnection')}
-                </button>
-                {testResult === 'success' && <span className="text-xs text-[var(--fg-status-success)]">✅ {t('settings.testSuccess')}</span>}
-                {testResult === 'fail' && <span className="text-xs text-[var(--fg-status-error)]">❌ {t('settings.testFail')}</span>}
+                <Button variant="outline" size="sm" onClick={testConnection} disabled={testing}>
+                  {!testing && <Plug size={12} />}
+                  {testing ? t('settings.testing') : t('settings.testConnection')}
+                </Button>
+                {testResult === 'success' && <span className="inline-flex items-center gap-1 text-xs text-[var(--fg-status-success)]"><Check size={12} /> {t('settings.testSuccess')}</span>}
+                {testResult === 'fail' && <span className="inline-flex items-center gap-1 text-xs text-[var(--fg-status-error)]"><X size={12} /> {t('settings.testFail')}</span>}
               </div>
             </div>
           </section>
@@ -193,7 +195,7 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
                 { v: 'light', l: '浅色' },
                 { v: 'dark', l: '深色' },
               ].map((opt) => (
-                <button key={opt.v} onClick={() => { setTheme(opt.v); applyTheme(opt.v, themePreset === 'none' ? undefined : themePreset) }}
+                <button key={opt.v} onClick={() => { setTheme(opt.v); applyTheme(opt.v, themePreset === 'none' ? undefined : themePreset); syncDashboardTheme() }}
                   className={`px-4 py-2 rounded-lg text-sm border-2 transition-all ${
                     theme === opt.v ? 'border-[var(--fg-accent)] bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] font-medium' : 'border-[var(--fg-border)] text-[var(--fg-text-secondary)] hover:border-[var(--fg-text-tertiary)]'
                   }`}>{opt.l}</button>
@@ -206,7 +208,7 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
             <h3 className="text-sm font-semibold text-[var(--fg-text-secondary)] mb-3 flex items-center gap-1.5"><Palette size={14} /> {t('settings.themePreset')}</h3>
             <div className="flex gap-2 flex-wrap">
               {([
-                { v: 'parchment', l: t('settings.themePreset.parchment'), bg: '#F5F0E1', accent: '#6B8F71' },
+                { v: 'parchment', l: t('settings.themePreset.parchment'), bg: '#FDFCF8', accent: '#4A8B71' },
                 { v: 'forest', l: t('settings.themePreset.forest'), bg: '#1B2E1E', accent: '#7DBF6E' },
                 { v: 'slate', l: t('settings.themePreset.slate'), bg: '#F0F2F5', accent: '#6366F1' },
                 { v: 'midnight', l: t('settings.themePreset.midnight'), bg: '#0D1117', accent: '#79C0FF' },
@@ -219,6 +221,7 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
                     onClick={() => {
                       setThemePreset(opt.v)
                       applyTheme(theme, opt.v === 'none' ? undefined : opt.v)
+                      syncDashboardTheme()
                     }}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border-2 transition-all ${
                       isActive ? 'border-[var(--fg-accent)] bg-[var(--fg-accent-muted)] font-medium' : 'border-[var(--fg-border)] hover:border-[var(--fg-text-tertiary)]'
@@ -317,7 +320,7 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
                 {logLoading ? '…' : t('settings.viewLogs')}
               </button>
               <button onClick={openLogDir}
-                className="px-4 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
+                className="px-4 py-1.5 border border-[var(--fg-input-border)] text-[var(--fg-text-secondary)] rounded-lg text-xs font-medium hover:bg-[var(--fg-tree-hover)] transition-colors">
                 {t('settings.openLogDir')}
               </button>
             </div>
@@ -327,26 +330,25 @@ export default function SettingsPanel({ t, onClose, onAbout }: Props) {
               </pre>
             )}
           </section>
-        </div>
+        </DialogBody>
 
-        <div className="flex justify-between gap-3 px-6 py-4 border-t border-[var(--fg-border)]">
+        <div className="flex justify-between gap-3 px-6 py-4 border-t border-[var(--fg-border)] shrink-0 bg-[var(--fg-card)]">
           <div className="flex gap-2">
             {onAbout && (
-              <button onClick={onAbout} className="px-3 py-2 text-xs text-[var(--fg-text-tertiary)] hover:text-[var(--fg-accent)] transition-colors">
-                ℹ️ {t('about.title')}
-              </button>
+              <Button variant="ghost" size="sm" onClick={onAbout}>
+                {t('about.title')}
+              </Button>
             )}
           </div>
-          <div className="flex gap-3">
-            {saved && <span className="text-xs text-[var(--fg-status-success)] self-center mr-2">✅ {t('settings.saved')}</span>}
-            <button onClick={onClose} className="px-4 py-2 text-sm text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-primary)]">{t('settings.cancel')}</button>
-            <button onClick={save} disabled={saving}
-              className="px-5 py-2 bg-[var(--fg-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-colors">
+          <div className="flex gap-3 items-center">
+            {saved && <span className="inline-flex items-center gap-1 text-xs text-[var(--fg-status-success)]"><Check size={12} /> {t('settings.saved')}</span>}
+            <Button variant="ghost" onClick={onClose}>{t('settings.cancel')}</Button>
+            <Button onClick={save} disabled={saving}>
               {saving ? t('settings.saving') : t('settings.save')}
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   )
 }

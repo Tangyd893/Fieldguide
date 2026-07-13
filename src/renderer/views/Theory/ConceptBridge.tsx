@@ -4,11 +4,12 @@
  * Used inside TheoryView paper detail when a project is selected.
  */
 import { useState, useEffect } from 'react'
+import { BookOpen, Bot, Loader2 } from 'lucide-react'
 
 interface Props {
   paperId: string
   projectId: string
-  t: (key: string) => string
+  t: (key: string, opts?: Record<string, unknown>) => string
   initialAnchorText?: string
 }
 
@@ -28,7 +29,7 @@ interface PaperRow {
   notes: string; tags: string; created_at: string
 }
 
-export default function ConceptBridge({ paperId, projectId, t: _t, initialAnchorText }: Props) {
+export default function ConceptBridge({ paperId, projectId, t, initialAnchorText }: Props) {
   const [links, setLinks] = useState<LinkRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
@@ -104,7 +105,7 @@ export default function ConceptBridge({ paperId, projectId, t: _t, initialAnchor
       const r = await window.fieldguide.chatSend(projectId, [{ role: 'user', content: prompt }])
       if (r.ok && r.data) {
         const d = r.data as { content: string }
-        setLinks(prev => prev.map(l => l.id === link.id ? { ...l, note: l.note + '\n\n---\n🤖 AI 解释:\n' + d.content } : l))
+        setLinks(prev => prev.map(l => l.id === link.id ? { ...l, note: l.note + '\n\n---\n' + t('bridge.aiExplainPrefix') + '\n' + d.content } : l))
       }
     } catch { /* ignore */ }
     finally { setExplaining(null) }
@@ -179,34 +180,36 @@ ${candidateLines}`
     : nodes.slice(0, 50)
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5">
+    <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg p-5">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700">🔗 概念桥接</h3>
+        <h3 className="text-sm font-semibold text-[var(--fg-text-primary)]">{t('bridge.conceptBridge')}</h3>
         <button onClick={() => { setShowAdd(!showAdd); if (!showAdd) loadNodes() }}
-          className="text-xs text-blue-600 hover:text-blue-800 font-medium">
-          {showAdd ? '取消' : '+ 关联代码节点'}
+          className="text-xs text-[var(--fg-accent-text)] hover:text-[var(--fg-accent)] font-medium">
+          {showAdd ? t('bridge.cancel') : t('bridge.addLink')}
         </button>
       </div>
 
       {loading ? (
-        <p className="text-xs text-gray-400">加载中…</p>
+        <p className="text-xs text-[var(--fg-text-tertiary)]">{t('bridge.loading')}</p>
       ) : links.length === 0 && !showAdd ? (
-        <p className="text-xs text-gray-400">尚未关联代码节点。点击上方按钮建立关联。</p>
+        <p className="text-xs text-[var(--fg-text-tertiary)]">{t('bridge.noLinks')}</p>
       ) : (
         <div className="space-y-2">
           {links.map((link) => (
-            <div key={link.id} className="flex items-start gap-2 p-2 bg-gray-50 rounded group">
+            <div key={link.id} className="flex items-start gap-2 p-2 bg-[var(--fg-tree-hover)] rounded group">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-mono text-blue-700 truncate">{link.node_id}</p>
-                {link.anchor_text && <p className="text-xs text-gray-500 mt-0.5">📖 {link.anchor_text}</p>}
-                {link.note && <p className="text-xs text-gray-400 mt-0.5 whitespace-pre-wrap">{link.note}</p>}
+                <p className="text-xs font-mono text-[var(--fg-accent-text)] truncate">{link.node_id}</p>
+                {link.anchor_text && <p className="text-xs text-[var(--fg-text-secondary)] mt-0.5 inline-flex items-start gap-1"><BookOpen size={11} className="shrink-0 mt-0.5" />{link.anchor_text}</p>}
+                {link.note && <p className="text-xs text-[var(--fg-text-tertiary)] mt-0.5 whitespace-pre-wrap">{link.note}</p>}
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => explainLink(link)} disabled={explaining === link.id}
-                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-purple-500 text-xs px-1 transition-opacity disabled:opacity-50"
-                  title="AI 解释关联">{explaining === link.id ? '…' : '🤖'}</button>
+                  className="opacity-0 group-hover:opacity-100 text-[var(--fg-text-tertiary)] hover:text-[var(--fg-accent)] text-xs px-1 transition-opacity disabled:opacity-50"
+                  title={t('bridge.aiExplainTitle')}>
+                  {explaining === link.id ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
+                </button>
                 <button onClick={() => removeLink(link.id)}
-                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 text-xs transition-opacity">×</button>
+                  className="opacity-0 group-hover:opacity-100 text-[var(--fg-text-tertiary)] hover:text-[var(--fg-status-error)] text-xs transition-opacity">×</button>
               </div>
             </div>
           ))}
@@ -215,53 +218,53 @@ ${candidateLines}`
 
       {/* Add link form */}
       {showAdd && (
-        <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+        <div className="mt-3 pt-3 border-t border-[var(--fg-border)] space-y-3">
           <div>
             <div className="flex items-center gap-2">
-              <label className="block text-xs font-medium text-gray-500 mb-1">搜索代码节点</label>
+              <label className="block text-xs font-medium text-[var(--fg-text-secondary)] mb-1">{t('bridge.searchNodes')}</label>
               <button
                 onClick={suggestNodes}
                 disabled={suggestingAI}
-                className="text-xs text-purple-600 hover:text-purple-800 mb-1 disabled:opacity-40"
-                title="AI 根据论文内容推荐最相关的代码节点"
+                className="inline-flex items-center gap-1 text-xs text-[var(--fg-accent-text)] hover:text-[var(--fg-accent)] mb-1 disabled:opacity-40"
               >
-                {suggestingAI ? '🤖 分析中…' : '🤖 AI 推荐'}
+                {suggestingAI ? <Loader2 size={11} className="animate-spin" /> : <Bot size={11} />}
+                {suggestingAI ? t('bridge.analyzing') : t('bridge.aiSuggest')}
               </button>
             </div>
             <input type="text" value={nodeQuery} onChange={(e) => { setNodeQuery(e.target.value); if (e.target.value) setAiSuggestedNodes([]) }}
               placeholder="输入函数名或类名…"
-              className="fg-input w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              className="fg-input w-full px-2 py-1.5 border border-[var(--fg-input-border)] rounded text-xs focus:outline-none focus:ring-1 focus:ring-[var(--fg-accent)]" />
           </div>
 
           {filteredNodes.length > 0 && (
-            <div className="max-h-40 overflow-auto border border-gray-200 rounded">
+            <div className="max-h-40 overflow-auto border border-[var(--fg-border)] rounded">
               {filteredNodes.map((n) => (
                 <button key={n.id}
                   onClick={() => setSelectedNode(n)}
-                  className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 transition-colors ${selectedNode?.id === n.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}>
+                  className={`w-full text-left px-2 py-1.5 text-xs hover:bg-[var(--fg-accent-muted)] transition-colors ${selectedNode?.id === n.id ? 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)]' : 'text-[var(--fg-text-primary)]'}`}>
                   <span className="font-mono">{n.label || n.id}</span>
-                  <span className="text-gray-400 ml-2">{n.type}</span>
-                  {n.filePath && <span className="text-gray-300 ml-2 truncate">— {n.filePath}</span>}
+                  <span className="text-[var(--fg-text-tertiary)] ml-2">{n.type}</span>
+                  {n.filePath && <span className="text-[var(--fg-text-tertiary)]/70 ml-2 truncate">— {n.filePath}</span>}
                 </button>
               ))}
             </div>
           )}
           {nodeQuery && filteredNodes.length === 0 && !aiSuggestedNodes.length && (
-            <p className="text-xs text-gray-400">未找到匹配节点</p>
+            <p className="text-xs text-[var(--fg-text-tertiary)]">{t('bridge.noMatch')}</p>
           )}
 
           {/* AI suggested nodes */}
           {!nodeQuery && aiSuggestedNodes.length > 0 && (
             <>
-              <p className="text-xs text-purple-600 font-medium mt-2 mb-1">🤖 AI 推荐 ({aiSuggestedNodes.length})</p>
-              <div className="max-h-28 overflow-auto border border-purple-200 rounded bg-purple-50/30">
+              <p className="text-xs text-[var(--fg-accent-text)] font-medium mt-2 mb-1">{t('bridge.aiRecommended')} ({aiSuggestedNodes.length})</p>
+              <div className="max-h-28 overflow-auto border border-[var(--fg-border)] rounded bg-[var(--fg-accent-muted)]/30">
                 {aiSuggestedNodes.map((n) => (
                   <button key={n.id}
                     onClick={() => { setSelectedNode(n); setNodeQuery(''); setAiSuggestedNodes([]) }}
-                    className={`w-full text-left px-2 py-1.5 text-xs hover:bg-purple-100 transition-colors ${selectedNode?.id === n.id ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}`}>
+                    className={`w-full text-left px-2 py-1.5 text-xs hover:bg-[var(--fg-accent-muted)] transition-colors ${selectedNode?.id === n.id ? 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)]' : 'text-[var(--fg-text-primary)]'}`}>
                     <span className="font-mono">{n.label || n.id}</span>
-                    <span className="text-gray-400 ml-2">{n.type}</span>
-                    {n.filePath && <span className="text-gray-300 ml-2 truncate">— {n.filePath}</span>}
+                    <span className="text-[var(--fg-text-tertiary)] ml-2">{n.type}</span>
+                    {n.filePath && <span className="text-[var(--fg-text-tertiary)]/70 ml-2 truncate">— {n.filePath}</span>}
                   </button>
                 ))}
               </div>
@@ -269,26 +272,26 @@ ${candidateLines}`
           )}
 
           {aiSuggestError && (
-            <p className="text-xs text-red-500">{aiSuggestError}</p>
+            <p className="text-xs text-[var(--fg-status-error)]">{aiSuggestError}</p>
           )}
 
           {selectedNode && (
             <>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">关联的论文段落</label>
+                <label className="block text-xs font-medium text-[var(--fg-text-secondary)] mb-1">{t('bridge.anchorLabel')}</label>
                 <input type="text" value={anchorText} onChange={(e) => setAnchorText(e.target.value)}
-                  placeholder="如: Section 3.2 介绍了 splitter 算法…"
-                  className="fg-input w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                  placeholder={t('bridge.anchorPlaceholder')}
+                  className="fg-input w-full px-2 py-1.5 border border-[var(--fg-input-border)] rounded text-xs focus:outline-none focus:ring-1 focus:ring-[var(--fg-accent)]" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">备注</label>
+                <label className="block text-xs font-medium text-[var(--fg-text-secondary)] mb-1">{t('bridge.noteLabel')}</label>
                 <input type="text" value={linkNote} onChange={(e) => setLinkNote(e.target.value)}
-                  placeholder="如: 该函数实现了论文中的 splitter"
-                  className="fg-input w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                  placeholder={t('bridge.notePlaceholder')}
+                  className="fg-input w-full px-2 py-1.5 border border-[var(--fg-input-border)] rounded text-xs focus:outline-none focus:ring-1 focus:ring-[var(--fg-accent)]" />
               </div>
               <button onClick={addLink} disabled={adding}
-                className="w-full py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-40">
-                {adding ? '关联中…' : `关联到「${selectedNode.label || selectedNode.id}」`}
+                className="w-full py-1.5 bg-[var(--fg-accent)] text-white rounded text-xs font-medium hover:opacity-90 disabled:opacity-40">
+                {adding ? t('bridge.linking') : t('bridge.linkTo', { name: selectedNode.label || selectedNode.id })}
               </button>
             </>
           )}

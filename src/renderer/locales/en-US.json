@@ -4,7 +4,8 @@
     "version": "v0.2.0"
   },
   "common": {
-    "browseFolder": "Browse…"
+    "browseFolder": "Browse…",
+    "close": "Close"
   },
   "tabs": {
     "library": "Projects",
@@ -40,7 +41,20 @@
       "stale": "Source changed"
     },
     "nodes": "{{count}} nodes",
-    "indexedAt": "Indexed at {{date}}"
+    "indexedAt": "Indexed at {{date}}",
+    "updateIndex": "Update",
+    "indexBtn": "Index",
+    "analyzeDiff": "Analyze",
+    "fullReindex": "Full",
+    "analyzing": "Analyzing…",
+    "diffTitle": "Change Impact Analysis",
+    "deleteConfirm": "Delete project \"{{name}}\"?\nThis only removes the record, not the source files.",
+    "fullReindexConfirm": "Full reindex \"{{name}}\"?\nThis ignores cached data and re-analyzes all files.",
+    "addFailed": "Add failed",
+    "analyzeFailed": "Analysis failed",
+    "deleteFailed": "Delete failed",
+    "noChanges": "No file changes detected.",
+    "analyzeDone": "Analysis complete."
   },
   "codeMap": {
     "noProject": "Add a project in the library first",
@@ -54,6 +68,11 @@
     "readError": "Read error",
     "nodeSearchPlaceholder": "Search functions, classes…"
   },
+  "fileTree": {
+    "openFile": "Open file",
+    "copyPath": "Copy path",
+    "revealInExplorer": "Reveal in Explorer"
+  },
   "index": {
     "phase": {
       "scan": "Scanning files…",
@@ -65,15 +84,122 @@
   },
   "chat": {
     "title": "AI Chat",
-    "placeholder": "Ask questions — answers based on project graph and paper library"
+    "placeholder": "Ask questions — answers based on project graph and paper library",
+    "send": "Send",
+    "welcome": "Hello! I'm the Fieldguide AI assistant. I can help you understand your codebase.",
+    "welcomeWithProject": "Hello! I'm the Fieldguide AI assistant. I can help you understand \"{{name}}\".\n\nTry asking:\n- What's the entry point?\n- How is auth implemented?\n- What are the core modules?",
+    "noProject": "Please select a project first, then I can help analyze the code.",
+    "noReply": "(No response)",
+    "close": "Close",
+    "requestFailed": "Request failed"
+  },
+  "commandPalette": {
+    "placeholder": "Search commands, files, or nodes…",
+    "noMatch": "No matching commands",
+    "jump": "Jump"
   },
   "theory": {
     "title": "Theory",
-    "desc": "Search arXiv papers, save to local library, cross-reference with code"
+    "desc": "Search arXiv papers, save to local library, cross-reference with code",
+    "myPapers": "My Papers",
+    "search": "Search",
+    "searchBtn": "Search",
+    "searchPlaceholder": "Search arXiv… (RAG, transformer, code generation)",
+    "searching": "Searching…",
+    "noResults": "No matching papers found",
+    "libraryEmpty": "Library empty",
+    "libraryEmptyHint": "Search arXiv and save papers of interest",
+    "saved": "Saved",
+    "save": "Save",
+    "hasNotes": "Has notes",
+    "backToLibrary": "← Back to Library",
+    "readPdf": "Read PDF",
+    "downloadPdf": "Download PDF",
+    "downloading": "Downloading…",
+    "notes": "Notes",
+    "notesPlaceholder": "Record your thoughts, code connections…",
+    "notesAutoSave": "Notes auto-saved to this paper",
+    "saveNotes": "Save Notes",
+    "deletePaper": "Delete this paper"
   },
   "bridge": {
     "title": "Concept Bridge",
-    "desc": "Paper sections ↔ code nodes, AI-powered explanations"
+    "desc": "Paper sections ↔ code nodes, AI-powered explanations",
+    "conceptBridge": "Concept Bridge",
+    "paperList": "Papers",
+    "linksSummary": "{{links}} links · {{papers}} papers",
+    "generateTour": "Generate Tour",
+    "generating": "Generating…",
+    "generateTourHint": "At least 3 bridge links recommended for a meaningful cross-reference tour",
+    "generateTourTitle": "Generate paper↔code cross-reference tour",
+    "noLinksFound": "No bridge links found.",
+    "tourGenerated": "Tour generated. View it in Code Map.",
+    "generateFailed": "Generation failed",
+    "aiExplainPrefix": "AI explanation:",
+    "aiExplainTitle": "AI Explain Link",
+    "unknownAuthor": "Unknown Author",
+    "noPapers": "No Papers",
+    "noPapersHint": "Search and save arXiv papers in the \"Theory\" tab first, then return here to create bridges.",
+    "noProject": "Concept Bridge",
+    "noProjectHint": "Select a project in the library first to browse and create paper ↔ code bridges.",
+    "selectPaper": "Select Paper",
+    "selectPaperTitle": "Concept Bridge",
+    "selectPaperHint": "Select a paper from the left sidebar to view and create its links to code nodes.",
+    "tourResult": "Cross-Reference Tour",
+    "tourResultSteps": "Cross-Reference Tour ({{count}} steps)",
+    "tourResultHint": "Tour written to the graph. Switch to the \"Code Map\" tab and open the Tour panel to follow along.",
+    "close": "Close",
+    "addLink": "+ Link Code Node",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "noLinks": "No links yet. Click the button above to create one.",
+    "searchNodes": "Search code nodes",
+    "aiSuggest": "AI Suggest",
+    "analyzing": "Analyzing…",
+    "noMatch": "No matching nodes",
+    "aiRecommended": "AI Recommended",
+    "anchorLabel": "Linked paper paragraph",
+    "anchorPlaceholder": "e.g. Section 3.2 describes the splitter algorithm…",
+    "noteLabel": "Note",
+    "notePlaceholder": "e.g. This function implements the splitter from the paper",
+    "linking": "Linking…",
+    "linkTo": "Link to \"{{name}}\""
+  },
+  "graph": {
+    "overview": "Overview"
+  },
+  "tour": {
+    "noTours": "No tours available",
+    "noToursHint": "Index the project with LLM analysis enabled to generate tours",
+    "steps": "{{count}} steps",
+    "nodesCount": "{{count}} nodes",
+    "playInDashboard": "Play tour in Dashboard"
+  },
+  "pdf": {
+    "title": "PDF Reader",
+    "bridgeAsText": "Use as bridge text",
+    "bridge": "Bridge",
+    "pageOf": "Page {{current}} / {{total}}",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "goTo": "Go",
+    "selectedText": "Selected text:",
+    "cancelSelection": "Clear selection",
+    "closeReader": "Close reader",
+    "loading": "Loading PDF…",
+    "loadFailed": "Failed to load PDF"
+  },
+  "cost": {
+    "title": "Index \"{{name}}\"",
+    "modeSelect": "Select indexing mode",
+    "loading": "Loading project stats…",
+    "sourceFiles": "Source files",
+    "structNodes": "Structural nodes (existing)",
+    "llmHint": "LLM analysis will generate summaries, architecture layers, and guided tours for code nodes.",
+    "estTokens": "Est. ~{{tokens}} tokens (~¥{{cost}})",
+    "fullIndex": "Full Index (with LLM analysis)",
+    "staticOnly": "Static Only (skip summaries & tours)",
+    "cancel": "Cancel"
   },
   "status": {
     "ready": "Ready",
@@ -132,11 +258,11 @@
     "projectRootDesc": "Git clones and Demo projects will be stored here by default. You can change this later in settings.",
     "projectRootHint": "Leave blank to pick a directory manually when adding projects.",
     "startTitle": "How to start?",
-    "demoTitle": "🎯 Try Demo Project",
+    "demoTitle": "Try Demo Project",
     "demoDesc": "Use the built-in Go sample — no network needed, explore the graph immediately",
-    "localTitle": "📁 Open Local Project",
+    "localTitle": "Open Local Project",
     "localDesc": "Pick an existing codebase and start indexing",
-    "skipTitle": "⏭ Later",
+    "skipTitle": "Later",
     "skipDesc": "Go straight to the project library, add projects anytime",
     "settingUp": "Preparing project…",
     "indexing": "Indexing project",
@@ -146,8 +272,8 @@
     "completeNodes": "Indexing complete, {{count}} nodes.",
     "completeTourHint": "We recommend following the Intro Tour to understand the main flow.",
     "completeNoNodes": "Project is ready. We recommend following the Intro Tour in the Code Map.",
-    "openCodeMap": "🗺️ Open Code Map",
-    "stayLibrary": "📚 Stay in Library",
+    "openCodeMap": "Open Code Map",
+    "stayLibrary": "Stay in Library",
     "errorTitle": "Setup issue",
     "errorHint": "Project setup failed. Please check your network or path and try again.",
     "enterLibrary": "Enter Library",

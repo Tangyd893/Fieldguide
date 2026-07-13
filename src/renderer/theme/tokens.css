@@ -47,6 +47,7 @@
 
   /* Overlay / Dialog */
   --fg-overlay: rgba(0, 0, 0, 0.3);
+  --fg-modal-scrim: rgba(0, 0, 0, 0.55);
   --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
 
   /* Status colors */
@@ -58,6 +59,12 @@
   --fg-status-error-bg: #fee2e2;
   --fg-status-info: #2563eb;
   --fg-status-info-bg: #dbeafe;
+
+  /* Syntax highlighting (fixed readable colors for all themes) */
+  --fg-syntax-string: #16a34a;
+  --fg-syntax-comment: #9ca3af;
+  --fg-syntax-number: #f97316;
+  --fg-syntax-keyword: #9333ea;
 }
 
 /* ── Explicit dark override ──────────────────────────── */
@@ -90,7 +97,14 @@
   --fg-input-disabled-text: #64748b;
 
   --fg-overlay: rgba(0, 0, 0, 0.5);
+  --fg-modal-scrim: rgba(0, 0, 0, 0.6);
   --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+
+  /* Syntax highlighting — softer tones for dark backgrounds */
+  --fg-syntax-string: #4ade80;
+  --fg-syntax-comment: #6b7280;
+  --fg-syntax-number: #fb923c;
+  --fg-syntax-keyword: #c084fc;
 }
 
 /* ── System-preference dark (no explicit theme set) ──── */
@@ -124,38 +138,51 @@
     --fg-input-disabled-text: #64748b;
 
     --fg-overlay: rgba(0, 0, 0, 0.5);
+    --fg-modal-scrim: rgba(0, 0, 0, 0.6);
     --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+
+    /* Syntax highlighting — softer tones for dark backgrounds */
+    --fg-syntax-string: #4ade80;
+    --fg-syntax-comment: #6b7280;
+    --fg-syntax-number: #fb923c;
+    --fg-syntax-keyword: #c084fc;
   }
 }
 
 /* ── Theme Presets (override base light/dark tokens) ──── */
 /* Place AFTER base themes so they take precedence via same-specificity ordering */
 
-/* Parchment — warm paper tones, green accent */
+/* Parchment — modern notebook / soft scientific, sage green accent */
 :root[data-theme-preset="parchment"] {
-  --fg-bg: #F5F0E1;
-  --fg-card: #FAF6EB;
-  --fg-border: #D4C9A8;
-  --fg-text-primary: #3D3529;
-  --fg-text-secondary: #6B6B56;
-  --fg-text-tertiary: #9E9E8E;
-  --fg-accent: #6B8F71;
-  --fg-accent-muted: #E8F0E4;
-  --fg-accent-text: #4A6B52;
-  --fg-tree-selected: #E8F0E4;
-  --fg-tree-hover: #F0EDDD;
-  --fg-tab-active: #6B8F71;
-  --fg-tab-hover: #6B6B56;
-  --fg-scrollbar-thumb: #C4B998;
+  --fg-bg: #FDFCF8;
+  --fg-card: #FFFFFF;
+  --fg-border: #E5E5E5;
+  --fg-text-primary: #222222;
+  --fg-text-secondary: #757575;
+  --fg-text-tertiary: #9E9E9E;
+  --fg-accent: #4A8B71;
+  --fg-accent-muted: #EBF4F0;
+  --fg-accent-text: #2D7D74;
+  --fg-tree-selected: #E8F0EC;
+  --fg-tree-hover: #F5F5F0;
+  --fg-tab-active: #4A8B71;
+  --fg-tab-hover: #757575;
+  --fg-scrollbar-thumb: #D1D1D1;
   --fg-scrollbar-track: transparent;
-  --fg-input-bg: #FAF6EB;
-  --fg-input-border: #D4C9A8;
-  --fg-input-text: #3D3529;
-  --fg-input-placeholder: #9E9E8E;
-  --fg-input-disabled-bg: #F0EDDD;
-  --fg-input-disabled-text: #9E9E8E;
+  --fg-input-bg: #FFFFFF;
+  --fg-input-border: #E0E0E0;
+  --fg-input-text: #222222;
+  --fg-input-placeholder: #9E9E9E;
+  --fg-input-disabled-bg: #F5F5F0;
+  --fg-input-disabled-text: #9E9E9E;
   --fg-overlay: rgba(0, 0, 0, 0.25);
+  --fg-modal-scrim: rgba(0, 0, 0, 0.45);
   --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+  --fg-sidebar-bg: #F8F7F4;
+  --fg-status-info: #4A90E2;
+  --fg-status-info-bg: #EBF3FC;
+  --fg-status-warning: #F5A623;
+  --fg-status-warning-bg: #FEF6E8;
 }
 
 /* Forest — deep greens, earthy */
@@ -182,6 +209,7 @@
   --fg-input-disabled-bg: #1B2E1E;
   --fg-input-disabled-text: #6B806E;
   --fg-overlay: rgba(0, 0, 0, 0.5);
+  --fg-modal-scrim: rgba(0, 0, 0, 0.6);
   --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
@@ -209,6 +237,7 @@
   --fg-input-disabled-bg: #F3F4F6;
   --fg-input-disabled-text: #9CA3AF;
   --fg-overlay: rgba(0, 0, 0, 0.3);
+  --fg-modal-scrim: rgba(0, 0, 0, 0.5);
   --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
 }
 
@@ -236,6 +265,7 @@
   --fg-input-disabled-bg: #0D1117;
   --fg-input-disabled-text: #6E7681;
   --fg-overlay: rgba(0, 0, 0, 0.5);
+  --fg-modal-scrim: rgba(0, 0, 0, 0.6);
   --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -263,6 +293,7 @@
   --fg-input-disabled-bg: #2D2420;
   --fg-input-disabled-text: #7A6E63;
   --fg-overlay: rgba(0, 0, 0, 0.5);
+  --fg-modal-scrim: rgba(0, 0, 0, 0.6);
   --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
 }
 

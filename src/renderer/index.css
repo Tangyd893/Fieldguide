@@ -1,9 +1,9 @@
+/* ── Semantic tokens (single source of truth for all colors) ── */
+@import './theme/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* ── Semantic tokens (single source of truth for all colors) ── */
-@import './theme/tokens.css';
 
 /* ── Global reset ─────────────────────────────────────── */
 * {
@@ -18,6 +18,17 @@ body {
   background: var(--fg-bg);
   color: var(--fg-text-primary);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Obsidian-style smooth theme / chrome transitions */
+body,
+header,
+footer,
+[data-fg-surface] {
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
 }
 
 /* Prevent text selection on UI chrome */
@@ -42,6 +53,18 @@ footer {
 
 .animate-slide-up {
   animation: slide-up 0.2s ease-out;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 /* ── Input field theming (uses semantic tokens) ──────── */

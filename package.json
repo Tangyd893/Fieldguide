@@ -11,13 +11,23 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.vitest.json --noEmit",
     "test:unit": "vitest run",
     "test:watch": "vitest",
+    "clean:dist": "node scripts/clean-dist.mjs",
     "pack": "node scripts/prepare-pack.mjs && electron-vite build && electron-builder --win --config",
     "dist": "node scripts/prepare-pack.mjs && electron-vite build && electron-builder --win --publish never"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
+    "@radix-ui/react-context-menu": "^2.3.3",
+    "@radix-ui/react-dialog": "^1.1.19",
+    "@radix-ui/react-dropdown-menu": "^2.1.20",
+    "@radix-ui/react-scroll-area": "^1.2.14",
+    "@radix-ui/react-slot": "^1.3.0",
+    "@radix-ui/react-tabs": "^1.1.17",
+    "@radix-ui/react-tooltip": "^1.2.12",
     "@understand-anything/core": "workspace:*",
     "better-sqlite3": "^11.10.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "i18next": "^25.10.10",
     "lucide-react": "^1.23.0",
     "pdf-parse": "^2.4.5",
@@ -26,7 +36,8 @@
     "react-dom": "^18.3.1",
     "react-i18next": "^16.6.6",
     "react-pdf": "^10.4.1",
-    "simple-git": "^3.36.0"
+    "simple-git": "^3.36.0",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",

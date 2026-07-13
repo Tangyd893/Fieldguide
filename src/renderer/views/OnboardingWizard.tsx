@@ -5,8 +5,10 @@
  * Phase 4: i18n 化 — 所有 UI 文案通过 t() 获取
  */
 import { useState, useEffect } from 'react'
+import { Compass, Loader2, Search, PartyPopper, AlertTriangle } from 'lucide-react'
 import FolderPathField from '../components/FolderPathField'
 import { useIndexProgress, progressPercent } from '../hooks/useIndexProgress'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 interface Props {
   t: (key: string, opts?: Record<string, unknown>) => string
@@ -164,19 +166,19 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
   const isStep5 = stepKey === 'step5'
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/25 z-50" />
-
-      {/* Card */}
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] bg-white rounded-xl shadow-2xl z-50 overflow-hidden">
+    <Dialog open modal onOpenChange={() => {}}>
+      <DialogContent
+        className="w-[480px] max-w-[95vw] p-0 overflow-hidden"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         {/* Progress dots */}
-        <div className="flex justify-center gap-2 pt-6 pb-2">
+        <div className="flex justify-center gap-2 pt-6 pb-2 bg-[var(--fg-card)]">
           {STEPS.map((_, i) => (
             <div
               key={i}
               className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                i <= step ? 'bg-blue-500' : 'bg-gray-200'
+                i <= step ? 'bg-[var(--fg-accent)]' : 'bg-[var(--fg-input-border)]'
               }`}
             />
           ))}
@@ -186,18 +188,22 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
         <div className="px-8 py-6">
           {stepKey === 'welcome' && (
             <div className="text-center">
-              <div className="text-5xl mb-4">🧭</div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('onboarding.welcomeTitle')}</h2>
-              <p className="text-sm text-gray-500 leading-relaxed">
+              <div className="flex justify-center mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-[var(--fg-accent-muted)] flex items-center justify-center">
+                  <Compass size={32} className="text-[var(--fg-accent)]" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-[var(--fg-text-primary)] mb-2">{t('onboarding.welcomeTitle')}</h2>
+              <p className="text-sm text-[var(--fg-text-secondary)] leading-relaxed">
                 {t('onboarding.welcomeDesc')}
               </p>
-              <p className="text-sm text-gray-400 mt-3">{t('onboarding.welcomeHint')}</p>
+              <p className="text-sm text-[var(--fg-text-tertiary)] mt-3">{t('onboarding.welcomeHint')}</p>
             </div>
           )}
 
           {stepKey === 'language' && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('onboarding.languageTitle')}</h3>
+              <h3 className="text-lg font-semibold text-[var(--fg-text-primary)] mb-4">{t('onboarding.languageTitle')}</h3>
               <div className="space-y-2">
                 {LOCALE_OPTIONS.map((opt) => (
                   <button
@@ -205,8 +211,8 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
                     onClick={() => setLocale(opt.value)}
                     className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all text-sm ${
                       locale === opt.value
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                        ? 'border-[var(--fg-accent)] bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] font-medium'
+                        : 'border-[var(--fg-border)] hover:border-[var(--fg-text-tertiary)] text-[var(--fg-text-secondary)]'
                     }`}
                   >
                     {opt.label}
@@ -218,8 +224,8 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
 
           {stepKey === 'projectRoot' && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('onboarding.projectRootTitle')}</h3>
-              <p className="text-sm text-gray-500 mb-4">
+              <h3 className="text-lg font-semibold text-[var(--fg-text-primary)] mb-2">{t('onboarding.projectRootTitle')}</h3>
+              <p className="text-sm text-[var(--fg-text-secondary)] mb-4">
                 {t('onboarding.projectRootDesc')}
               </p>
               <FolderPathField
@@ -229,7 +235,7 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
                 browseLabel={t('common.browseFolder')}
                 autoFocus
               />
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-[var(--fg-text-tertiary)] mt-2">
                 {t('onboarding.projectRootHint')}
               </p>
             </div>
@@ -237,28 +243,28 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
 
           {stepKey === 'start' && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('onboarding.startTitle')}</h3>
+              <h3 className="text-lg font-semibold text-[var(--fg-text-primary)] mb-4">{t('onboarding.startTitle')}</h3>
               <div className="space-y-3">
                 <button
                   onClick={() => handleStartOption('demo')}
-                  className="w-full text-left px-4 py-3 rounded-lg border-2 border-blue-500 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  className="w-full text-left px-4 py-3 rounded-lg border-2 border-[var(--fg-accent)] bg-[var(--fg-accent-muted)] hover:bg-[var(--fg-accent-muted)]/70 transition-colors"
                 >
-                  <span className="font-medium text-blue-700 text-sm">{t('onboarding.demoTitle')}</span>
-                  <p className="text-xs text-blue-500 mt-0.5">{t('onboarding.demoDesc')}</p>
+                  <span className="font-medium text-[var(--fg-accent-text)] text-sm">{t('onboarding.demoTitle')}</span>
+                  <p className="text-xs text-[var(--fg-accent)] mt-0.5">{t('onboarding.demoDesc')}</p>
                 </button>
                 <button
                   onClick={() => handleStartOption('local')}
-                  className="w-full text-left px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-colors"
+                  className="w-full text-left px-4 py-3 rounded-lg border-2 border-[var(--fg-border)] hover:border-[var(--fg-text-tertiary)] transition-colors"
                 >
-                  <span className="font-medium text-gray-700 text-sm">{t('onboarding.localTitle')}</span>
-                  <p className="text-xs text-gray-400 mt-0.5">{t('onboarding.localDesc')}</p>
+                  <span className="font-medium text-[var(--fg-text-primary)] text-sm">{t('onboarding.localTitle')}</span>
+                  <p className="text-xs text-[var(--fg-text-tertiary)] mt-0.5">{t('onboarding.localDesc')}</p>
                 </button>
                 <button
                   onClick={() => handleStartOption('skip')}
-                  className="w-full text-left px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-colors"
+                  className="w-full text-left px-4 py-3 rounded-lg border-2 border-[var(--fg-border)] hover:border-[var(--fg-text-tertiary)] transition-colors"
                 >
-                  <span className="font-medium text-gray-700 text-sm">{t('onboarding.skipTitle')}</span>
-                  <p className="text-xs text-gray-400 mt-0.5">{t('onboarding.skipDesc')}</p>
+                  <span className="font-medium text-[var(--fg-text-primary)] text-sm">{t('onboarding.skipTitle')}</span>
+                  <p className="text-xs text-[var(--fg-text-tertiary)] mt-0.5">{t('onboarding.skipDesc')}</p>
                 </button>
               </div>
             </div>
@@ -268,10 +274,10 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
             <div>
               {step5Phase === 'setting-up' && (
                 <div className="text-center py-4">
-                  <div className="text-3xl mb-3 animate-pulse">⏳</div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('onboarding.settingUp')}</h3>
+                  <div className="flex justify-center mb-3"><Loader2 size={28} className="animate-spin text-[var(--fg-accent)]" /></div>
+                  <h3 className="text-lg font-semibold text-[var(--fg-text-primary)] mb-2">{t('onboarding.settingUp')}</h3>
                   {selectedOption === 'local' && localProjectPath && (
-                    <p className="text-xs text-gray-500 mb-2 font-mono break-all px-4">{localProjectPath}</p>
+                    <p className="text-xs text-[var(--fg-text-secondary)] mb-2 font-mono break-all px-4">{localProjectPath}</p>
                   )}
                   <p className="text-sm text-[var(--fg-text-secondary)]">{t('onboarding.settingUp')}</p>
                 </div>
@@ -279,7 +285,7 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
 
               {step5Phase === 'indexing' && (
                 <div className="text-center py-4">
-                  <div className="text-3xl mb-3 animate-pulse">🔍</div>
+                  <div className="flex justify-center mb-3"><Search size={28} className="animate-pulse text-[var(--fg-accent)]" /></div>
                   <h3 className="text-lg font-semibold text-[var(--fg-text-primary)] mb-2">{t('onboarding.indexing')}</h3>
                   <p className="text-sm text-[var(--fg-text-secondary)] mb-3">
                     {idxProgress.progress?.phase ? idxProgress.phaseLabel(idxProgress.progress.phase, t) : ''}
@@ -300,29 +306,29 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
 
               {step5Phase === 'complete' && (
                 <div className="text-center py-2">
-                  <div className="text-5xl mb-3">🎉</div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t('onboarding.complete')}</h3>
+                  <div className="flex justify-center mb-3"><PartyPopper size={36} className="text-[var(--fg-accent)]" /></div>
+                  <h3 className="text-xl font-bold text-[var(--fg-text-primary)] mb-2">{t('onboarding.complete')}</h3>
                   {step5NodeCount > 0 ? (
-                    <p className="text-sm text-gray-500 mb-4">
+                    <p className="text-sm text-[var(--fg-text-secondary)] mb-4">
                       {t('onboarding.completeNodes', { count: step5NodeCount })}
                       <br />
                       {t('onboarding.completeTourHint')}
                     </p>
                   ) : (
-                    <p className="text-sm text-gray-500 mb-4">
+                    <p className="text-sm text-[var(--fg-text-secondary)] mb-4">
                       {t('onboarding.completeNoNodes')}
                     </p>
                   )}
                   <div className="flex gap-3 justify-center">
                     <button
                       onClick={() => handleFinish('codemap')}
-                      className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition-colors"
+                      className="px-5 py-2.5 bg-[var(--fg-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 shadow-sm transition-colors"
                     >
                       {t('onboarding.openCodeMap')}
                     </button>
                     <button
                       onClick={() => handleFinish('library')}
-                      className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                      className="px-5 py-2.5 border border-[var(--fg-input-border)] text-[var(--fg-text-secondary)] rounded-lg text-sm font-medium hover:bg-[var(--fg-tree-hover)] transition-colors"
                     >
                       {t('onboarding.stayLibrary')}
                     </button>
@@ -332,15 +338,15 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
 
               {step5Phase === 'error' && (
                 <div className="text-center py-4">
-                  <div className="text-5xl mb-3">⚠️</div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('onboarding.errorTitle')}</h3>
-                  <p className="text-sm text-gray-500 mb-4">
+                  <div className="flex justify-center mb-3"><AlertTriangle size={36} className="text-[var(--fg-status-warning)]" /></div>
+                  <h3 className="text-lg font-semibold text-[var(--fg-text-primary)] mb-2">{t('onboarding.errorTitle')}</h3>
+                  <p className="text-sm text-[var(--fg-text-secondary)] mb-4">
                     {step5Error || t('onboarding.errorHint')}
                   </p>
                   <div className="flex gap-3 justify-center">
                     <button
                       onClick={() => handleFinish('library')}
-                      className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition-colors"
+                      className="px-5 py-2.5 bg-[var(--fg-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 shadow-sm transition-colors"
                     >
                       {t('onboarding.enterLibrary')}
                     </button>
@@ -357,23 +363,23 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
             <button
               onClick={prev}
               disabled={step === 0}
-              className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-0 transition-opacity"
+              className="px-4 py-2 text-sm text-[var(--fg-text-tertiary)] hover:text-[var(--fg-text-primary)] disabled:opacity-0 transition-opacity"
             >
               {t('onboarding.prev')}
             </button>
-            <span className="text-xs text-gray-300 self-center">
+            <span className="text-xs text-[var(--fg-text-tertiary)] self-center">
               {step + 1} / {total}
             </span>
             <button
               onClick={next}
               disabled={step >= total - 2}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-40"
+              className="px-5 py-2 bg-[var(--fg-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-40"
             >
               {step === total - 2 ? '—' : t('onboarding.next')}
             </button>
           </div>
         )}
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   )
 }

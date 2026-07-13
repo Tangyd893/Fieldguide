@@ -4,7 +4,8 @@
     "version": "v0.2.0"
   },
   "common": {
-    "browseFolder": "瀏覽…"
+    "browseFolder": "瀏覽…",
+    "close": "關閉"
   },
   "tabs": {
     "library": "專案庫",
@@ -40,7 +41,20 @@
       "stale": "原始碼已更新"
     },
     "nodes": "{{count}} 個節點",
-    "indexedAt": "索引於 {{date}}"
+    "indexedAt": "索引於 {{date}}",
+    "updateIndex": "更新",
+    "indexBtn": "索引",
+    "analyzeDiff": "分析",
+    "fullReindex": "全量",
+    "analyzing": "分析中…",
+    "diffTitle": "變更影響分析",
+    "deleteConfirm": "確定刪除專案「{{name}}」？\n此操作僅刪除紀錄，不會刪除原始碼檔案。",
+    "fullReindexConfirm": "確定對「{{name}}」執行全量重建索引？\n這將忽略已有快取重新分析所有檔案。",
+    "addFailed": "加入失敗",
+    "analyzeFailed": "分析失敗",
+    "deleteFailed": "刪除失敗",
+    "noChanges": "未檢測到檔案變更。",
+    "analyzeDone": "分析完成。"
   },
   "codeMap": {
     "noProject": "請先在專案庫中加入專案",
@@ -54,6 +68,11 @@
     "readError": "讀取失敗",
     "nodeSearchPlaceholder": "搜尋函式、類別…"
   },
+  "fileTree": {
+    "openFile": "開啟檔案",
+    "copyPath": "複製路徑",
+    "revealInExplorer": "在檔案總管中開啟"
+  },
   "index": {
     "phase": {
       "scan": "正在掃描檔案…",
@@ -65,15 +84,122 @@
   },
   "chat": {
     "title": "AI 問答",
-    "placeholder": "輸入問題，基於專案圖譜與論文庫智慧回答"
+    "placeholder": "輸入問題，基於專案圖譜與論文庫智慧回答",
+    "send": "傳送",
+    "welcome": "你好！我是 Fieldguide AI 助手。我可以幫你理解程式碼結構。",
+    "welcomeWithProject": "你好！我是 Fieldguide AI 助手。我可以幫你理解「{{name}}」的程式碼結構。\n\n試試問我：\n- 這個專案的入口在哪裡？\n- 認證邏輯是怎麼實作的？\n- 有哪些核心模組？",
+    "noProject": "你好！請先在專案庫中選擇一個專案，然後我可以幫你分析程式碼。",
+    "noReply": "（未獲得回覆）",
+    "close": "關閉",
+    "requestFailed": "請求失敗"
+  },
+  "commandPalette": {
+    "placeholder": "搜尋命令、檔案或節點…",
+    "noMatch": "無符合命令",
+    "jump": "跳轉"
   },
   "theory": {
     "title": "理論學習",
-    "desc": "搜尋 arXiv 論文，收藏至本機論文庫，與程式碼對照學習"
+    "desc": "搜尋 arXiv 論文，收藏至本機論文庫，與程式碼對照學習",
+    "myPapers": "我的論文",
+    "search": "搜尋",
+    "searchBtn": "搜尋",
+    "searchPlaceholder": "搜尋 arXiv… (RAG, transformer, code generation)",
+    "searching": "搜尋中…",
+    "noResults": "未找到相關論文",
+    "libraryEmpty": "論文庫為空",
+    "libraryEmptyHint": "搜尋 arXiv 並收藏感興趣的論文",
+    "saved": "已收藏",
+    "save": "收藏",
+    "hasNotes": "有筆記",
+    "backToLibrary": "← 返回論文庫",
+    "readPdf": "閱讀 PDF",
+    "downloadPdf": "下載 PDF",
+    "downloading": "下載中…",
+    "notes": "筆記",
+    "notesPlaceholder": "記錄你的想法、與程式碼的關聯…",
+    "notesAutoSave": "筆記自動儲存到此論文",
+    "saveNotes": "儲存筆記",
+    "deletePaper": "刪除此論文"
   },
   "bridge": {
     "title": "概念橋接",
-    "desc": "論文段落 ↔ 程式碼節點，AI 輔助解釋關聯"
+    "desc": "論文段落 ↔ 程式碼節點，AI 輔助解釋關聯",
+    "conceptBridge": "概念橋接",
+    "paperList": "論文列表",
+    "linksSummary": "{{links}} 條關聯 · {{papers}} 篇論文",
+    "generateTour": "產生對照 Tour",
+    "generating": "產生中…",
+    "generateTourHint": "建議至少 3 條橋接關係以產生有意義的對照 Tour",
+    "generateTourTitle": "產生論文↔程式碼交替對照 Tour",
+    "noLinksFound": "沒有找到橋接關係。",
+    "tourGenerated": "Tour 已產生，請在程式碼地圖中檢視。",
+    "generateFailed": "產生失敗",
+    "aiExplainPrefix": "AI 解釋:",
+    "aiExplainTitle": "AI 解釋關聯",
+    "unknownAuthor": "未知作者",
+    "noPapers": "暫無論文",
+    "noPapersHint": "請先在「理論」Tab 中搜尋並儲存 arXiv 論文，然後回到此處建立橋接。",
+    "noProject": "概念橋接",
+    "noProjectHint": "請先在專案庫中選擇一個專案，以瀏覽和建立論文與程式碼的橋接關聯。",
+    "selectPaper": "選擇論文",
+    "selectPaperTitle": "概念橋接",
+    "selectPaperHint": "從左側選擇一篇論文，檢視和建立它與程式碼節點之間的關聯。",
+    "tourResult": "對照 Tour",
+    "tourResultSteps": "對照 Tour ({{count}} 步)",
+    "tourResultHint": "Tour 已寫入圖譜。切換到「程式碼地圖」Tab，點擊 Tour 面板即可跟隨導覽。",
+    "close": "關閉",
+    "addLink": "+ 關聯程式碼節點",
+    "cancel": "取消",
+    "loading": "載入中…",
+    "noLinks": "尚未關聯程式碼節點。點擊上方按鈕建立關聯。",
+    "searchNodes": "搜尋程式碼節點",
+    "aiSuggest": "AI 推薦",
+    "analyzing": "分析中…",
+    "noMatch": "未找到符合節點",
+    "aiRecommended": "AI 推薦",
+    "anchorLabel": "關聯的論文段落",
+    "anchorPlaceholder": "如: Section 3.2 介紹了 splitter 演算法…",
+    "noteLabel": "備註",
+    "notePlaceholder": "如: 該函式實作了論文中的 splitter",
+    "linking": "關聯中…",
+    "linkTo": "關聯到「{{name}}」"
+  },
+  "graph": {
+    "overview": "總覽"
+  },
+  "tour": {
+    "noTours": "暫無導覽",
+    "noToursHint": "索引專案並啟用 LLM 分析後可產生 Tour",
+    "steps": "{{count}} 步",
+    "nodesCount": "{{count}} 個節點",
+    "playInDashboard": "在 Dashboard 中播放 Tour"
+  },
+  "pdf": {
+    "title": "PDF 閱讀器",
+    "bridgeAsText": "作為橋接文字",
+    "bridge": "橋接",
+    "pageOf": "第 {{current}} / {{total}} 頁",
+    "prevPage": "上一頁",
+    "nextPage": "下一頁",
+    "goTo": "跳轉",
+    "selectedText": "已選取文字:",
+    "cancelSelection": "取消選取",
+    "closeReader": "關閉閱讀器",
+    "loading": "載入 PDF…",
+    "loadFailed": "PDF 載入失敗"
+  },
+  "cost": {
+    "title": "索引「{{name}}」",
+    "modeSelect": "選擇索引模式",
+    "loading": "載入專案統計…",
+    "sourceFiles": "原始檔",
+    "structNodes": "結構節點（已有）",
+    "llmHint": "LLM 分析將為程式碼節點產生摘要、架構分層和引導 Tour。",
+    "estTokens": "預估消耗 ~{{tokens}} tokens（約 ¥{{cost}}）",
+    "fullIndex": "完整索引（含 LLM 分析）",
+    "staticOnly": "僅靜態索引（跳過摘要與 Tour）",
+    "cancel": "取消"
   },
   "status": {
     "ready": "就緒",
@@ -132,11 +258,11 @@
     "projectRootDesc": "Git clone 和 Demo 專案將預設存放於此目錄下。後續可在設定中修改。",
     "projectRootHint": "可留空，後續加入專案時手動選擇目錄。",
     "startTitle": "如何開始？",
-    "demoTitle": "🎯 體驗 Demo 專案",
+    "demoTitle": "體驗 Demo 專案",
     "demoDesc": "使用內建 Go 範例專案，無需網路，立即可瀏覽圖譜",
-    "localTitle": "📁 開啟本機專案",
+    "localTitle": "開啟本機專案",
     "localDesc": "選擇已有程式碼倉庫並開始索引",
-    "skipTitle": "⏭ 稍後再說",
+    "skipTitle": "稍後再說",
     "skipDesc": "直接進入專案庫，隨時可加入專案",
     "settingUp": "正在準備專案…",
     "indexing": "正在索引專案",
@@ -146,8 +272,8 @@
     "completeNodes": "索引完成，共 {{count}} 個節點。",
     "completeTourHint": "建議跟隨 Intro Tour 了解專案的主鏈路。",
     "completeNoNodes": "專案已就緒。建議在程式碼地圖中跟隨 Intro Tour 了解專案結構。",
-    "openCodeMap": "🗺️ 開啟程式碼地圖",
-    "stayLibrary": "📚 留在專案庫",
+    "openCodeMap": "開啟程式碼地圖",
+    "stayLibrary": "留在專案庫",
     "errorTitle": "設定遇到問題",
     "errorHint": "專案準備失敗，請檢查網路或路徑後重試。",
     "enterLibrary": "進入專案庫",

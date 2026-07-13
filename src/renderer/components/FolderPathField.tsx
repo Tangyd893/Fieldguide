@@ -1,6 +1,7 @@
 /**
  * Path input with native folder picker — used in onboarding, settings, project library.
  */
+import { FolderOpen } from 'lucide-react'
 interface Props {
   value: string
   onChange: (value: string) => void
@@ -37,16 +38,17 @@ export default function FolderPathField({
         placeholder={placeholder}
         disabled={disabled}
         autoFocus={autoFocus}
-        className="fg-input flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="fg-input flex-1 min-w-0 px-3 py-2 border border-[var(--fg-input-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]"
       />
       <button
         type="button"
         onClick={browse}
         disabled={disabled}
-        className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 transition-colors"
+        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 border border-[var(--fg-input-border)] rounded-lg text-sm font-medium text-[var(--fg-text-secondary)] bg-[var(--fg-tree-hover)] hover:bg-[var(--fg-input-border)] disabled:opacity-40 transition-colors"
         title={browseLabel}
       >
-        📁 {browseLabel}
+        <FolderOpen size={14} />
+        {browseLabel}
       </button>
     </div>
   )
