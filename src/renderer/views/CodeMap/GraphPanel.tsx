@@ -48,6 +48,8 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
   const [activeLayer, setActiveLayer] = useState<string | null>(null)
   const [iframeLoading, setIframeLoading] = useState(true)
 
+  const [graphEmpty, setGraphEmpty] = useState(false)
+
   const idxProgress = useIndexProgress(projectId)
   const prevComplete = useRef(false)
   useEffect(() => {
@@ -108,8 +110,39 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
     }).catch(() => { /* layers are optional */ })
   }, [projectId, iframeKey])
 
+  useEffect(() => {
+    if (!projectId) {
+      setGraphEmpty(false)
+      return
+    }
+    window.fieldguide.graphGet?.(projectId).then((result) => {
+      if (result.ok && result.data) {
+        const graph = result.data as { nodes?: unknown[] }
+        setGraphEmpty(!graph.nodes?.length)
+      } else {
+        setGraphEmpty(true)
+      }
+    }).catch(() => setGraphEmpty(true))
+  }, [projectId, iframeKey])
+
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.dashboardLoading')}</div>
   if (!dashboardUrl) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.dashboardUnavailable')}</div>
+  if (idxProgress.isIndexing) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-2 text-[var(--fg-text-tertiary)] text-sm bg-[var(--fg-bg)]" data-fg-surface>
+        <div className="w-8 h-8 border-2 border-[var(--fg-accent)] border-t-transparent rounded-full animate-spin" />
+        <span>{t('codeMap.graphIndexing')}</span>
+      </div>
+    )
+  }
+  if (graphEmpty) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-2 px-6 text-center bg-[var(--fg-bg)]" data-fg-surface>
+        <p className="text-sm text-[var(--fg-text-secondary)]">{t('codeMap.graphEmpty')}</p>
+        <p className="text-xs text-[var(--fg-text-tertiary)]">{t('codeMap.graphEmptyHint')}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full flex flex-col relative bg-[var(--fg-bg)]" data-fg-surface>

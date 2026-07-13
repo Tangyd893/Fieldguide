@@ -25,6 +25,7 @@ import { useWorkspaceLayout } from './hooks/useWorkspaceLayout'
 import { useIndexProgress, progressPercent } from './hooks/useIndexProgress'
 import { useDashboardThemeSync } from './hooks/useDashboardThemeSync'
 import { syncDashboardTheme } from './lib/dashboard-theme'
+import { postToDashboard } from './lib/dashboard-bridge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -90,6 +91,36 @@ export default function App() {
   const { toasts, removeToast } = useToast()
 
   useDashboardThemeSync()
+
+  // Diff overlay → Dashboard iframe
+  useEffect(() => {
+    const unsub = window.fieldguide.onDiffResult?.((data) => {
+      const payload = data as { changedNodeIds?: string[]; affectedNodeIds?: string[] }
+      postToDashboard({
+        type: 'setDiffOverlay',
+        changed: payload.changedNodeIds ?? [],
+        affected: payload.affectedNodeIds ?? [],
+      })
+    })
+    return () => unsub?.()
+  }, [])
+
+  // System menu → renderer actions
+  useEffect(() => {
+    const unsubFolder = window.fieldguide.onMenuOpenProjectsFolder?.(() => {
+      window.fieldguide.configGet().then((r) => {
+        if (r.ok && r.data) {
+          const root = (r.data as Record<string, unknown>).projectsRoot as string
+          if (root) window.fieldguide.openFile(root).catch(() => {})
+        }
+      })
+    })
+    const unsubAbout = window.fieldguide.onMenuAbout?.(() => setShowAbout(true))
+    return () => {
+      unsubFolder?.()
+      unsubAbout?.()
+    }
+  }, [])
 
   // Apply saved theme on mount
   useEffect(() => {
@@ -289,14 +320,14 @@ export default function App() {
 
   // Command palette commands
   const commands = [
-    { id: 'library', label: '项目库', shortcut: 'Tab', action: () => setActiveTab('library') },
+    { id: 'library', label: t('commandPalette.library'), shortcut: 'Tab', action: () => setActiveTab('library') },
     ...(selectedProject ? [
-      { id: 'reindex', label: `重新索引: ${selectedProject.name}`, action: handleReIndex },
-      { id: 'codemap', label: '代码地图', shortcut: 'Tab', action: () => setActiveTab('codemap') },
-      { id: 'openFolder', label: `在资源管理器打开项目`, action: () => window.fieldguide.openInExplorer(selectedProject.id, '.') },
+      { id: 'reindex', label: t('commandPalette.reindex', { name: selectedProject.name }), action: handleReIndex },
+      { id: 'codemap', label: t('commandPalette.codemap'), shortcut: 'Tab', action: () => setActiveTab('codemap') },
+      { id: 'openFolder', label: t('commandPalette.openFolder'), action: () => window.fieldguide.openInExplorer(selectedProject.id, '.') },
     ] : []),
-    { id: 'settings', label: '打开设置', action: () => setShowSettings(true) },
-    { id: 'toggleTheme', label: '切换主题 (亮/暗)', action: () => {
+    { id: 'settings', label: t('commandPalette.settings'), action: () => setShowSettings(true) },
+    { id: 'toggleTheme', label: t('commandPalette.toggleTheme'), action: () => {
       const current = document.documentElement.dataset.theme
       const next = current === 'dark' ? 'light' : 'dark'
       const preset = document.documentElement.dataset.themePreset
@@ -658,7 +689,7 @@ function StatusBar({ project, t, indexProgress }: {
         ) : error ? (
           <span className="text-[var(--fg-status-error)]">{error}</span>
         ) : (
-          <span className="text-[var(--fg-text-tertiary)]">{project ? project.status : t('status.ready')}</span>
+          <span className="text-[var(--fg-text-tertiary)]">{project ? t(`project.status.${project.status}`) : t('status.ready')}</span>
         )}
         {project?.node_count ? <span className="text-[var(--fg-text-tertiary)]">· {t('status.nodes', { count: project.node_count })}</span> : null}
         {project ? <span className="text-[var(--fg-text-tertiary)]">· {project.name}</span> : null}

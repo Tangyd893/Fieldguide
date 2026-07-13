@@ -16,7 +16,9 @@
   "panels": {
     "graph": "图谱",
     "code": "代码",
-    "chat": "问答"
+    "chat": "问答",
+    "tour": "导览",
+    "tourUnavailable": "导览不可用"
   },
   "project": {
     "emptyTitle": "添加你的第一个项目",
@@ -60,6 +62,9 @@
     "noProject": "请先在项目库中添加项目",
     "dashboardLoading": "加载图谱…",
     "dashboardUnavailable": "图谱暂不可用 — 请确认 UA Dashboard 已构建",
+    "graphEmpty": "尚无知识图谱",
+    "graphEmptyHint": "请在项目库中索引此项目以生成图谱。",
+    "graphIndexing": "正在构建知识图谱…",
     "fileTreeSearch": "搜索文件…",
     "noFiles": "无匹配文件",
     "loading": "加载中…",
@@ -71,7 +76,8 @@
   "fileTree": {
     "openFile": "打开文件",
     "copyPath": "复制路径",
-    "revealInExplorer": "在资源管理器打开"
+    "revealInExplorer": "在资源管理器打开",
+    "loadError": "加载文件树失败"
   },
   "index": {
     "phase": {
@@ -96,7 +102,20 @@
   "commandPalette": {
     "placeholder": "搜索命令、文件或节点…",
     "noMatch": "无匹配命令",
-    "jump": "跳转"
+    "jump": "跳转",
+    "library": "项目库",
+    "reindex": "重新索引: {{name}}",
+    "codemap": "代码地图",
+    "openFolder": "在资源管理器打开项目",
+    "settings": "打开设置",
+    "toggleTheme": "切换主题 (亮/暗)"
+  },
+  "split": {
+    "resizeHint": "拖拽调整 · 双击恢复均分",
+    "singlePanel": "单面板",
+    "horizontal": "左右分屏",
+    "vertical": "上下分屏",
+    "swap": "交换面板"
   },
   "theory": {
     "title": "理论学习",

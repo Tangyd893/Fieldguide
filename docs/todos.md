@@ -1,13 +1,90 @@
 # Fieldguide 待办清单
 
-> 最后更新：2026-07-12（收尾完成，待验收）  
-> 来源：主题 v2 + i18n/emoji 收尾 + README/roadmap 同步  
-> 相对完整路线图约 **96–98%**；用户可感知闭环约 **92%**；**视觉/交互质感 ~95%**；Phase 4 可发布约 **55%**（差人工验收）
+> 最后更新：2026-07-13（Obsidian 壳层已提交 + P0 核心体验修复）  
+> 来源：用户反馈（his-go 文件树 / 图谱桥接 / 系统菜单 i18n）+ Obsidian 壳层 polish  
+> 相对完整路线图约 **96–98%**；用户可感知闭环约 **94%**；**视觉/交互质感 ~96%**；Phase 4 可发布约 **55%**（差人工验收）  
 > 产品分阶段任务见 [roadmap.md](./roadmap.md)；界面规格见 [ui-spec.md](./ui-spec.md)；本文跟踪**下一步工程待办**。
 
 ---
 
-## 当前快照
+## 当前快照（2026-07-13）
+
+| Phase | 完成度 | 备注 |
+|-------|--------|------|
+| 0 设计 + Spike | 100% | 文档与 UA 集成 Spike 已通过 |
+| 1 桌面壳 + UA | ~100% | 文件树深度/gitignore 对齐；图谱桥接补全；Electron 菜单三语 |
+| 2 智能层 | ~95% | diff overlay 已转发至 Dashboard iframe |
+| 3 理论 + 桥接 | ~90% | 桥接 + RAG + 对照 Tour + PDF 阅读器均已接线 |
+| 4 发布 | ~55% | 安装包可构建；**待人工验收**（`ux-visual-regression` + `p4-release`） |
+| **UX 质感** | **~96%** | Obsidian 壳层 polish 已提交（`f353d6a`）；P0 体验修复已落地 |
+
+**基线验证**（2026-07-13）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（53 passed / 2 skipped）
+
+**最近提交**：`f353d6a` — Obsidian 壳层 polish（modal scrim、设置布局、统一 Dialog、`clean:dist`）
+
+### 用户场景完成度（相对 product-spec）
+
+| 场景 | 完成度 | 主要缺口 |
+|------|--------|----------|
+| A 读懂新项目 | ~94% | his-go 等深层 `.go` 文件树已修复；30 分钟用户自测未验收 |
+| B 论文↔实现 | ~92% | 功能齐；用户自测未做 |
+| C 影响评估 | ~93% | diff 高亮已接线至 Dashboard；需 his-go 实测 |
+| 可发布产品 | ~55% | 干净机器安装包 + 30 分钟用户自测待做 |
+
+---
+
+## 推进顺序（总览）
+
+```mermaid
+flowchart TD
+  done1[Obsidian 壳层 polish 已提交]
+  done2[P0 文件树 / 图谱 / 菜单 i18n]
+  p4[Phase 4 人工验收 + 发布]
+  p1opt[P1 壳层 i18n 尾项 已完成]
+  defer[延后: 设置左侧导航 / Dashboard 深度主题统一]
+  done1 --> done2 --> p1opt --> p4
+  p4 --> defer
+```
+
+---
+
+## P0 — 核心体验修复（2026-07-13 用户反馈 · ✅ 已完成）
+
+> **背景**：his-go `backend-api-auth` 及同级 `.go` 不可见；图谱点击无跳转；Electron 顶部 File/Edit 菜单不随语言切换。
+
+- [x] **p0-filetree** · 文件树与 UA 扫描对齐  
+  - [`src/main/file-tree.ts`](../src/main/file-tree.ts)：`maxDepth` 8、节点上限 2000  
+  - 新建 [`src/main/project-ignore.ts`](../src/main/project-ignore.ts)：共享 `IGNORE_DIRS` + UA `createIgnoreFilter` / `.gitignore` 回退  
+  - [`FileTree.tsx`](../src/renderer/views/CodeMap/FileTree.tsx)：IPC 错误提示；`cmd`/`internal`/`services` 等自动展开  
+  - 单测：[`src/main/__tests__/file-tree.test.ts`](../src/main/__tests__/file-tree.test.ts)  
+  - 验收：以 his-go 为项目根 → `backend-api-auth` 及深层 `.go` 可见
+
+- [x] **p0-graph-bridge** · 图谱桥接补全  
+  - [`src/main/ua/dashboard.ts`](../src/main/ua/dashboard.ts)：`setTheme` / `setChromeless`；`nodeSelected` 携带 `nodeId`（store 轮询）  
+  - [`App.tsx`](../src/renderer/App.tsx)：`diff:result` → `postToDashboard(setDiffOverlay)`  
+  - [`GraphPanel.tsx`](../src/renderer/views/CodeMap/GraphPanel.tsx)：空图 / 索引中 / Dashboard 不可用三态占位  
+  - 验收：点击图谱节点 → 左侧打开对应文件；diff 分析后节点高亮
+
+- [x] **p0-menu-i18n** · Electron 系统菜单三语  
+  - 新建 [`src/main/menu.ts`](../src/main/menu.ts)；[`index.ts`](../src/main/index.ts) 启动时应用；`config:set` 切换语言时重建  
+  - 验收：设置 zh-CN / en-US 后顶部 **文件/编辑/视图** 同步切换
+
+- [x] **p1-shell-i18n** · 壳层 i18n 尾项（同批完成）  
+  - [`SplitPanel.tsx`](../src/renderer/views/CodeMap/SplitPanel.tsx) 分屏控件 + Tour Tab  
+  - [`App.tsx`](../src/renderer/App.tsx) 命令面板 + 状态栏 `project.status.*`  
+  - locale：`split.*` `commandPalette.*` `panels.tour` `fileTree.loadError` `codeMap.graphEmpty*`
+
+### 下一步（P1 → Phase 4）
+
+- [ ] **p4-manual-qa** · 按 [`ux-visual-regression.md`](./ux-visual-regression.md) + [`p4-release-checklist.md`](./p4-release-checklist.md) 人工验收  
+- [ ] **p4-his-go-smoke** · his-go 全链路：索引 → 文件树 → 图谱点击 → diff 高亮  
+- [ ] **p4-packaged-dashboard** · `pnpm dist` 前确认 UA Dashboard `dist` 已构建并打入 `extraResources`  
+- [ ] **ux-settings-left-nav** · Obsidian 式设置左侧导航（延后，非阻断发布）  
+- [ ] **ux-dashboard-theme-deep** · Dashboard 与壳层 CSS 变量深度统一（延后）
+
+---
+
+## 历史快照（2026-07-12）
 
 | Phase | 完成度 | 备注 |
 |-------|--------|------|
@@ -20,9 +97,9 @@
 
 **基线验证**（2026-07-12）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（47 passed / 2 skipped）
 
-**状态**：代码收尾已完成，工作区待 commit，**请你验收**
+**状态**：Obsidian Phase A–D 已于 `f353d6a` 提交
 
-### 用户场景完成度（相对 product-spec）
+### 用户场景完成度（2026-07-12）
 
 | 场景 | 完成度 | 主要缺口 |
 |------|--------|----------|
@@ -38,7 +115,7 @@
 ### P0 — Obsidian 对齐 UX（2026-07-10 方案 · Phase A–D ✅ 2026-07-10）
 
 > **目标**：默认羊皮纸质感、精致侧栏与滚动条、界面缩放、活动面板文件路由、IDE 式索引进度。  
-> **状态**：代码侧 Phase A–D + 主题 v2 **已在工作区完成、未提交**；Phase E 文档部分完成（ui-spec ✅ / README·roadmap ⬜）。
+> **状态**：Phase A–D + 主题 v2 + Obsidian 壳层 polish **已提交**（`f353d6a`）；P0 核心体验修复见文首 **2026-07-13** 区块。
 > **分屏策略（已定）**：见 **ux-split-policy** — 双栏默认**左代码 / 右图谱**，可配置且持久化，不写死。
 
 #### Phase A — 设计系统与默认主题（Week 1）

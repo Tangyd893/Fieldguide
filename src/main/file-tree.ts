@@ -1,39 +1,43 @@
 /**
  * Read a project's directory tree for the file explorer.
- *
- * Returns a flat list of entries with depth/parent info,
- * so the renderer can build the tree UI.
  */
 import { readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import {
+  BINARY_EXTS,
+  IGNORE_DIRS,
+  type ProjectIgnoreFilter,
+} from './project-ignore'
 
 export interface FileEntry {
   name: string
-  path: string       // relative to project root
+  path: string
   isDirectory: boolean
   size: number
   children?: FileEntry[]
 }
 
-const IGNORE_DIRS = new Set([
-  '.git', 'node_modules', '.understand-anything', 'vendor',
-  '__pycache__', '.venv', 'dist', 'build', 'out', '.next',
-  'target', '.turbo', '.cache', '.idea', '.vscode',
-])
+export interface ReadProjectTreeOptions {
+  maxDepth?: number
+  maxNodes?: number
+  ignoreFilter?: ProjectIgnoreFilter
+}
 
-const BINARY_EXTS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg',
-  '.woff', '.woff2', '.ttf', '.eot',
-  '.exe', '.dll', '.so', '.dylib',
-  '.zip', '.tar', '.gz', '.7z',
-  '.pdf', '.doc', '.docx',
-])
+const DEFAULT_MAX_DEPTH = 8
+const DEFAULT_MAX_NODES = 2000
 
-export function readProjectTree(rootPath: string, maxDepth = 3): FileEntry[] {
-  const result: FileEntry[] = []
+export function readProjectTree(
+  rootPath: string,
+  options: ReadProjectTreeOptions = {},
+): FileEntry[] {
+  const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH
+  const maxNodes = options.maxNodes ?? DEFAULT_MAX_NODES
+  const ignoreFilter = options.ignoreFilter ?? { ignores: () => false }
+  let nodeCount = 0
+  let truncated = false
 
   function walk(currentPath: string, depth: number): FileEntry[] {
-    if (depth > maxDepth) return []
+    if (depth > maxDepth || truncated) return []
 
     let entries: string[]
     try {
@@ -42,7 +46,6 @@ export function readProjectTree(rootPath: string, maxDepth = 3): FileEntry[] {
       return []
     }
 
-    // Sort: directories first, then files, both alphabetically
     entries.sort((a, b) => {
       const aIsDir = statSync(join(currentPath, a), { throwIfNoEntry: false })?.isDirectory() ?? false
       const bIsDir = statSync(join(currentPath, b), { throwIfNoEntry: false })?.isDirectory() ?? false
@@ -54,6 +57,7 @@ export function readProjectTree(rootPath: string, maxDepth = 3): FileEntry[] {
     const children: FileEntry[] = []
 
     for (const entry of entries) {
+      if (truncated) break
       if (entry.startsWith('.')) continue
       if (IGNORE_DIRS.has(entry)) continue
 
@@ -66,8 +70,15 @@ export function readProjectTree(rootPath: string, maxDepth = 3): FileEntry[] {
       }
 
       const relPath = relative(rootPath, fullPath).replace(/\\/g, '/')
+      if (ignoreFilter.ignores(relPath)) continue
 
       if (st.isDirectory()) {
+        nodeCount++
+        if (nodeCount > maxNodes) {
+          truncated = true
+          break
+        }
+
         const child: FileEntry = {
           name: entry,
           path: relPath,
@@ -80,8 +91,14 @@ export function readProjectTree(rootPath: string, maxDepth = 3): FileEntry[] {
         }
         children.push(child)
       } else if (st.isFile()) {
-        const ext = entry.split('.').pop()?.toLowerCase() ?? ''
-        if (BINARY_EXTS.has(`.${ext}`)) continue
+        const ext = entry.includes('.') ? `.${entry.split('.').pop()?.toLowerCase() ?? ''}` : ''
+        if (BINARY_EXTS.has(ext)) continue
+
+        nodeCount++
+        if (nodeCount > maxNodes) {
+          truncated = true
+          break
+        }
 
         children.push({
           name: entry,

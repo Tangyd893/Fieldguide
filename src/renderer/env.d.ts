@@ -86,6 +86,8 @@ interface FieldguideAPI {
   // Diff
   diffAnalyze(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   onDiffResult(cb: (data: unknown) => void): () => void
+  onMenuOpenProjectsFolder(cb: () => void): () => void
+  onMenuAbout(cb: () => void): () => void
 
   // Bridge Tour
   bridgeGenerateTour(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>

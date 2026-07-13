@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog } from 'electron'
 import { registerDashboardProtocol } from './ua/dashboard'
 import { createWindow } from './window'
 import { logError } from './logger'
+import { loadConfig } from './config'
+import { setApplicationMenu } from './menu'
 
 // Side-effect import: registers all IPC handlers
 import './ipc/index'
@@ -22,6 +24,8 @@ if (!gotSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
+  setApplicationMenu(loadConfig().locale)
+
   let dashboardUrl = ''
   try {
     dashboardUrl = registerDashboardProtocol()

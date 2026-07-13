@@ -108,6 +108,21 @@ const api = {
     }
   },
 
+  onMenuOpenProjectsFolder: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('menu:openProjectsFolder', handler)
+    return () => {
+      ipcRenderer.removeListener('menu:openProjectsFolder', handler)
+    }
+  },
+  onMenuAbout: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('menu:about', handler)
+    return () => {
+      ipcRenderer.removeListener('menu:about', handler)
+    }
+  },
+
   // Bridge Tour
   bridgeGenerateTour: (projectId: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('bridge:generateTour', { projectId }),

@@ -19,20 +19,37 @@ interface Props {
   t: (key: string, opts?: Record<string, unknown>) => string
 }
 
+const AUTO_EXPAND_DIRS = new Set(['cmd', 'internal', 'pkg', 'api', 'services', 'backend-api-auth'])
+
+function shouldAutoExpand(name: string, depth: number): boolean {
+  return depth < 1 || (depth <= 2 && AUTO_EXPAND_DIRS.has(name))
+}
+
 export default function FileTree({ projectId, onFileClick, activeFilePath, t }: Props) {
   const [tree, setTree] = useState<FileEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
 
   useEffect(() => { loadTree() }, [projectId])
 
   async function loadTree() {
     setLoading(true)
+    setError(null)
     try {
       const result = await window.fieldguide.fileTree(projectId)
-      if (result.ok && result.data) setTree(result.data as FileEntry[])
-    } catch { /* ignore */ }
-    finally { setLoading(false) }
+      if (result.ok && result.data) {
+        setTree(result.data as FileEntry[])
+      } else {
+        setTree([])
+        setError(result.error?.message ?? t('fileTree.loadError'))
+      }
+    } catch (err) {
+      setTree([])
+      setError(err instanceof Error ? err.message : t('fileTree.loadError'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   function filterTree(entries: FileEntry[], query: string): FileEntry[] {
@@ -58,8 +75,9 @@ export default function FileTree({ projectId, onFileClick, activeFilePath, t }: 
       <ScrollArea className="flex-1">
         <div className="text-sm py-1">
           {loading ? <div className="p-4 text-[var(--fg-text-tertiary)] text-xs">{t('codeMap.loading')}</div>
-            : filtered.length === 0 ? <div className="p-4 text-[var(--fg-text-tertiary)] text-xs">{t('codeMap.noFiles')}</div>
-              : <TreeNodeList entries={filtered} depth={0} onFileClick={onFileClick} activeFilePath={activeFilePath} projectId={projectId} t={t} />}
+            : error ? <div className="p-4 text-[var(--fg-status-error)] text-xs">{error}</div>
+              : filtered.length === 0 ? <div className="p-4 text-[var(--fg-text-tertiary)] text-xs">{t('codeMap.noFiles')}</div>
+                : <TreeNodeList entries={filtered} depth={0} onFileClick={onFileClick} activeFilePath={activeFilePath} projectId={projectId} t={t} />}
         </div>
       </ScrollArea>
     </div>
@@ -77,7 +95,7 @@ function TreeNode({ entry, depth, onFileClick, activeFilePath, projectId, t }: {
   entry: FileEntry; depth: number; onFileClick: (p: string) => void; activeFilePath?: string; projectId: string
   t: (key: string) => string
 }) {
-  const [expanded, setExpanded] = useState(depth < 1)
+  const [expanded, setExpanded] = useState(() => shouldAutoExpand(entry.name, depth))
   const hasChildren = entry.isDirectory && entry.children && entry.children.length > 0
   const isActive = entry.path === activeFilePath
   const pl = 8 + depth * 16

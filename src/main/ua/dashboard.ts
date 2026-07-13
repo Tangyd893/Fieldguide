@@ -147,45 +147,45 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
         case 'drillIntoLayer':
           store.drillIntoLayer(data.layerId);
           break;
+        case 'setTheme':
+          if (data.colors) {
+            var root = document.documentElement;
+            Object.keys(data.colors).forEach(function(key) {
+              root.style.setProperty('--fg-' + key.replace(/([A-Z])/g, '-$1').toLowerCase(), data.colors[key]);
+            });
+            if (data.colors.mode && data.colors.mode !== 'system') {
+              root.dataset.theme = data.colors.mode;
+            }
+            if (data.colors.preset) {
+              root.dataset.themePreset = data.colors.preset;
+            }
+          }
+          break;
+        case 'setChromeless':
+          document.documentElement.classList.toggle('fg-chromeless', !!data.chromeless);
+          var chromeHeader = document.querySelector('header');
+          if (chromeHeader) chromeHeader.style.display = data.chromeless ? 'none' : '';
+          break;
       }
     }
     run();
   });
 
-  // ── Expose store when available (poll for Zustand) ──
-  // We look for the store by intercepting Zustand's createStore
-  var _origCreate = window.__ZUSTAND_ORIGINAL__;
-  var pollInterval = setInterval(function() {
-    // Try to find the store via React internals on the root fiber
-    try {
-      var rootEl = document.getElementById('root');
-      if (!rootEl) return;
-      var fiberKey = Object.keys(rootEl).find(function(k) { return k.startsWith('__reactFiber'); });
-      if (!fiberKey) return;
-      // Walk fiber tree to find a component that uses useDashboardStore
-      function walkFiber(fiber, depth) {
-        if (!fiber || depth > 50) return;
-        if (fiber.memoizedState && fiber.memoizedState.queue) {
-          // This might be a hook state — check if it has store-like methods
-        }
-        walkFiber(fiber.child, depth + 1);
-        walkFiber(fiber.sibling, depth + 1);
-      }
-    } catch(e) {}
-  }, 200);
-
-  // ── Send events to Fieldguide shell on store changes ──
-  // We use a MutationObserver to detect node selection in the sidebar
-  var observer = new MutationObserver(function() {
+  // ── Poll store for node selection changes ──
+  var lastSelectedNodeId = null;
+  setInterval(function() {
     if (window.parent === window) return;
-    // Look for the "NodeInfo" sidebar content
-    var nodeInfo = document.querySelector('[data-testid="node-info"]');
-    if (nodeInfo) {
-      // NodeInfo is rendered when a node is selected
-      window.parent.postMessage({ source: 'ua-dashboard', type: 'nodeSelected' }, '*');
+    var store = window.__uaStore;
+    if (!store || !store.getState) return;
+    var state = store.getState();
+    var nodeId = state.selectedNodeId || state.focusNodeId || null;
+    if (nodeId !== lastSelectedNodeId) {
+      lastSelectedNodeId = nodeId;
+      if (nodeId) {
+        window.parent.postMessage({ source: 'ua-dashboard', type: 'nodeSelected', nodeId: nodeId }, '*');
+      }
     }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+  }, 150);
 })();
 </script>`
 

@@ -16,7 +16,9 @@
   "panels": {
     "graph": "Graph",
     "code": "Code",
-    "chat": "Chat"
+    "chat": "Chat",
+    "tour": "Tour",
+    "tourUnavailable": "Tour is not available"
   },
   "project": {
     "emptyTitle": "Add your first project",
@@ -60,6 +62,9 @@
     "noProject": "Add a project in the library first",
     "dashboardLoading": "Loading graph…",
     "dashboardUnavailable": "Graph unavailable — please build UA Dashboard",
+    "graphEmpty": "No knowledge graph yet",
+    "graphEmptyHint": "Index this project from the library to generate the graph.",
+    "graphIndexing": "Building knowledge graph…",
     "fileTreeSearch": "Search files…",
     "noFiles": "No matching files",
     "loading": "Loading…",
@@ -71,7 +76,8 @@
   "fileTree": {
     "openFile": "Open file",
     "copyPath": "Copy path",
-    "revealInExplorer": "Reveal in Explorer"
+    "revealInExplorer": "Reveal in Explorer",
+    "loadError": "Failed to load file tree"
   },
   "index": {
     "phase": {
@@ -96,7 +102,20 @@
   "commandPalette": {
     "placeholder": "Search commands, files, or nodes…",
     "noMatch": "No matching commands",
-    "jump": "Jump"
+    "jump": "Jump",
+    "library": "Projects",
+    "reindex": "Reindex: {{name}}",
+    "codemap": "Code Map",
+    "openFolder": "Reveal project in Explorer",
+    "settings": "Open settings",
+    "toggleTheme": "Toggle theme (light/dark)"
+  },
+  "split": {
+    "resizeHint": "Drag to resize · double-click to reset",
+    "singlePanel": "Single panel",
+    "horizontal": "Split left/right",
+    "vertical": "Split top/bottom",
+    "swap": "Swap panels"
   },
   "theory": {
     "title": "Theory",

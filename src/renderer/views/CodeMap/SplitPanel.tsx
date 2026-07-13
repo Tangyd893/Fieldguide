@@ -54,7 +54,12 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, render
     document.addEventListener('mouseup', onUp)
   }, [isVertical, setPos])
 
-  const TAB_LABELS: Record<PanelTab, string> = { graph: t('panels.graph'), code: t('panels.code'), chat: t('panels.chat'), tour: 'Tour' }
+  const TAB_LABELS: Record<PanelTab, string> = {
+    graph: t('panels.graph'),
+    code: t('panels.code'),
+    chat: t('panels.chat'),
+    tour: t('panels.tour'),
+  }
 
   function renderContent(panelIndex: number) {
     const panel = panels[panelIndex]
@@ -63,7 +68,7 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, render
       case 'graph': return renderGraph()
       case 'code': return renderCode(panel.filePath)
       case 'chat': return renderChat()
-      case 'tour': return renderTour?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">Tour 不可用</div>
+      case 'tour': return renderTour?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.tourUnavailable')}</div>
     }
   }
 
@@ -79,7 +84,7 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, render
     <div
       onMouseDown={onMouseDown}
       onDoubleClick={restorePanels}
-      title="拖拽调整 · 双击恢复均分"
+      title={t('split.resizeHint')}
       className={cn(
         'group shrink-0 z-10 flex items-center justify-center transition-colors duration-150',
         isVertical
@@ -99,11 +104,11 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, render
   return (
     <div ref={containerRef} className={cn('h-full w-full flex relative', isVertical ? 'flex-col' : 'flex-row')}>
       <div className="absolute top-0 right-0 flex items-center gap-0.5 px-2 py-1 z-20">
-        <Button variant="ghost" size="icon-sm" onClick={() => setNumPanels(1)} title="单面板" className="text-[10px]">▣</Button>
-        <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('horizontal') }} title="左右分屏" className="text-[10px]">◫</Button>
-        <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('vertical') }} title="上下分屏" className="text-[10px]">◰</Button>
+        <Button variant="ghost" size="icon-sm" onClick={() => setNumPanels(1)} title={t('split.singlePanel')} className="text-[10px]">▣</Button>
+        <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('horizontal') }} title={t('split.horizontal')} className="text-[10px]">◫</Button>
+        <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('vertical') }} title={t('split.vertical')} className="text-[10px]">◰</Button>
         {hasTwo && (
-          <Button variant="ghost" size="icon-sm" onClick={swapPanels} title="交换面板" className="text-[10px]">⇄</Button>
+          <Button variant="ghost" size="icon-sm" onClick={swapPanels} title={t('split.swap')} className="text-[10px]">⇄</Button>
         )}
       </div>
 

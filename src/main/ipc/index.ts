@@ -26,6 +26,8 @@ import {
 } from '../db'
 import type { PaperRow } from '../db'
 import { readProjectTree } from '../file-tree'
+import { getProjectIgnoreFilter } from '../project-ignore'
+import { setApplicationMenu } from '../menu'
 import { cloneRepo } from '../git'
 import { installDemoProject } from '../sample-project'
 import { indexProject } from '../ua/client'
@@ -60,7 +62,12 @@ ipcMain.handle('config:get', (): IpcResult<unknown> => {
 
 ipcMain.handle('config:set', (_e, patch: Record<string, unknown>): IpcResult<unknown> => {
   try {
-    return ipcOk(updateConfig(patch as never))
+    const prev = loadConfig()
+    const next = updateConfig(patch as never)
+    if ('locale' in patch && patch.locale !== prev.locale) {
+      setApplicationMenu(next.locale)
+    }
+    return ipcOk(next)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }
@@ -371,11 +378,12 @@ ipcMain.handle('graph:stats', (_e, { projectId }: { projectId: string }): IpcRes
 
 /* ──────────── File Tree & Code ──────────── */
 
-ipcMain.handle('file:tree', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+ipcMain.handle('file:tree', async (_e, { projectId }: { projectId: string }): Promise<IpcResult<unknown>> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
   try {
-    const tree = readProjectTree(project.root_path)
+    const ignoreFilter = await getProjectIgnoreFilter(project.root_path)
+    const tree = readProjectTree(project.root_path, { ignoreFilter })
     return ipcOk(tree)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))

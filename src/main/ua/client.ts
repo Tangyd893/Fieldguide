@@ -15,6 +15,7 @@ import { readdirSync, statSync, readFileSync, existsSync } from 'node:fs'
 import { join, relative, extname, basename } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app } from 'electron'
+import { BINARY_EXTS, IGNORE_DIRS, getProjectIgnoreFilter } from '../project-ignore'
 
 // UA Core imports — loaded dynamically to handle ESM
 let TreeSitterPlugin: any
@@ -134,20 +135,6 @@ function detectLanguage(filePath: string): string {
 
 // ─── File scanner ───
 
-const IGNORE_DIRS = new Set([
-  '.git', 'node_modules', '.understand-anything', 'vendor',
-  '__pycache__', '.venv', 'dist', 'build', 'out', '.next',
-  'target', '.turbo', '.cache', '.idea', '.vscode',
-])
-
-const BINARY_EXTS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg',
-  '.woff', '.woff2', '.ttf', '.eot',
-  '.exe', '.dll', '.so', '.dylib',
-  '.zip', '.tar', '.gz', '.7z',
-  '.pdf', '.doc', '.docx',
-])
-
 interface ScannedFile {
   path: string
   language: string
@@ -163,7 +150,8 @@ export interface ScanResult {
 export async function scanProject(rootPath: string, changedAfter?: string): Promise<ScanResult> {
   await loadCore()
   const files: ScannedFile[] = []
-  const ignoreFilter = createIgnoreFilter?.(rootPath) ?? { ignores: () => false }
+  const uaFilter = createIgnoreFilter?.(rootPath)
+  const ignoreFilter = uaFilter ?? await getProjectIgnoreFilter(rootPath)
 
   walk(rootPath, rootPath, files, ignoreFilter, changedAfter ? new Date(changedAfter) : undefined)
 
