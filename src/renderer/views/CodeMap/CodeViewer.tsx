@@ -37,7 +37,10 @@ export default function CodeViewer({ projectId, filePath, t }: Props) {
         <span className="flex-1" />
         <span>{t('codeMap.lines', { count: lines.length })}</span>
       </div>
-      <div className="font-mono text-[13px] leading-5" style={{ fontFamily: 'var(--fg-font-mono)' }}>
+      <div
+        className="font-mono leading-5"
+        style={{ fontFamily: 'var(--fg-font-mono)', fontSize: 'var(--fg-mono-font-size, 13px)' }}
+      >
         {lines.map((line, i) => (
           <div key={i} className="flex hover:bg-[var(--fg-accent-muted)]/30 group">
             <span className="w-12 flex-shrink-0 text-right pr-3 text-[var(--fg-text-tertiary)] select-none text-xs leading-5 py-px border-r border-[var(--fg-border)]">

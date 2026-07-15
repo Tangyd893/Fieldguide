@@ -15,7 +15,25 @@ import { readdirSync, statSync, readFileSync, existsSync } from 'node:fs'
 import { join, relative, extname, basename } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app } from 'electron'
-import { BINARY_EXTS, IGNORE_DIRS, getProjectIgnoreFilter } from '../project-ignore'
+import { BINARY_EXTS, IGNORE_DIRS, getProjectIgnoreFilter, normalizeIgnoreFilter } from '../project-ignore'
+
+let indexAbortController: AbortController | null = null
+
+export function beginIndex(): AbortSignal {
+  indexAbortController?.abort()
+  indexAbortController = new AbortController()
+  return indexAbortController.signal
+}
+
+export function cancelIndex(): boolean {
+  if (!indexAbortController) return false
+  indexAbortController.abort()
+  return true
+}
+
+export function isIndexCancelled(): boolean {
+  return indexAbortController?.signal.aborted ?? false
+}
 
 // UA Core imports — loaded dynamically to handle ESM
 let TreeSitterPlugin: any
@@ -151,7 +169,7 @@ export async function scanProject(rootPath: string, changedAfter?: string): Prom
   await loadCore()
   const files: ScannedFile[] = []
   const uaFilter = createIgnoreFilter?.(rootPath)
-  const ignoreFilter = uaFilter ?? await getProjectIgnoreFilter(rootPath)
+  const ignoreFilter = normalizeIgnoreFilter(uaFilter ?? await getProjectIgnoreFilter(rootPath))
 
   walk(rootPath, rootPath, files, ignoreFilter, changedAfter ? new Date(changedAfter) : undefined)
 
@@ -185,7 +203,7 @@ function walk(
     if (IGNORE_DIRS.has(entry)) continue
 
     // Apply UA ignore filter
-    if (ignoreFilter.ignores?.(relPath)) continue
+    if (ignoreFilter.ignores(relPath)) continue
 
     let st: ReturnType<typeof statSync>
     try {
@@ -241,6 +259,7 @@ export async function extractStructure(
   rootPath: string,
   files: ScannedFile[],
   onProgress?: (current: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<ExtractResult> {
   await loadCore()
 
@@ -259,6 +278,7 @@ export async function extractStructure(
   let analyzed = 0
 
   for (const file of codeFiles) {
+    if (signal?.aborted) throw new Error('INDEX_CANCELLED')
     const fullPath = join(rootPath, file.path)
     let content: string
     try {
@@ -505,8 +525,12 @@ export async function indexProject(
   onProgress?: (current: number, total: number) => void,
   incremental?: boolean,
   llmConfig?: LLMEnrichConfig,
+  signal?: AbortSignal,
 ): Promise<IndexResult> {
   try {
+    if (signal?.aborted) {
+      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: 'INDEX_CANCELLED' }
+    }
     // Determine changedAfter for incremental mode
     let changedAfter: string | undefined
     if (incremental) {
@@ -531,7 +555,10 @@ export async function indexProject(
 
     // Phase 2: Extract structure
     onPhase?.('parse')
-    const extractResult = await extractStructure(rootPath, scanResult.files, onProgress)
+    const extractResult = await extractStructure(rootPath, scanResult.files, onProgress, signal)
+    if (signal?.aborted) {
+      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: 'INDEX_CANCELLED' }
+    }
 
     // Phase 3: Build graph
     onPhase?.('build')
@@ -633,12 +660,16 @@ export async function indexProject(
       llmEnriched,
     }
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg === 'INDEX_CANCELLED') {
+      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: 'INDEX_CANCELLED' }
+    }
     return {
       success: false,
       graphPath: '',
       nodeCount: 0,
       edgeCount: 0,
-      error: err instanceof Error ? err.message : String(err),
+      error: msg,
     }
   }
 }

@@ -11,9 +11,11 @@ interface Props {
   renderTour?: () => ReactNode
   t: (key: string) => string
   layout: ReturnType<typeof useWorkspaceLayout>
+  /** When true, layout buttons live in the title bar instead. */
+  hideChromeControls?: boolean
 }
 
-export default function SplitPanel({ renderGraph, renderCode, renderChat, renderTour, t, layout: ctrl }: Props) {
+export default function SplitPanel({ renderGraph, renderCode, renderChat, renderTour, t, layout: ctrl, hideChromeControls }: Props) {
   const {
     layout,
     setActivePanel,
@@ -103,14 +105,16 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, render
 
   return (
     <div ref={containerRef} className={cn('h-full w-full flex relative', isVertical ? 'flex-col' : 'flex-row')}>
-      <div className="absolute top-0 right-0 flex items-center gap-0.5 px-2 py-1 z-20">
-        <Button variant="ghost" size="icon-sm" onClick={() => setNumPanels(1)} title={t('split.singlePanel')} className="text-[10px]">▣</Button>
-        <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('horizontal') }} title={t('split.horizontal')} className="text-[10px]">◫</Button>
-        <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('vertical') }} title={t('split.vertical')} className="text-[10px]">◰</Button>
-        {hasTwo && (
-          <Button variant="ghost" size="icon-sm" onClick={swapPanels} title={t('split.swap')} className="text-[10px]">⇄</Button>
-        )}
-      </div>
+      {!hideChromeControls && (
+        <div className="absolute top-0 right-0 flex items-center gap-0.5 px-2 py-1 z-20">
+          <Button variant="ghost" size="icon-sm" onClick={() => setNumPanels(1)} title={t('split.singlePanel')} className="text-[10px]">▣</Button>
+          <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('horizontal') }} title={t('split.horizontal')} className="text-[10px]">◫</Button>
+          <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('vertical') }} title={t('split.vertical')} className="text-[10px]">◰</Button>
+          {hasTwo && (
+            <Button variant="ghost" size="icon-sm" onClick={swapPanels} title={t('split.swap')} className="text-[10px]">⇄</Button>
+          )}
+        </div>
+      )}
 
       {panels[0] && (
         <PanelChrome

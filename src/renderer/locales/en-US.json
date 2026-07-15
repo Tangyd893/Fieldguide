@@ -11,7 +11,12 @@
     "library": "Projects",
     "codemap": "Code Map",
     "theory": "Theory",
-    "bridge": "Bridge"
+    "bridge": "Bridge",
+    "settings": "Settings"
+  },
+  "titleBar": {
+    "noProject": "No project",
+    "openLibrary": "Open project library…"
   },
   "panels": {
     "graph": "Graph",
@@ -97,7 +102,14 @@
     "noProject": "Please select a project first, then I can help analyze the code.",
     "noReply": "(No response)",
     "close": "Close",
-    "requestFailed": "Request failed"
+    "requestFailed": "Request failed",
+    "clearHistory": "Clear history",
+    "showSteps": "Show reasoning steps ({{count}})",
+    "hideSteps": "Hide reasoning steps",
+    "stepThought": "Thought",
+    "stepAction": "Tool",
+    "stepObservation": "Observation",
+    "stepAnswer": "Answer"
   },
   "commandPalette": {
     "placeholder": "Search commands, files, or nodes…",
@@ -108,7 +120,10 @@
     "codemap": "Code Map",
     "openFolder": "Reveal project in Explorer",
     "settings": "Open settings",
-    "toggleTheme": "Toggle theme (light/dark)"
+    "toggleTheme": "Toggle theme (light/dark)",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomReset": "Reset zoom"
   },
   "split": {
     "resizeHint": "Drag to resize · double-click to reset",
@@ -185,7 +200,12 @@
     "linkTo": "Link to \"{{name}}\""
   },
   "graph": {
-    "overview": "Overview"
+    "overview": "Overview",
+    "viewMode": {
+      "structural": "Structure",
+      "domain": "Domain",
+      "knowledge": "Knowledge"
+    }
   },
   "tour": {
     "noTours": "No tours available",
@@ -202,6 +222,9 @@
     "prevPage": "Previous",
     "nextPage": "Next",
     "goTo": "Go",
+    "saveHighlight": "Save highlight",
+    "savedHighlights": "Saved highlights",
+    "highlightSaved": "Highlight saved",
     "selectedText": "Selected text:",
     "cancelSelection": "Clear selection",
     "closeReader": "Close reader",
@@ -222,7 +245,11 @@
   },
   "status": {
     "ready": "Ready",
-    "nodes": "{{count}} nodes"
+    "nodes": "{{count}} nodes",
+    "cancelIndex": "Cancel indexing",
+    "shellZoom": "UI zoom: {{zoom}}%",
+    "zoom": "Shell {{shell}}% · Graph {{dash}}%",
+    "zoomHint": "Shell and graph zoom are independent — adjust in Settings → Appearance"
   },
   "tooltip": {
     "addProjectFirst": "Add a project first",
@@ -238,11 +265,38 @@
   },
   "settings": {
     "title": "Settings",
+    "subtitle": "Preferences and workspace",
+    "nav": {
+      "general": "General",
+      "appearance": "Appearance",
+      "llm": "Models",
+      "data": "Data & Diagnostics",
+      "about": "About"
+    },
     "llm": "LLM Configuration",
+    "llmHint": "Pick a provider to fill the API base URL, then choose a model",
+    "provider": "Provider",
+    "chatModel": "Model",
+    "customModel": "Custom model name…",
+    "backToModelList": "Back to model list",
+    "baseUrlLocked": "Locked to the provider preset; choose Custom for a free-form URL",
+    "providers": {
+      "deepseek": "DeepSeek",
+      "openai": "OpenAI",
+      "moonshot": "Moonshot Kimi",
+      "siliconflow": "SiliconFlow",
+      "openrouter": "OpenRouter",
+      "ollama": "Ollama (local)",
+      "custom": "Custom / OpenAI-compatible"
+    },
     "projectsRoot": "Projects Root",
+    "projectsRootLabel": "Git clone destination",
     "projectsRootHint": "Git clones will be placed in this directory",
     "language": "Language",
     "theme": "Theme",
+    "themeSystem": "System",
+    "themeLight": "Light",
+    "themeDark": "Dark",
     "themePreset": "Theme Preset",
     "themePreset.parchment": "Parchment",
     "themePreset.forest": "Forest",
@@ -250,6 +304,15 @@
     "themePreset.midnight": "Midnight",
     "themePreset.paper-dark": "Paper Dark",
     "themePreset.none": "None",
+    "shellZoom": "App window zoom",
+    "shellZoomHint": "Affects Fieldguide chrome only (title bar, sidebars, settings). Shortcuts: Ctrl+= / Ctrl+- / Ctrl+0, or Ctrl+scroll",
+    "dashboardZoom": "Graph (Dashboard) zoom",
+    "dashboardZoomHint": "Affects the embedded knowledge-graph iframe only — independent of app zoom",
+    "fonts": "Fonts",
+    "uiFont": "UI font",
+    "monoFont": "Code font",
+    "uiFontSize": "UI font size",
+    "monoFontSize": "Code font size",
     "testConnection": "Test Connection",
     "testing": "Testing…",
     "testSuccess": "Connected",
@@ -260,7 +323,12 @@
     "cancel": "Cancel",
     "diagnostics": "Diagnostics",
     "openLogDir": "Open Log Folder",
-    "viewLogs": "View Logs"
+    "viewLogs": "View Logs",
+    "data": "Data Management",
+    "openDataDir": "Open Data Folder",
+    "clearCache": "Clear Export Cache",
+    "exportGraph": "Export Project Graph",
+    "cacheCleared": "Cleared {{count}} export file(s)"
   },
   "about": {
     "title": "About Fieldguide",

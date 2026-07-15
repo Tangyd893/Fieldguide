@@ -12,6 +12,7 @@ export type IpcErrorCode =
   | 'PARSE_ERROR'
   | 'SOURCE_UNAVAILABLE'
   | 'EMBED_API_ERROR'
+  | 'INDEX_CANCELLED'
   | 'UNKNOWN';
 
 export interface IpcError {

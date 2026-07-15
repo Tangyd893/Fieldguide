@@ -11,6 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.vitest.json --noEmit",
     "test:unit": "vitest run",
     "test:watch": "vitest",
+    "qa:baseline": "node scripts/qa-baseline.mjs",
+    "qa:scenario": "node scripts/scenario-smoke.mjs",
     "clean:dist": "node scripts/clean-dist.mjs",
     "pack": "node scripts/prepare-pack.mjs && electron-vite build && electron-builder --win --config",
     "dist": "node scripts/prepare-pack.mjs && electron-vite build && electron-builder --win --publish never"

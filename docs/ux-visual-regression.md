@@ -70,10 +70,17 @@
 ## 自动化辅助
 
 ```bash
-pnpm typecheck && pnpm test:unit
+pnpm typecheck && pnpm test:unit && pnpm qa:baseline
 ```
 
 主题 token 一致性可由 `src/renderer/theme/__tests__/theme-tokens.test.ts` 校验 `--fg-*` 变量在 presets 中均已定义。
+
+### 已自动化（2026-07-13）
+
+- [x] typecheck 三份 tsconfig
+- [x] vitest 单元 + 集成（graph-reader fixture、agent、IPC handlers）
+- [x] tiny-go / sample-project 图谱 fixture 存在
+- [x] GitHub Actions CI（`.github/workflows/ci.yml`）
 
 ## 验收记录
 

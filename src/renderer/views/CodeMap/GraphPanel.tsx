@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import { useIndexProgress } from '../../hooks/useIndexProgress'
 import {
   type DashboardMessage,
@@ -6,6 +6,7 @@ import {
   postToDashboard,
   dashboardDrillIntoLayer,
   dashboardNavigateToOverview,
+  dashboardSetViewMode,
 } from '@/lib/dashboard-bridge'
 import { syncDashboardTheme } from '@/lib/dashboard-theme'
 
@@ -46,6 +47,7 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
   const [iframeKey, setIframeKey] = useState(0)
   const [layers, setLayers] = useState<LayerInfo[]>([])
   const [activeLayer, setActiveLayer] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'structural' | 'domain' | 'knowledge'>('structural')
   const [iframeLoading, setIframeLoading] = useState(true)
 
   const [graphEmpty, setGraphEmpty] = useState(false)
@@ -146,7 +148,27 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
 
   return (
     <div className="h-full flex flex-col relative bg-[var(--fg-bg)]" data-fg-surface>
-      {layers.length > 0 && (
+      <div className="flex items-center gap-1 px-2 py-1 border-b border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0">
+        {(['structural', 'domain', 'knowledge'] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => {
+              setViewMode(mode)
+              dashboardSetViewMode(mode)
+              if (mode === 'structural') {
+                dashboardNavigateToOverview()
+                setActiveLayer(null)
+              }
+            }}
+            className={`px-2 py-0.5 text-xs rounded-full whitespace-nowrap transition-colors duration-150 ${
+              viewMode === mode ? 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] font-medium' : 'text-[var(--fg-text-secondary)] hover:bg-[var(--fg-tree-hover)]'
+            }`}
+          >
+            {t(`graph.viewMode.${mode}`)}
+          </button>
+        ))}
+      </div>
+      {layers.length > 0 && viewMode === 'structural' && (
         <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0 overflow-x-auto">
           <button
             onClick={() => { dashboardNavigateToOverview(); setActiveLayer(null) }}
@@ -185,14 +207,18 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
         ref={iframeRef}
         key={iframeKey}
         src={dashboardUrl}
-        className="w-full flex-1 border-0 bg-[var(--fg-bg)]"
+        className="w-full flex-1 border-0 bg-[var(--fg-bg)] origin-top-left"
         title="UA Dashboard"
         onLoad={() => {
           setIframeLoading(false)
           syncDashboardTheme()
           postToDashboard({ type: 'setChromeless', chromeless: true })
         }}
-        style={iframeLoading ? { visibility: 'hidden' } : undefined}
+        style={{
+          visibility: iframeLoading ? 'hidden' : undefined,
+          // Chromium CSS zoom — independent of shell rem zoom
+          ...({ zoom: 'var(--fg-dashboard-zoom, 1)' } as CSSProperties),
+        }}
       />
     </div>
   )

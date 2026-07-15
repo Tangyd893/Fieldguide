@@ -12,6 +12,7 @@ interface MenuStrings {
   view: string
   help: string
   openProjectsFolder: string
+  openProject: string
   quit: string
   undo: string
   redo: string
@@ -21,6 +22,9 @@ interface MenuStrings {
   selectAll: string
   reload: string
   toggleDevTools: string
+  zoomIn: string
+  zoomOut: string
+  zoomReset: string
   about: string
 }
 
@@ -30,7 +34,8 @@ const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
     edit: '编辑',
     view: '视图',
     help: '帮助',
-    openProjectsFolder: '打开项目根目录',
+    openProjectsFolder: '在资源管理器中打开项目根目录',
+    openProject: '打开项目…',
     quit: '退出',
     undo: '撤销',
     redo: '重做',
@@ -40,6 +45,9 @@ const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
     selectAll: '全选',
     reload: '重新加载',
     toggleDevTools: '切换开发者工具',
+    zoomIn: '放大',
+    zoomOut: '缩小',
+    zoomReset: '重置缩放',
     about: '关于 Fieldguide',
   },
   'zh-TW': {
@@ -47,7 +55,8 @@ const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
     edit: '編輯',
     view: '檢視',
     help: '說明',
-    openProjectsFolder: '開啟專案根目錄',
+    openProjectsFolder: '在檔案總管開啟專案根目錄',
+    openProject: '開啟專案…',
     quit: '結束',
     undo: '復原',
     redo: '重做',
@@ -57,6 +66,9 @@ const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
     selectAll: '全選',
     reload: '重新載入',
     toggleDevTools: '切換開發者工具',
+    zoomIn: '放大',
+    zoomOut: '縮小',
+    zoomReset: '重設縮放',
     about: '關於 Fieldguide',
   },
   'en-US': {
@@ -64,7 +76,8 @@ const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
     edit: 'Edit',
     view: 'View',
     help: 'Help',
-    openProjectsFolder: 'Open Projects Folder',
+    openProjectsFolder: 'Reveal Projects Root in Explorer',
+    openProject: 'Open Project…',
     quit: 'Quit',
     undo: 'Undo',
     redo: 'Redo',
@@ -74,6 +87,9 @@ const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
     selectAll: 'Select All',
     reload: 'Reload',
     toggleDevTools: 'Toggle Developer Tools',
+    zoomIn: 'Zoom In',
+    zoomOut: 'Zoom Out',
+    zoomReset: 'Reset Zoom',
     about: 'About Fieldguide',
   },
 }
@@ -88,10 +104,16 @@ export function buildApplicationMenu(locale: MenuLocale): Menu {
 
   const fileSubmenu: MenuItemConstructorOptions[] = [
     {
+      label: s.openProject,
+      accelerator: 'CmdOrCtrl+O',
+      click: () => {
+        focusedWindow()?.webContents.send('menu:openProject')
+      },
+    },
+    {
       label: s.openProjectsFolder,
       click: () => {
-        const win = focusedWindow()
-        win?.webContents.send('menu:openProjectsFolder')
+        focusedWindow()?.webContents.send('menu:openProjectsFolder')
       },
     },
     { type: 'separator' },
@@ -121,6 +143,22 @@ export function buildApplicationMenu(locale: MenuLocale): Menu {
       label: s.toggleDevTools,
       accelerator: isMac ? 'Alt+Command+I' : 'Ctrl+Shift+I',
       click: () => focusedWindow()?.webContents.toggleDevTools(),
+    },
+    { type: 'separator' },
+    {
+      label: s.zoomIn,
+      accelerator: 'CmdOrCtrl+=',
+      click: () => focusedWindow()?.webContents.send('menu:zoomIn'),
+    },
+    {
+      label: s.zoomOut,
+      accelerator: 'CmdOrCtrl+-',
+      click: () => focusedWindow()?.webContents.send('menu:zoomOut'),
+    },
+    {
+      label: s.zoomReset,
+      accelerator: 'CmdOrCtrl+0',
+      click: () => focusedWindow()?.webContents.send('menu:zoomReset'),
     },
   ]
 

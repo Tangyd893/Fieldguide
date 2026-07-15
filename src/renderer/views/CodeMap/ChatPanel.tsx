@@ -1,43 +1,88 @@
 /**
- * ChatPanel — LLM 问答面板 (ui-spec §3.2.5)
- * Phase 2: connected to real LLM backend via chat:send IPC.
+ * ChatPanel — ReAct Agent 问答面板 (ui-spec §3.2.5)
  */
 import { useState, useRef, useEffect } from 'react'
+
+interface AgentStep {
+  type: 'thought' | 'action' | 'observation' | 'answer'
+  content: string
+  tool?: string
+}
 
 interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: string
+  steps?: AgentStep[]
+  nodeRefs?: string[]
 }
 
 interface Props {
   t: (key: string, opts?: Record<string, unknown>) => string
   projectId?: string
   projectName?: string
+  onNodeRefClick?: (nodeId: string) => void
 }
 
-export default function ChatPanel({ t, projectId, projectName }: Props) {
+export default function ChatPanel({ t, projectId, projectName, onNodeRefClick }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
   const messagesEnd = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setMessages([{
-      id: 'welcome',
-      role: 'assistant',
-      content: projectName
-        ? t('chat.welcomeWithProject', { name: projectName })
-        : t('chat.noProject'),
-      timestamp: new Date().toISOString(),
-    }])
+    if (!projectId) {
+      setMessages([{
+        id: 'welcome',
+        role: 'assistant',
+        content: t('chat.noProject'),
+        timestamp: new Date().toISOString(),
+      }])
+      return
+    }
+
+    window.fieldguide.chatHistory(projectId).then((result) => {
+      if (result.ok && result.data && Array.isArray(result.data) && result.data.length > 0) {
+        setMessages((result.data as Message[]).map(m => ({
+          id: m.id || Date.now().toString(),
+          role: m.role as Message['role'],
+          content: m.content,
+          timestamp: m.timestamp || new Date().toISOString(),
+          steps: m.steps,
+        })))
+      } else {
+        setMessages([{
+          id: 'welcome',
+          role: 'assistant',
+          content: t('chat.welcomeWithProject', { name: projectName }),
+          timestamp: new Date().toISOString(),
+        }])
+      }
+    }).catch(() => {
+      setMessages([{
+        id: 'welcome',
+        role: 'assistant',
+        content: t('chat.welcomeWithProject', { name: projectName }),
+        timestamp: new Date().toISOString(),
+      }])
+    })
   }, [projectId, projectName, t])
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  function toggleSteps(id: string) {
+    setExpandedSteps(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   async function send() {
     const text = input.trim()
@@ -49,6 +94,7 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
       content: text,
       timestamp: new Date().toISOString(),
     }
+    const history = messages.filter(m => m.role !== 'system' && m.id !== 'welcome')
     setMessages((prev) => [...prev, userMsg])
     setInput('')
     setSending(true)
@@ -57,16 +103,18 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
     try {
       const result = await window.fieldguide.chatSend(
         projectId,
-        messages.concat(userMsg).map(m => ({ role: m.role, content: m.content }))
+        [...history, userMsg].map(m => ({ role: m.role, content: m.content }))
       )
 
       if (result.ok && result.data) {
-        const data = result.data as { content: string }
+        const data = result.data as { content: string; steps?: AgentStep[]; nodeRefs?: string[] }
         const assistantMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: data.content || t('chat.noReply'),
           timestamp: new Date().toISOString(),
+          steps: data.steps,
+          nodeRefs: data.nodeRefs,
         }
         setMessages((prev) => [...prev, assistantMsg])
       } else {
@@ -79,34 +127,89 @@ export default function ChatPanel({ t, projectId, projectName }: Props) {
     }
   }
 
+  async function clearHistory() {
+    if (!projectId) return
+    await window.fieldguide.chatClear(projectId)
+    setMessages([{
+      id: 'welcome',
+      role: 'assistant',
+      content: t('chat.welcomeWithProject', { name: projectName }),
+      timestamp: new Date().toISOString(),
+    }])
+  }
+
+  function stepLabel(step: AgentStep): string {
+    switch (step.type) {
+      case 'thought': return t('chat.stepThought')
+      case 'action': return step.tool ? `${t('chat.stepAction')}: ${step.tool}` : t('chat.stepAction')
+      case 'observation': return t('chat.stepObservation')
+      case 'answer': return t('chat.stepAnswer')
+      default: return step.type
+    }
+  }
+
   return (
     <div className="h-full flex flex-col bg-[var(--fg-bg)]">
+      <div className="flex items-center justify-end px-3 py-1.5 border-b border-[var(--fg-border)]">
+        <button
+          onClick={clearHistory}
+          disabled={!projectId}
+          className="text-xs text-[var(--fg-text-tertiary)] hover:text-[var(--fg-accent)] disabled:opacity-40"
+        >
+          {t('chat.clearHistory')}
+        </button>
+      </div>
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === 'user'
-                  ? 'bg-[var(--fg-accent)] text-white'
-                  : msg.role === 'system'
-                    ? 'bg-[var(--fg-status-warning-bg)] border border-[var(--fg-status-warning)] text-[var(--fg-status-warning)]'
-                    : 'bg-[var(--fg-card)] border border-[var(--fg-border)] text-[var(--fg-text-primary)]'
-              }`}
-            >
-              {msg.content}
+          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className="max-w-[85%] space-y-2">
               <div
-                className={`text-xs mt-1 ${
-                  msg.role === 'user' ? 'text-white/70' : 'text-[var(--fg-text-tertiary)]'
+                className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'bg-[var(--fg-accent)] text-white'
+                    : msg.role === 'system'
+                      ? 'bg-[var(--fg-status-warning-bg)] border border-[var(--fg-status-warning)] text-[var(--fg-status-warning)]'
+                      : 'bg-[var(--fg-card)] border border-[var(--fg-border)] text-[var(--fg-text-primary)]'
                 }`}
               >
-                {new Date(msg.timestamp).toLocaleTimeString(undefined, {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {msg.content}
+                <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white/70' : 'text-[var(--fg-text-tertiary)]'}`}>
+                  {new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
+              {msg.steps && msg.steps.length > 0 && (
+                <div className="text-xs">
+                  <button
+                    onClick={() => toggleSteps(msg.id)}
+                    className="text-[var(--fg-accent)] hover:underline"
+                  >
+                    {expandedSteps.has(msg.id) ? t('chat.hideSteps') : t('chat.showSteps', { count: msg.steps.length })}
+                  </button>
+                  {expandedSteps.has(msg.id) && (
+                    <div className="mt-1 space-y-1 pl-2 border-l-2 border-[var(--fg-border)]">
+                      {msg.steps.map((step, i) => (
+                        <div key={i} className="text-[var(--fg-text-tertiary)]">
+                          <span className="font-medium text-[var(--fg-text-secondary)]">{stepLabel(step)}</span>
+                          <pre className="whitespace-pre-wrap break-words mt-0.5 max-h-24 overflow-auto">{step.content.slice(0, 400)}</pre>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {msg.nodeRefs && msg.nodeRefs.length > 0 && onNodeRefClick && (
+                <div className="flex flex-wrap gap-1">
+                  {msg.nodeRefs.map(ref => (
+                    <button
+                      key={ref}
+                      onClick={() => onNodeRefClick(ref)}
+                      className="text-xs px-2 py-0.5 rounded-full bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] hover:opacity-80"
+                    >
+                      {ref.split('/').pop() || ref}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}

@@ -81,6 +81,26 @@ function migrate(db: Database.Database): void {
       FOREIGN KEY (paper_id) REFERENCES papers(id),
       FOREIGN KEY (project_id) REFERENCES projects(id)
     );
+
+    CREATE TABLE IF NOT EXISTS paper_highlights (
+      id TEXT PRIMARY KEY,
+      paper_id TEXT NOT NULL,
+      page INTEGER NOT NULL DEFAULT 1,
+      text TEXT NOT NULL,
+      color TEXT DEFAULT 'yellow',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (paper_id) REFERENCES papers(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      steps_json TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
   `)
 }
 
@@ -229,6 +249,67 @@ export function insertConceptLink(link: Omit<ConceptLinkRow, 'id' | 'created_at'
 
 export function removeConceptLink(id: string): void {
   getDb().prepare('DELETE FROM concept_links WHERE id = ?').run(id)
+}
+
+/* ──────────── Paper Highlights ──────────── */
+
+export interface PaperHighlightRow {
+  id: string
+  paper_id: string
+  page: number
+  text: string
+  color: string
+  created_at: string
+}
+
+export function listPaperHighlights(paperId: string): PaperHighlightRow[] {
+  return getDb().prepare('SELECT * FROM paper_highlights WHERE paper_id = ? ORDER BY page, created_at')
+    .all(paperId) as PaperHighlightRow[]
+}
+
+export function insertPaperHighlight(h: Omit<PaperHighlightRow, 'id' | 'created_at'>): PaperHighlightRow {
+  const id = `hl-${Date.now()}`
+  const now = new Date().toISOString()
+  getDb().prepare(`
+    INSERT INTO paper_highlights (id, paper_id, page, text, color, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, h.paper_id, h.page, h.text, h.color, now)
+  return getDb().prepare('SELECT * FROM paper_highlights WHERE id = ?').get(id) as PaperHighlightRow
+}
+
+export function removePaperHighlight(id: string): void {
+  getDb().prepare('DELETE FROM paper_highlights WHERE id = ?').run(id)
+}
+
+/* ──────────── Chat History ──────────── */
+
+export interface ChatMessageRow {
+  id: string
+  project_id: string
+  role: string
+  content: string
+  steps_json: string
+  created_at: string
+}
+
+export function listChatMessages(projectId: string, limit = 50): ChatMessageRow[] {
+  return getDb().prepare(
+    'SELECT * FROM chat_messages WHERE project_id = ? ORDER BY created_at DESC LIMIT ?'
+  ).all(projectId, limit).reverse() as ChatMessageRow[]
+}
+
+export function insertChatMessage(m: Omit<ChatMessageRow, 'id' | 'created_at'>): ChatMessageRow {
+  const id = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  const now = new Date().toISOString()
+  getDb().prepare(`
+    INSERT INTO chat_messages (id, project_id, role, content, steps_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, m.project_id, m.role, m.content, m.steps_json, now)
+  return getDb().prepare('SELECT * FROM chat_messages WHERE id = ?').get(id) as ChatMessageRow
+}
+
+export function clearChatMessages(projectId: string): void {
+  getDb().prepare('DELETE FROM chat_messages WHERE project_id = ?').run(projectId)
 }
 
 export function closeDb(): void {

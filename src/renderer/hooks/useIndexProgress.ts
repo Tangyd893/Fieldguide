@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 export interface IndexProgress {
-  type: 'phase' | 'progress' | 'complete' | 'error'
+  type: 'phase' | 'progress' | 'complete' | 'error' | 'cancelled'
   phase?: string // scan | parse | build | save | llm
   current?: number
   total?: number
@@ -30,7 +30,7 @@ export function useIndexProgress(projectId?: string) {
       setProgress(ev)
       if (ev.type === 'phase' || ev.type === 'progress') {
         setIsIndexing(true)
-      } else if (ev.type === 'complete' || ev.type === 'error') {
+      } else if (ev.type === 'complete' || ev.type === 'error' || ev.type === 'cancelled') {
         setIsIndexing(false)
       }
     })

@@ -43,6 +43,10 @@ const api = {
   // Index
   projectIndex: (projectId: string, incremental?: boolean): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('project:index', { projectId, incremental }),
+  projectIndexCancel: (projectId: string): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('project:indexCancel', { projectId }),
+  projectExportGraph: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('project:exportGraph', { projectId }),
   onIndexProgress: (cb: (data: unknown) => void) => {
     const handler = (_event: unknown, data: unknown) => cb(data)
     ipcRenderer.on('index:progress', handler)
@@ -68,6 +72,10 @@ const api = {
   // Chat
   chatSend: (projectId: string, messages: Array<{ role: string; content: string }>): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('chat:send', { projectId, messages }),
+  chatHistory: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('chat:history', { projectId }),
+  chatClear: (projectId: string): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('chat:clear', { projectId }),
 
   // Papers
   paperList: (): Promise<IpcResult<unknown[]>> =>
@@ -88,6 +96,12 @@ const api = {
     ipcRenderer.invoke('paper:query', { query, paperId, topK }),
   paperIndexStatus: (id: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('paper:indexStatus', { id }),
+  paperHighlights: (paperId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('paper:highlights', { paperId }),
+  paperAddHighlight: (paperId: string, page: number, text: string, color?: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('paper:addHighlight', { paperId, page, text, color }),
+  paperRemoveHighlight: (id: string): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('paper:removeHighlight', { id }),
 
   // Concept Links
   conceptList: (projectId?: string, paperId?: string): Promise<IpcResult<unknown[]>> =>
@@ -115,12 +129,32 @@ const api = {
       ipcRenderer.removeListener('menu:openProjectsFolder', handler)
     }
   },
+  onMenuOpenProject: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('menu:openProject', handler)
+    return () => ipcRenderer.removeListener('menu:openProject', handler)
+  },
   onMenuAbout: (cb: () => void) => {
     const handler = () => cb()
     ipcRenderer.on('menu:about', handler)
     return () => {
       ipcRenderer.removeListener('menu:about', handler)
     }
+  },
+  onMenuZoomIn: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('menu:zoomIn', handler)
+    return () => ipcRenderer.removeListener('menu:zoomIn', handler)
+  },
+  onMenuZoomOut: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('menu:zoomOut', handler)
+    return () => ipcRenderer.removeListener('menu:zoomOut', handler)
+  },
+  onMenuZoomReset: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('menu:zoomReset', handler)
+    return () => ipcRenderer.removeListener('menu:zoomReset', handler)
   },
 
   // Bridge Tour
@@ -147,6 +181,12 @@ const api = {
     ipcRenderer.invoke('diagnostics:getLogs', { lines }),
   diagnosticsOpenLogDir: (): Promise<IpcResult<null>> =>
     ipcRenderer.invoke('diagnostics:openLogDir'),
+
+  // Data management
+  dataOpenDir: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('data:openDir'),
+  dataClearCache: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('data:clearCache'),
 }
 
 contextBridge.exposeInMainWorld('fieldguide', api)

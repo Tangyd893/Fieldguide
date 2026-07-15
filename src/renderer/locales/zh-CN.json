@@ -11,7 +11,12 @@
     "library": "项目库",
     "codemap": "代码地图",
     "theory": "理论",
-    "bridge": "桥接"
+    "bridge": "桥接",
+    "settings": "设置"
+  },
+  "titleBar": {
+    "noProject": "未选择项目",
+    "openLibrary": "打开项目库…"
   },
   "panels": {
     "graph": "图谱",
@@ -97,7 +102,14 @@
     "noProject": "你好！请先在项目库中选择一个项目，然后我可以帮你分析代码。",
     "noReply": "（未获得回复）",
     "close": "关闭",
-    "requestFailed": "请求失败"
+    "requestFailed": "请求失败",
+    "clearHistory": "清空历史",
+    "showSteps": "查看推理步骤 ({{count}})",
+    "hideSteps": "隐藏推理步骤",
+    "stepThought": "思考",
+    "stepAction": "工具调用",
+    "stepObservation": "观察",
+    "stepAnswer": "回答"
   },
   "commandPalette": {
     "placeholder": "搜索命令、文件或节点…",
@@ -108,7 +120,10 @@
     "codemap": "代码地图",
     "openFolder": "在资源管理器打开项目",
     "settings": "打开设置",
-    "toggleTheme": "切换主题 (亮/暗)"
+    "toggleTheme": "切换主题 (亮/暗)",
+    "zoomIn": "放大界面",
+    "zoomOut": "缩小界面",
+    "zoomReset": "重置界面缩放"
   },
   "split": {
     "resizeHint": "拖拽调整 · 双击恢复均分",
@@ -185,7 +200,12 @@
     "linkTo": "关联到「{{name}}」"
   },
   "graph": {
-    "overview": "总览"
+    "overview": "总览",
+    "viewMode": {
+      "structural": "结构",
+      "domain": "业务域",
+      "knowledge": "知识"
+    }
   },
   "tour": {
     "noTours": "暂无导览",
@@ -202,6 +222,9 @@
     "prevPage": "上一页",
     "nextPage": "下一页",
     "goTo": "跳转",
+    "saveHighlight": "保存高亮",
+    "savedHighlights": "已保存高亮",
+    "highlightSaved": "高亮已保存",
     "selectedText": "已选中文本:",
     "cancelSelection": "取消选择",
     "closeReader": "关闭阅读器",
@@ -222,7 +245,11 @@
   },
   "status": {
     "ready": "就绪",
-    "nodes": "{{count}} 节点"
+    "nodes": "{{count}} 节点",
+    "cancelIndex": "取消索引",
+    "shellZoom": "界面缩放: {{zoom}}%",
+    "zoom": "壳 {{shell}}% · 图谱 {{dash}}%",
+    "zoomHint": "界面缩放与图谱缩放相互独立，可在设置 → 外观中调整"
   },
   "tooltip": {
     "addProjectFirst": "请先添加项目",
@@ -238,11 +265,38 @@
   },
   "settings": {
     "title": "设置",
+    "subtitle": "偏好与工作区配置",
+    "nav": {
+      "general": "常规",
+      "appearance": "外观",
+      "llm": "模型",
+      "data": "数据与诊断",
+      "about": "关于"
+    },
     "llm": "LLM 配置",
+    "llmHint": "选择供应商后自动填入 API 地址，并可选模型名称",
+    "provider": "模型供应商",
+    "chatModel": "模型名称",
+    "customModel": "自定义模型名称…",
+    "backToModelList": "返回模型列表",
+    "baseUrlLocked": "由供应商预设；如需完全自定义请选「自定义 / OpenAI 兼容」",
+    "providers": {
+      "deepseek": "DeepSeek",
+      "openai": "OpenAI",
+      "moonshot": "月之暗面 Kimi",
+      "siliconflow": "硅基流动 SiliconFlow",
+      "openrouter": "OpenRouter",
+      "ollama": "Ollama（本地）",
+      "custom": "自定义 / OpenAI 兼容"
+    },
     "projectsRoot": "项目根目录",
+    "projectsRootLabel": "Git clone 目标路径",
     "projectsRootHint": "通过 Git URL 添加项目时，代码将 clone 到此目录下",
     "language": "界面语言",
     "theme": "主题",
+    "themeSystem": "跟随系统",
+    "themeLight": "浅色",
+    "themeDark": "深色",
     "themePreset": "主题预设",
     "themePreset.parchment": "羊皮纸",
     "themePreset.forest": "森林",
@@ -250,6 +304,15 @@
     "themePreset.midnight": "午夜蓝",
     "themePreset.paper-dark": "暗纸",
     "themePreset.none": "无预设",
+    "shellZoom": "应用窗口缩放",
+    "shellZoomHint": "仅影响 Fieldguide 壳层（顶栏、侧栏、设置页等）。快捷键：Ctrl+= / Ctrl+- / Ctrl+0，或 Ctrl+滚轮",
+    "dashboardZoom": "图谱（Dashboard）缩放",
+    "dashboardZoomHint": "仅影响嵌入的知识图谱 iframe，与应用窗口缩放独立",
+    "fonts": "字体",
+    "uiFont": "界面字体",
+    "monoFont": "代码字体",
+    "uiFontSize": "界面字号",
+    "monoFontSize": "代码字号",
     "testConnection": "测试连接",
     "testing": "测试中…",
     "testSuccess": "连接成功",
@@ -260,7 +323,12 @@
     "cancel": "取消",
     "diagnostics": "诊断",
     "openLogDir": "打开日志目录",
-    "viewLogs": "查看日志"
+    "viewLogs": "查看日志",
+    "data": "数据管理",
+    "openDataDir": "打开数据目录",
+    "clearCache": "清除导出缓存",
+    "exportGraph": "导出当前项目图谱",
+    "cacheCleared": "已清除 {{count}} 个导出文件"
   },
   "about": {
     "title": "关于 Fieldguide",

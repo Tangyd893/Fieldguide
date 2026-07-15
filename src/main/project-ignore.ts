@@ -1,5 +1,8 @@
 /**
  * Shared project ignore rules for file-tree and UA scanner.
+ *
+ * UA core uses `isIgnored()`; Fieldguide historically used `ignores()`.
+ * All filters are normalized to ProjectIgnoreFilter with `.ignores()`.
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -24,9 +27,30 @@ export interface ProjectIgnoreFilter {
   ignores: (relPath: string) => boolean
 }
 
+/** Accept UA `isIgnored` or Fieldguide `ignores`, or a bare predicate. */
+export type IgnoreFilterLike =
+  | ProjectIgnoreFilter
+  | { isIgnored: (relPath: string) => boolean }
+  | ((relPath: string) => boolean)
+  | null
+  | undefined
+
 const filterCache = new Map<string, ProjectIgnoreFilter>()
 
-let uaCreateIgnoreFilter: ((root: string) => ProjectIgnoreFilter) | null = null
+let uaCreateIgnoreFilter: ((root: string) => IgnoreFilterLike) | null = null
+
+export function normalizeIgnoreFilter(raw: IgnoreFilterLike): ProjectIgnoreFilter {
+  if (!raw) return { ignores: () => false }
+  if (typeof raw === 'function') return { ignores: (p) => Boolean(raw(p)) }
+  if (typeof (raw as ProjectIgnoreFilter).ignores === 'function') {
+    return raw as ProjectIgnoreFilter
+  }
+  if (typeof (raw as { isIgnored: (p: string) => boolean }).isIgnored === 'function') {
+    const f = raw as { isIgnored: (p: string) => boolean }
+    return { ignores: (p) => Boolean(f.isIgnored(p)) }
+  }
+  return { ignores: () => false }
+}
 
 async function loadUAIgnoreFilter(): Promise<typeof uaCreateIgnoreFilter> {
   if (uaCreateIgnoreFilter) return uaCreateIgnoreFilter
@@ -35,7 +59,7 @@ async function loadUAIgnoreFilter(): Promise<typeof uaCreateIgnoreFilter> {
   const appRoot = app.isPackaged ? app.getAppPath() : process.cwd()
   const require_ = createRequire(join(appRoot, 'package.json'))
 
-  let core: { createIgnoreFilter?: (root: string) => ProjectIgnoreFilter }
+  let core: { createIgnoreFilter?: (root: string) => IgnoreFilterLike }
   try {
     core = await import(pathToFileURL(require_.resolve('@understand-anything/core')).href)
   } catch {
@@ -98,7 +122,7 @@ export function createBasicGitignoreFilter(rootPath: string): ProjectIgnoreFilte
 
   return {
     ignores(relPath: string) {
-      return patterns.some(p => matchPattern(p, relPath))
+      return patterns.some((p) => matchPattern(p, relPath))
     },
   }
 }
@@ -108,8 +132,16 @@ export async function getProjectIgnoreFilter(rootPath: string): Promise<ProjectI
   const cached = filterCache.get(rootPath)
   if (cached) return cached
 
-  const create = await loadUAIgnoreFilter()
-  const filter = create?.(rootPath) ?? createBasicGitignoreFilter(rootPath)
+  let filter: ProjectIgnoreFilter
+  try {
+    const create = await loadUAIgnoreFilter()
+    filter = create
+      ? normalizeIgnoreFilter(create(rootPath))
+      : createBasicGitignoreFilter(rootPath)
+  } catch {
+    filter = createBasicGitignoreFilter(rootPath)
+  }
+
   filterCache.set(rootPath, filter)
   return filter
 }

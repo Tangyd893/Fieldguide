@@ -6,7 +6,7 @@
  */
 import { ipcMain, BrowserWindow, shell, app } from 'electron'
 import { join } from 'node:path'
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs'
 import { loadConfig, updateConfig } from '../config'
 import {
   listProjects,
@@ -23,6 +23,12 @@ import {
   listConceptLinks,
   insertConceptLink,
   removeConceptLink,
+  listPaperHighlights,
+  insertPaperHighlight,
+  removePaperHighlight,
+  listChatMessages,
+  insertChatMessage,
+  clearChatMessages,
 } from '../db'
 import type { PaperRow } from '../db'
 import { readProjectTree } from '../file-tree'
@@ -30,7 +36,7 @@ import { getProjectIgnoreFilter } from '../project-ignore'
 import { setApplicationMenu } from '../menu'
 import { cloneRepo } from '../git'
 import { installDemoProject } from '../sample-project'
-import { indexProject } from '../ua/client'
+import { indexProject, beginIndex, cancelIndex } from '../ua/client'
 import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
 import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
 import {
@@ -44,7 +50,8 @@ import {
 } from '../ua/graph-reader'
 import { indexPaper, queryPaper, countChunks, getChunks, removeChunks, getIndexStats } from '../vector'
 import { analyzeProjectDiff } from '../ua/diff'
-import { generateCrossTour, buildCrossSourceContext } from '../ua/cross-tour'
+import { generateCrossTour } from '../ua/cross-tour'
+import { runAgent } from '../agent/react'
 import { logInfo, logError, logIndexStart, logIndexComplete, logIndexError, logChatRequest } from '../logger'
 import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
@@ -426,131 +433,72 @@ ipcMain.handle('chat:send', async (_e, {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
 
-  // Build code context from knowledge graph
-  let codeContext = ''
-  const graphPath = join(project.root_path, '.understand-anything', 'knowledge-graph.json')
-  if (existsSync(graphPath)) {
-    try {
-      const graph = JSON.parse(readFileSync(graphPath, 'utf-8'))
-      const nodes = (graph.nodes || []) as Array<{
-        id: string; type: string; label: string; filePath?: string
-        metadata?: { summary?: string; complexity?: string }
-      }>
-      // Provide a structured overview: file → symbols
-      const fileMap = new Map<string, Array<{ name: string; type: string; summary?: string }>>()
-      for (const node of nodes.slice(0, 200)) {
-        const fp = node.filePath || node.id || ''
-        const fileName = fp.split('/').slice(-1)[0] || fp
-        if (!fileMap.has(fileName)) fileMap.set(fileName, [])
-        fileMap.get(fileName)!.push({
-          name: node.label || node.id || '',
-          type: node.type || 'unknown',
-          summary: node.metadata?.summary,
-        })
-      }
-      const entries = [...fileMap.entries()].slice(0, 30)
-      codeContext = entries.map(([file, syms]) =>
-        `📄 ${file}:\n${syms.map(s => `  - ${s.type === 'function' ? '🔧' : s.type === 'class' ? '🏛️' : '📦'} ${s.name}${s.summary ? ` — ${s.summary}` : ''}`).join('\n')}`
-      ).join('\n\n')
-    } catch { /* ignore parse errors */ }
+  const lastUser = [...messages].reverse().find(m => m.role === 'user')
+  if (lastUser) {
+    insertChatMessage({
+      project_id: projectId,
+      role: 'user',
+      content: lastUser.content,
+      steps_json: '',
+    })
   }
 
-  // Build paper context from saved papers
-  let paperContext = ''
   try {
-    const papers = listPapers()
-    if (papers.length > 0) {
-      paperContext = papers.slice(0, 10).map(p =>
-        `📰 ${p.title} (arxiv:${p.arxiv_id})\n   ${p.summary.slice(0, 300)}${p.notes ? `\n   笔记: ${p.notes.slice(0, 200)}` : ''}`
-      ).join('\n\n')
-    }
-  } catch { /* ignore */ }
-
-  // Try paper RAG: query chunks relevant to user's latest question
-  let ragContext = ''
-  try {
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
-    if (lastUserMsg && lastUserMsg.content.trim().length > 10) {
-      const ragResults = await queryPaper(lastUserMsg.content, undefined, 3)
-      if (ragResults.length > 0) {
-        ragContext = ragResults.map((r, i) =>
-          `📎 Chunk ${i + 1} (score: ${r.score.toFixed(3)}, arxiv:${getPaper(r.chunk.paper_id)?.arxiv_id ?? '?'})\n${r.chunk.text.slice(0, 600)}`
-        ).join('\n\n')
-      }
-    }
-  } catch { /* RAG is best-effort; ignore failures */ }
-
-  // Cross-source context from concept links (paper ↔ code bridges)
-  let crossContext = ''
-  try {
-    const crossItems = buildCrossSourceContext(projectId)
-    if (crossItems.length > 0) {
-      crossContext = crossItems.slice(0, 10).map(c =>
-        `🔗 ${c.paperTitle} (arxiv:${c.arxivId})\n   📄 "${c.excerpt.slice(0, 200)}"\n   → 💻 ${c.nodeName} (${c.nodeType}) @ ${c.nodeFile}${c.note ? `\n   笔记: ${c.note.slice(0, 150)}` : ''}`
-      ).join('\n\n')
-    }
-  } catch { /* best-effort */ }
-
-  const systemPrompt = [
-    'You are Fieldguide AI, a code analysis assistant that helps developers understand codebases and research papers.',
-    codeContext ? `\n## Project Structure\n\n${codeContext}` : `\nThe project is "${project.name}".`,
-    paperContext ? `\n## Saved Papers\n\n${paperContext}` : '',
-    ragContext ? `\n## Relevant Paper Excerpts (RAG)\n\n${ragContext}\n\nUse these excerpts when relevant to the user\'s question. Cite the arxiv ID when referencing.` : '',
-    '\nUse all available context to answer precisely. When referencing code, mention specific file names and symbols. When referencing papers, mention the arxiv ID. Keep answers concise and practical. Reply in the same language as the user\'s question.',
-  ].filter(Boolean).join('\n')
-
-  const allMessages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt },
-    ...messages,
-  ]
-
-  const url = `${config.llm.baseUrl}/v1/chat/completions`
-    .replace(/\/+$/, '')
-    .replace(/\/v1\/chat\/completions\/v1\/chat\/completions/, '/v1/chat/completions')
-
-  try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.llm.apiKey}`,
+    const result = await runAgent(
+      {
+        projectId,
+        projectName: project.name,
+        projectRoot: project.root_path,
+        locale: config.locale,
       },
-      body: JSON.stringify({
-        model: config.llm.chatModel,
-        messages: allMessages,
-        temperature: 0.3,
-        max_tokens: 2048,
-      }),
-      signal: AbortSignal.timeout(60_000),
+      messages,
+    )
+
+    insertChatMessage({
+      project_id: projectId,
+      role: 'assistant',
+      content: result.content,
+      steps_json: JSON.stringify(result.steps),
     })
 
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => '')
-      let errMsg = `LLM API 错误 (${resp.status})`
-      if (resp.status === 401) errMsg = 'API Key 无效，请检查设置'
-      else if (resp.status === 429) errMsg = 'API 请求过于频繁，请稍后再试'
-      else if (text) {
-        try {
-          const j = JSON.parse(text)
-          errMsg = j.error?.message || errMsg
-        } catch { errMsg += `: ${text.slice(0, 200)}` }
-      }
-      return ipcErr('LLM_API_ERROR', errMsg, true)
-    }
-
-    const data = await resp.json() as {
-      choices?: Array<{ message?: { content?: string } }>
-    }
-    const content = data.choices?.[0]?.message?.content || ''
-
-    logChatRequest(project.name, messages.length, content.length)
-    return ipcOk({ content })
+    logChatRequest(project.name, messages.length, result.content.length)
+    return ipcOk({
+      content: result.content,
+      steps: result.steps,
+      nodeRefs: result.nodeRefs,
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('AbortError') || msg.includes('timeout')) {
-      return ipcErr('LLM_API_ERROR', 'LLM 请求超时，请检查网络或 API 地址', true)
-    }
-    return ipcErr('LLM_API_ERROR', `请求失败: ${msg}`, true)
+    if (msg.includes('429')) return ipcErr('LLM_RATE_LIMIT', 'API 请求过于频繁，请稍后再试', true)
+    return ipcErr('LLM_API_ERROR', `Agent 请求失败: ${msg}`, true)
+  }
+})
+
+ipcMain.handle('chat:history', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const rows = listChatMessages(projectId)
+    return ipcOk(rows.map(r => ({
+      id: r.id,
+      role: r.role,
+      content: r.content,
+      steps: r.steps_json ? JSON.parse(r.steps_json) : [],
+      timestamp: r.created_at,
+    })))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('chat:clear', (_e, { projectId }: { projectId: string }): IpcResult<null> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    clearChatMessages(projectId)
+    return ipcOk(null)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
   }
 })
 
@@ -569,15 +517,13 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental }: { project
 
     const config = loadConfig()
     const hasLLM = isLLMConfigured()
+    const signal = beginIndex()
 
     const result = await indexProject(
       project.root_path,
       project.name,
       (phase) => {
         win?.webContents.send('index:progress', { type: 'phase', phase, projectId })
-        if (phase === 'scan') {
-          // Log file count after scan completes (next phase)
-        }
       },
       (current, total) => {
         win?.webContents.send('index:progress', {
@@ -594,7 +540,14 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental }: { project
         apiKey: config.llm.apiKey,
         chatModel: config.llm.chatModel,
       } : undefined,
+      signal,
     )
+
+    if (result.error === 'INDEX_CANCELLED') {
+      updateProjectStatus(projectId, 'pending')
+      win?.webContents.send('index:progress', { type: 'cancelled', projectId })
+      return ipcErr('INDEX_CANCELLED', '索引已取消', false)
+    }
 
     if (result.success) {
       updateProjectStatus(projectId, 'ready', result.nodeCount)
@@ -618,6 +571,35 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental }: { project
     logIndexError(project.name, msg)
     win?.webContents.send('index:progress', { type: 'error', projectId, error: msg })
     return ipcErr('UNKNOWN', msg)
+  }
+})
+
+ipcMain.handle('project:indexCancel', (_e, { projectId }: { projectId: string }): IpcResult<null> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  if (project.status !== 'indexing') {
+    return ipcErr('UNKNOWN', '当前没有进行中的索引', false)
+  }
+  const cancelled = cancelIndex()
+  if (!cancelled) return ipcErr('UNKNOWN', '无法取消索引', false)
+  return ipcOk(null)
+})
+
+ipcMain.handle('project:exportGraph', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  const graphPath = join(project.root_path, '.understand-anything', 'knowledge-graph.json')
+  if (!existsSync(graphPath)) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+
+  try {
+    const exportsDir = join(app.getPath('appData'), 'Fieldguide', 'exports')
+    if (!existsSync(exportsDir)) mkdirSync(exportsDir, { recursive: true })
+    const dest = join(exportsDir, `${project.slug}-knowledge-graph.json`)
+    copyFileSync(graphPath, dest)
+    return ipcOk({ exportPath: dest })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
   }
 })
 
@@ -900,6 +882,78 @@ ipcMain.handle('diagnostics:openLogDir', async (): Promise<IpcResult<null>> => {
     const dir = join(app.getPath('appData'), 'Fieldguide', 'logs')
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     await shell.openPath(dir)
+    return ipcOk(null)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Data Management ──────────── */
+
+ipcMain.handle('data:openDir', async (): Promise<IpcResult<unknown>> => {
+  try {
+    const dir = join(app.getPath('appData'), 'Fieldguide')
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    await shell.openPath(dir)
+    return ipcOk({ path: dir })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('data:clearCache', (): IpcResult<unknown> => {
+  try {
+    const base = join(app.getPath('appData'), 'Fieldguide')
+    const exportsDir = join(base, 'exports')
+    let removed = 0
+    if (existsSync(exportsDir)) {
+      for (const f of readdirSync(exportsDir)) {
+        rmSync(join(exportsDir, f), { force: true })
+        removed++
+      }
+    }
+    return ipcOk({ removed })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Paper Highlights ──────────── */
+
+ipcMain.handle('paper:highlights', (_e, { paperId }: { paperId: string }): IpcResult<unknown> => {
+  const paper = getPaper(paperId)
+  if (!paper) return ipcErr('UNKNOWN', '论文不存在')
+  try {
+    return ipcOk(listPaperHighlights(paperId))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('paper:addHighlight', (_e, {
+  paperId, page, text, color,
+}: {
+  paperId: string; page: number; text: string; color?: string
+}): IpcResult<unknown> => {
+  const paper = getPaper(paperId)
+  if (!paper) return ipcErr('UNKNOWN', '论文不存在')
+  if (!text?.trim()) return ipcErr('UNKNOWN', '高亮文本不能为空')
+  try {
+    const hl = insertPaperHighlight({
+      paper_id: paperId,
+      page: page || 1,
+      text: text.trim(),
+      color: color || 'yellow',
+    })
+    return ipcOk(hl)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('paper:removeHighlight', (_e, { id }: { id: string }): IpcResult<null> => {
+  try {
+    removePaperHighlight(id)
     return ipcOk(null)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))

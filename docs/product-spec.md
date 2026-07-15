@@ -123,10 +123,11 @@ Fieldguide
 | 论文 RAG | **Fieldguide**（Phase 3） | `query_paper` |
 | 跨论文 + 代码 + 桥接 | **Fieldguide**（Phase 3） | 扩展 ReAct：`link_concept`、对照 Tour |
 
-Fieldguide 右栏 Agent（Phase 3）：
-- ReAct 循环，展示 thought / action / observation / answer
-- 上下文绑定：选中节点（来自 Dashboard 同步）、Tour 步骤、论文章节
-- 纯代码问题：提示「可在代码地图 Dashboard 中提问」
+Fieldguide 右栏 Agent（Phase 3，**已实现 2026-07-13**）：
+- **ReAct 工具调用循环**（`src/main/agent/react.ts`），最多 4 轮；UI 展示 thought / action / observation / answer
+- 工具：`search_nodes`、`query_paper`、`get_node_source`、`list_concept_links`
+- 上下文绑定：项目图谱、论文 RAG、concept_links；聊天历史持久化至 SQLite
+- 纯代码结构问答：仍建议在 UA Dashboard 内提问；壳层 Agent 侧重跨源对照
 
 ---
 

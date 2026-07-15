@@ -131,7 +131,7 @@ function buildSummary(items: Array<{ paper: PaperRow; node: GraphNode; link: Con
 
 export interface CrossSourceContext {
   paperTitle: string; arxivId: string; excerpt: string
-  nodeName: string; nodeType: string; nodeFile: string; note: string
+  nodeId: string; nodeName: string; nodeType: string; nodeFile: string; note: string
 }
 
 export function buildCrossSourceContext(projectId: string): CrossSourceContext[] {
@@ -157,6 +157,7 @@ export function buildCrossSourceContext(projectId: string): CrossSourceContext[]
     context.push({
       paperTitle: paper.title, arxivId: paper.arxiv_id,
       excerpt: link.anchor_text || paper.summary.slice(0, 300),
+      nodeId: link.node_id,
       nodeName: node.label || node.id, nodeType: node.type || 'unknown',
       nodeFile: node.filePath || '', note: link.note || '',
     })

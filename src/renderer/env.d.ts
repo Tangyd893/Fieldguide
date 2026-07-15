@@ -56,6 +56,8 @@ interface FieldguideAPI {
 
   // Index
   projectIndex(projectId: string, incremental?: boolean): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  projectIndexCancel(projectId: string): Promise<{ ok: boolean; error?: { message: string } }>
+  projectExportGraph(projectId: string): Promise<{ ok: boolean; data?: { exportPath?: string }; error?: { message: string } }>
   onIndexProgress(cb: (data: unknown) => void): () => void
 
   // File tree & code
@@ -68,7 +70,9 @@ interface FieldguideAPI {
   openFolderDialog(): Promise<{ ok: boolean; data?: string | null; error?: { message: string } }>
 
   // Chat
-  chatSend(projectId: string, messages: Array<{ role: string; content: string }>): Promise<{ ok: boolean; data?: { content: string }; error?: { message: string } }>
+  chatSend(projectId: string, messages: Array<{ role: string; content: string }>): Promise<{ ok: boolean; data?: { content: string; steps?: unknown[]; nodeRefs?: string[] }; error?: { message: string } }>
+  chatHistory(projectId: string): Promise<{ ok: boolean; data?: unknown[]; error?: { message: string } }>
+  chatClear(projectId: string): Promise<{ ok: boolean; error?: { message: string } }>
 
   // Papers
   paperList(): Promise<{ ok: boolean; data?: PaperRow[]; error?: { message: string } }>
@@ -77,6 +81,9 @@ interface FieldguideAPI {
   paperRemove(id: string): Promise<{ ok: boolean; error?: { message: string } }>
   paperSearch(query: string): Promise<{ ok: boolean; data?: PaperRow[]; error?: { message: string } }>
   paperDownloadPdf(id: string): Promise<{ ok: boolean; data?: { pdf_path: string }; error?: { message: string } }>
+  paperHighlights(paperId: string): Promise<{ ok: boolean; data?: unknown[]; error?: { message: string } }>
+  paperAddHighlight(paperId: string, page: number, text: string, color?: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  paperRemoveHighlight(id: string): Promise<{ ok: boolean; error?: { message: string } }>
 
   // Concept Links
   conceptList(projectId?: string, paperId?: string): Promise<{ ok: boolean; data?: ConceptLinkRow[]; error?: { message: string } }>
@@ -87,7 +94,11 @@ interface FieldguideAPI {
   diffAnalyze(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   onDiffResult(cb: (data: unknown) => void): () => void
   onMenuOpenProjectsFolder(cb: () => void): () => void
+  onMenuOpenProject(cb: () => void): () => void
   onMenuAbout(cb: () => void): () => void
+  onMenuZoomIn(cb: () => void): () => void
+  onMenuZoomOut(cb: () => void): () => void
+  onMenuZoomReset(cb: () => void): () => void
 
   // Bridge Tour
   bridgeGenerateTour(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
@@ -101,6 +112,8 @@ interface FieldguideAPI {
   // Diagnostics
   diagnosticsGetLogs(lines?: number): Promise<{ ok: boolean; data?: { files: string[]; content: string; logDir: string }; error?: { message: string } }>
   diagnosticsOpenLogDir(): Promise<{ ok: boolean; error?: { message: string } }>
+  dataOpenDir(): Promise<{ ok: boolean; data?: { path?: string }; error?: { message: string } }>
+  dataClearCache(): Promise<{ ok: boolean; data?: { removed?: number }; error?: { message: string } }>
 }
 
 declare global {
