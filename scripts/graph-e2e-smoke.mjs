@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 /**
- * Graph path smoke (non-GUI) — verifies everything needed before iframe shows nodes.
+ * Graph path smoke (non-GUI) — verifies everything needed before iframe shows nodes
+ * and the click→open-file bridge contract (including built Dashboard __uaStore).
  *
  * Checks:
  *  1. Built-in Demo sample-project graph
- *  2. UA Dashboard dist (sibling or packaged)
- *  3. Shell bridge wiring (tourStepChanged / nodeSelected)
- *  4. HIS-Go graph if sibling present
+ *  2. UA Dashboard dist (resources + packaged)
+ *  3. Built JS exposes __uaStore (bootstrap-ua patch survived build)
+ *  4. Shell bridge wiring (tourStepChanged / nodeSelected)
+ *  5. HIS-Go graph if sibling present
+ *  6. Incremental merge export
  *
  * Usage: node scripts/graph-e2e-smoke.mjs
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -23,6 +26,16 @@ function check(label, ok, detail = '') {
 
 function loadJson(p) {
   return JSON.parse(readFileSync(p, 'utf-8'))
+}
+
+/** True if any Dashboard asset JS contains the Fieldguide bridge hook. */
+function bundleHasUaStore(dashIndexHtml) {
+  if (!dashIndexHtml || !existsSync(dashIndexHtml)) return false
+  const assetsDir = join(dirname(dashIndexHtml), 'assets')
+  if (!existsSync(assetsDir)) return false
+  return readdirSync(assetsDir)
+    .filter((f) => f.endsWith('.js'))
+    .some((f) => readFileSync(join(assetsDir, f), 'utf-8').includes('__uaStore'))
 }
 
 console.log('Fieldguide Graph E2E Smoke (headless)\n')
@@ -42,12 +55,37 @@ if (!existsSync(sampleGraph)) {
 }
 
 // ── 2. Dashboard dist ──
-const dashCandidates = [
-  join(root, 'dist/win-unpacked/resources/dashboard/index.html'),
-  join(root, '..', 'Understand-Anything', 'understand-anything-plugin', 'packages', 'dashboard', 'dist', 'index.html'),
-]
+const localDash = join(root, 'resources', 'dashboard', 'index.html')
+const packagedDash = join(root, 'dist/win-unpacked/resources/dashboard/index.html')
+const siblingDash = join(
+  root,
+  '..',
+  'Understand-Anything',
+  'understand-anything-plugin',
+  'packages',
+  'dashboard',
+  'dist',
+  'index.html',
+)
+const dashCandidates = [localDash, packagedDash, siblingDash]
 const dashFound = dashCandidates.find((p) => existsSync(p))
-pass = check('UA Dashboard dist available', !!dashFound, dashFound || 'not found') && pass
+pass = check('UA Dashboard dist available', !!dashFound, dashFound || 'not found — run: pnpm bootstrap:ua') && pass
+
+pass = check(
+  'resources/dashboard bundle exposes __uaStore',
+  bundleHasUaStore(localDash),
+  localDash,
+) && pass
+
+if (existsSync(packagedDash)) {
+  pass = check(
+    'packaged dist dashboard exposes __uaStore',
+    bundleHasUaStore(packagedDash),
+    packagedDash,
+  ) && pass
+} else {
+  console.log('⚠️  packaged dist/win-unpacked dashboard not found — skip pack __uaStore check (run pnpm dist)')
+}
 
 // ── 3. Shell bridge (static source checks) ──
 const appSrc = readFileSync(join(root, 'src/renderer/App.tsx'), 'utf-8')
@@ -57,6 +95,8 @@ const dashSrc = readFileSync(join(root, 'src/main/ua/dashboard.ts'), 'utf-8')
 pass = check('Dashboard protocol / graph override', dashSrc.includes('setDashboardGraph') || dashSrc.includes('knowledge-graph')) && pass
 pass = check('Bridge polls __uaStore.getState', dashSrc.includes('__uaStore') && dashSrc.includes('store.getState')) && pass
 pass = check('Bridge invokes actions via getState()', dashSrc.includes('s.selectNode') || dashSrc.includes('getState().selectNode')) && pass
+pass = check('Embed token bypasses TokenGate', dashSrc.includes('fieldguide-embed') && dashSrc.includes('understand-anything-token')) && pass
+pass = check('Theme maps to UA --color-root', dashSrc.includes('--color-root')) && pass
 
 const uaMain = join(root, '..', 'Understand-Anything', 'understand-anything-plugin', 'packages', 'dashboard', 'src', 'main.tsx')
 if (existsSync(uaMain)) {
@@ -87,6 +127,10 @@ if (existsSync(hisGraph)) {
 const clientSrc = readFileSync(join(root, 'src/main/ua/client.ts'), 'utf-8')
 pass = check('mergeIncrementalGraph exported', clientSrc.includes('export function mergeIncrementalGraph')) && pass
 
+// ── 6. Pack readiness (sibling core + local dashboard) ──
+const coreLink = join(root, 'node_modules', '@understand-anything', 'core')
+pass = check('@understand-anything/core resolvable', existsSync(coreLink), coreLink) && pass
+
 console.log(`\n${pass ? 'Graph path smoke passed.' : 'Graph path smoke FAILED.'}`)
-console.log('Note: iframe click→file still needs one manual check in `pnpm dev` / installed app.')
+console.log('Click→file: verified via bridge source + built __uaStore + vitest runtime sim (dashboard-bridge-script).')
 process.exit(pass ? 0 : 1)

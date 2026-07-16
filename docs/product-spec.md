@@ -133,26 +133,29 @@ Fieldguide 右栏 Agent（Phase 3，**已实现 2026-07-13**）：
 
 ## 五、功能清单与优先级
 
-> **实现来源**：标有 UA 的功能由 [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) 提供，Fieldguide 负责集成与桌面壳；标有 FG 的为 Fieldguide 自建。详见 [understand-anything-integration.md](./understand-anything-integration.md)。
+> **实现来源**：标有 UA 的功能由 [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) 提供，Fieldguide 负责集成与桌面壳；标有 FG 的为 Fieldguide 自建。详见 [understand-anything-integration.md](./understand-anything-integration.md) **§交付边界**。
+>
+> **当前交付口径**：F-02/F-03（结构图谱 + Dashboard）已交付；F-05/F-06 在有 Key 时为精简 LLM；业务域 / graph-reviewer **延期**。
 
 | ID | 功能 | 来源 | 优先级 | Phase |
 |----|------|------|--------|-------|
-| F-01 | 添加本地/Git 项目并索引 | FG 壳 + UA pipeline | P0 | 1 |
-| F-02 | 多语言结构图谱（26+ 类型） | UA | P0 | 1 |
-| F-03 | 交互式图谱 UI（缩放、选中、邻居） | UA Dashboard | P0 | 1 |
-| F-04 | 节点详情 + 源码预览 | UA Dashboard | P0 | 1 |
-| F-05 | LLM 节点摘要 + 架构分层 | UA | P0 | 1–2 |
-| F-06 | 引导 Tour | UA | P0 | 1–2 |
-| F-07 | 语义代码搜索 + 代码问答 | UA | P0 | 2 |
+| F-01 | 添加本地/Git 项目并索引 | FG 壳 + UA 精简 pipeline | P0 | 1 |
+| F-02 | 多语言结构图谱（26+ 类型） | UA core（✅ 已交付） | P0 | 1 |
+| F-03 | 交互式图谱 UI（缩放、选中、邻居） | UA Dashboard 嵌入（✅ 已交付） | P0 | 1 |
+| F-04 | 节点详情 + 源码预览 | UA Dashboard + 壳层开文件（✅） | P0 | 1 |
+| F-05 | LLM 节点摘要 + 架构分层 | UA prompts（部分；非完整 Agent） | P0 | 1–2 |
+| F-06 | 引导 Tour | UA prompts + 壳层 TourPanel（部分） | P0 | 1–2 |
+| F-07 | 语义代码搜索 + 代码问答 | UA / FG Agent | P0 | 2 |
 | F-08 | arXiv 搜索 + 论文库 | FG | P1 | 3 |
 | F-09 | PDF 导入 + RAG 问答 | FG | P1 | 3 |
 | F-10 | 概念桥接 + 对照 Tour | FG | P1 | 3 |
-| F-11 | Git diff 影响分析 | UA `/understand-diff` | P2 | 2–4 |
-| F-12 | 增量索引 | UA | P2 | 2 |
+| F-11 | Git diff 影响分析 | FG diff overlay（非完整 `/understand-diff` Agent） | P2 | 2–4 |
+| F-12 | 增量索引 | FG `mergeIncrementalGraph` + UA | P2 | 2 |
 | F-13a | i18n 三语 UI 骨架（简中/繁中/en-US） | FG shell + UA language | P0 | 1 |
 | F-13b | LLM 输出随 locale + 文案 polish | UA + FG | P1 | 2 / 4 |
 | F-14 | Windows 安装包 | FG | P1 | 4 |
 | F-15 | 跨论文+图谱统一 Agent | FG 扩展 | P1 | 3 |
+| F-16 | 业务域视图 / graph-reviewer | UA Agent（**延期**） | P2 | 延期 |
 
 ---
 

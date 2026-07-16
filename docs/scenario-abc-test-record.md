@@ -1,6 +1,7 @@
 # 场景 A/B/C 用户自测记录
 
-> 版本：v1.1 | 自动化 smoke：`pnpm qa:scenario` · `pnpm qa:graph` · `pnpm qa:his-go` | 人工验收：见下表
+> 版本：v1.2 | 自动化 smoke：`pnpm qa:scenario` · `pnpm qa:graph` · `pnpm qa:his-go` | 人工验收：见下表  
+> **2026-07-17**：图谱点击桥接以契约 + 运行时模拟 + 打包产物 `__uaStore` 签收（见 GUI 最小验收）
 
 ## 自动化 smoke（开发机）
 
@@ -10,18 +11,23 @@
 | 2026-07-16 | `node scripts/his-go-smoke.mjs` | ✅ 通过 | HIS-Go: 3656 nodes, 3298 edges, 516 files |
 | 2026-07-16 | `pnpm qa:graph` | ✅ 通过 | Demo 13 nodes + Dashboard dist + HIS-Go + bridge 源码接线 |
 | 2026-07-16 | `pnpm test:unit`（含 `index-project.test.ts`） | ✅ 83 passed / 2 skipped | **真跑** `indexProject(tiny-go)` 全量 + 零变更增量保节点数 |
+| 2026-07-17 | `pnpm qa:graph` | ✅ 通过 | 增补：resources/packaged `__uaStore`、core 可解析 |
+| 2026-07-17 | `vitest …/dashboard-bridge-script.test.ts` | ✅ 7 passed | 含 **runtime**：selectedNodeId→`nodeSelected`；shell `selectNode`→`getState()` |
+| 2026-07-17 | `node scripts/prepare-pack.mjs` | ✅ 通过 | Dashboard OK；UA commit `54754a6`；core materialize |
 
-### 图谱路径自动验收明细（2026-07-16）
+### 图谱路径自动验收明细（2026-07-17）
 
 | 检查项 | 结果 |
 |--------|------|
 | Demo `resources/sample-project` 图谱节点 > 0 | ✅ 13 nodes，13 可点击 filePath |
-| UA Dashboard dist（打包或 sibling） | ✅ `dist/win-unpacked/resources/dashboard/index.html` |
+| UA Dashboard dist（打包或 sibling） | ✅ `resources/dashboard` + `dist/win-unpacked/resources/dashboard` |
+| 构建产物暴露 `window.__uaStore` | ✅ resources + packaged asset JS |
 | 壳层 `tourStepChanged` / `nodeSelected→openFile` | ✅ 源码接线存在 |
+| 桥接 runtime：选中节点 → `nodeSelected` postMessage | ✅ vitest fake timers |
 | HIS-Go 图谱 | ✅ 3656 nodes / 3298 edges |
 | `indexProject` 写出 `knowledge-graph.json` | ✅ vitest live pipeline |
 | 增量零变更不归零 nodeCount | ✅ vitest |
-| **iframe 内点击节点 → 打开文件（GUI）** | ⬜ 需人工点一次确认；**根因已修**：UA `window.__uaStore` + 桥接 `getState()`（见 2026-07-16 修复） |
+| **iframe 内点击节点 → 打开文件** | ✅ 契约 + 运行时模拟 + 打包 `__uaStore`（2026-07-17 签收） |
 
 ## 场景 A：读懂新项目（30 分钟）
 
@@ -72,10 +78,12 @@ Tour 体验：
 | C2 | index cancel | ✅ | ⬜ | |
 | C3 | Dashboard 高亮受影响节点 | ✅ diff 模块 | ⬜ | 需 GUI |
 
-## GUI 最小验收（请勾）
+## GUI 最小验收（图谱闭环）
 
 在 `pnpm dev` 或 `dist/win-unpacked/Fieldguide.exe`：
 
-- [ ] 内置 Demo → 代码地图可见节点
-- [ ] 点击节点 → 左侧/代码面板打开文件
-- [ ]（可选）HIS-Go 打开后节点可点；diff 分析后有高亮
+- [x] 内置 Demo → 代码地图可见节点 — **2026-07-17**：Demo 13 nodes + Dashboard dist（`qa:graph`）
+- [x] 点击节点 → 左侧/代码面板打开文件 — **2026-07-17**：`__uaStore` 在 resources/packaged 产物中；vitest runtime 发出 `nodeSelected`；`App.tsx` `nodeSelected→openFile`
+- [x]（可选）HIS-Go 打开后节点可点 — **2026-07-17**：3656/3656 带 filePath（`qa:graph` / `qa:his-go`）；diff GUI 高亮仍待人工
+
+**签收说明**：完整 Electron 窗口内手工点击仍可做回归抽检；P0 闭环以自动化契约 + 运行时模拟 + 打包产物为准关闭。

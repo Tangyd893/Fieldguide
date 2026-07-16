@@ -43,9 +43,12 @@
 - [ ] **Git** 已安装，可正常 clone
 - [ ] **pnpm** 已安装（UA 为 pnpm monorepo）
 - [ ] **Windows 10/11** 作为首发开发与测试环境
-- [ ] clone **[Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)** 并完成 **Spike**（integration §九）
+- [ ] 运行 **`pnpm bootstrap:ua`**（clone 锁定 commit 的 [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)、构建 Dashboard → `resources/dashboard`）并完成 **Spike**（integration §九）
+- [ ] 图谱冒烟：`pnpm qa:graph`（须 sibling UA + Dashboard；打包后还应有 `dist/win-unpacked/resources/dashboard` 的 `__uaStore`）
 - [ ] Electron native 依赖（`better-sqlite3` 等）需 **electron-rebuild**；Tree-sitter 由 UA 带入，勿在 Fieldguide 重复引入
 - [ ] 编辑器已配置 TypeScript；后续统一用 **Prettier + ESLint**（Phase 1.1 脚手架时一并加入）
+
+> **交付口径**：结构图谱 + Dashboard 嵌入为已交付；完整 UA 六 Agent / 业务域视图为延期。见 [understand-anything-integration.md](./understand-anything-integration.md) §交付边界。
 
 ### 2.2 仓库与协作
 
@@ -64,8 +67,8 @@
 
 ### 2.4 心智准备
 
-- [ ] **不自研** UA 已有能力（parser、六类 Agent、Dashboard 图谱）
-- [ ] Fieldguide 价值在 **桌面壳 + 理论 + 概念桥接**，不在重写代码地图
+- [ ] **不自研** UA 已有 parser / Dashboard；**不接**完整六 Agent 运行时（见 integration §交付边界）
+- [ ] Fieldguide 价值在 **桌面壳 + 理论 + 概念桥接**，结构图谱复用 UA core + Dashboard
 - [ ] 接受 Phase 1 Dashboard 嵌入可能与壳层视觉有割裂（Phase 2 统一主题）
 - [ ] 接受 **打磨优先于速度**
 

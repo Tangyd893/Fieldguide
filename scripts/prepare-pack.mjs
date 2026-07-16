@@ -35,19 +35,36 @@ function materializeIfSymlink(dest, src) {
 }
 
 const uaRoot = join(root, '..', 'Understand-Anything', 'understand-anything-plugin', 'packages')
+const localDashboard = join(root, 'resources', 'dashboard')
+const siblingDashboard = join(uaRoot, 'dashboard', 'dist')
 
 // ── Dashboard dist guard ───────────────────────────────────────────
-const dashboardSrc = join(uaRoot, 'dashboard', 'dist')
-const dashboardIndex = join(dashboardSrc, 'index.html')
-if (!existsSync(dashboardIndex)) {
+// Prefer Fieldguide resources/dashboard (from pnpm bootstrap:ua); sync from sibling if needed.
+const siblingIndex = join(siblingDashboard, 'index.html')
+const localIndex = join(localDashboard, 'index.html')
+
+if (existsSync(siblingIndex) && !existsSync(localIndex)) {
+  mkdirSync(localDashboard, { recursive: true })
+  cpSync(siblingDashboard, localDashboard, { recursive: true })
+  console.log(`[prepare-pack] synced sibling Dashboard → ${localDashboard}`)
+} else if (existsSync(siblingIndex) && existsSync(localIndex)) {
+  // Keep local copy fresh from sibling when both exist
+  rmSync(localDashboard, { recursive: true, force: true })
+  mkdirSync(localDashboard, { recursive: true })
+  cpSync(siblingDashboard, localDashboard, { recursive: true })
+  console.log(`[prepare-pack] refreshed resources/dashboard from sibling`)
+}
+
+if (!existsSync(localIndex)) {
   console.error(
-    `[prepare-pack] ERROR: Dashboard dist not found at ${dashboardSrc}\n` +
-    '  Build the UA Dashboard first, or run: cd ../Understand-Anything/understand-anything-plugin && pnpm build\n' +
-    '  Without the dashboard, the Code Map view will not render.',
+    `[prepare-pack] ERROR: Dashboard dist not found at ${localDashboard}\n` +
+      '  Run: pnpm bootstrap:ua\n' +
+      '  (clones Understand-Anything, builds Dashboard, copies to resources/dashboard)\n' +
+      '  Without the dashboard, the Code Map view will not render.',
   )
   process.exit(1)
 }
-console.log(`[prepare-pack] Dashboard dist OK: ${dashboardSrc}`)
+console.log(`[prepare-pack] Dashboard dist OK: ${localDashboard}`)
 
 // ── UA commit guard ────────────────────────────────────────────────
 const pkgPath = join(root, 'package.json')

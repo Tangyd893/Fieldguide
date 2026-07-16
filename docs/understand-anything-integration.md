@@ -19,6 +19,17 @@ Fieldguide **基于 [Understand-Anything](https://github.com/Egonex-AI/Understan
 
 **产品关系**：UA 是成熟的 IDE/CLI 插件；Fieldguide 是 **独立桌面学习工作台**，在 UA 代码理解能力之上扩展「理论 ↔ 实现」闭环。二者不是竞品关系，而是 **上游引擎 + 垂直产品**。
 
+### 交付边界（2026-07-17 对齐）
+
+| 层级 | 状态 | 说明 |
+|------|------|------|
+| **已交付** | 结构图谱闭环 | `client.ts` 精简管线（scan → Tree-sitter → GraphBuilder → 可选 LLM）→ `knowledge-graph.json`；Dashboard iframe；点节点开文件；增量 merge |
+| **部分交付** | LLM 摘要 / Tour / 分层 | 有 API Key 时直接调 UA prompt 助手，**不是** UA Skill/Agent 编排 |
+| **明确延期** | 完整六 Agent | `graph-reviewer`、`domain-analyzer` 及 UA Agent 运行时；业务域 Tab 无 `domain-graph.json` 则隐藏 |
+| **环境前提** | sibling + bootstrap | 须 `pnpm bootstrap:ua`（锁定 commit）→ `resources/dashboard`；打包前 `prepare-pack` |
+
+验收与 smoke：`pnpm qa:graph`、[scenario-abc-test-record.md](./scenario-abc-test-record.md)、[spike-ua.md](./spike-ua.md) §已知问题。
+
 ---
 
 ## 二、UA 提供的能力（复用，不重复实现）
@@ -210,10 +221,10 @@ Fieldguide/
 以下能力 **必须调用 UA**，不得在 Fieldguide 重写：
 
 - Tree-sitter 多语言 parser
-- `project-scanner` / `file-analyzer` / `architecture-analyzer` / `tour-builder` / `graph-reviewer` / `domain-analyzer`
-- `knowledge-graph.json` schema 的主结构
-- 增量 hash 检测与 patch 逻辑
+- `GraphBuilder` / `knowledge-graph.json` schema 的主结构（结构索引路径）
 - Dashboard 内的图谱布局、LOD、Tour 播放器（Phase 1–2）
+
+> **落地说明（2026-07-17）**：文档早期写的完整 Agent 名（`architecture-analyzer` / `tour-builder` / `graph-reviewer` / `domain-analyzer`）表示 **UA 上游能力**。Fieldguide **当前不接** Agent 运行时；结构路径用 `@understand-anything/core` 程序化 API，LLM 阶段为精简直接调用。`graph-reviewer` / `domain-analyzer` **延期**，见上文「交付边界」。
 
 以下能力 **由 Fieldguide 实现**：
 

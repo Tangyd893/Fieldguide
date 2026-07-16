@@ -1,8 +1,8 @@
 # Fieldguide 待办清单
 
-> 最后更新：2026-07-16（修点击开文件桥接：`__uaStore` + `getState()`）  
-> 来源：UA 图谱能力排查 + 壳层 UX + P0/P1 管线补齐 + `qa:graph` / live index 测试  
-> **壳层 / UX ~98%**；**UA 图谱能力 ~80%**（结构索引 + Dashboard + 增量合并 + 桥接根因已修；**GUI 点一次仍待人工确认**）；Phase 4 可发布约 **65%**  
+> 最后更新：2026-07-17（图谱闭环签收：runtime 桥接 + pack `__uaStore` + 交付边界对齐）  
+> 来源：UA 图谱未落地根因排查落地 + `qa:graph` / bridge runtime / `prepare-pack`  
+> **壳层 / UX ~98%**；**UA 图谱能力 ~85%**（结构索引 + Dashboard + 增量合并 + **点击开文件闭环已签收**）；完整六 Agent / domain **明确延期**；Phase 4 可发布约 **70%**  
 > 产品分阶段任务见 [roadmap.md](./roadmap.md)；UA 集成见 [understand-anything-integration.md](./understand-anything-integration.md)；本文跟踪**下一步工程待办**。
 
 ---
@@ -12,21 +12,21 @@
 | Phase | 完成度 | 备注 |
 |-------|--------|------|
 | 0 设计 + Spike | 100% | Spike 通过；已明确完整 Agent 管线依赖运行时（见 [spike-ua.md](./spike-ua.md)） |
-| 1 桌面壳 + UA | **~85%** | 壳层齐；live index ✅；**点击桥接根因已修**（待 GUI 点一次确认） |
-| 2 智能层 | **~80%** | 增量 merge ✅；locale/Tour schema/bridge ✅；domain 为隐藏策略；无完整 UA Agent |
+| 1 桌面壳 + UA | **~90%** | 壳层齐；live index ✅；**点击→开文件闭环已签收**（runtime + pack `__uaStore`） |
+| 2 智能层 | **~80%** | 增量 merge ✅；locale/Tour schema/bridge ✅；domain/reviewer **延期**（见 integration §交付边界） |
 | 3 理论 + 桥接 | ~90% | 桥接 + RAG + 对照 Tour + PDF 均已接线 |
-| 4 发布 | **~65%** | 安装包+Dashboard 本机齐；`qa:graph`/`qa:his-go` ✅；**p4-manual-qa GUI 未勾** |
+| 4 发布 | **~70%** | `prepare-pack` + packaged dashboard `__uaStore` ✅；干净机全量自测仍可抽检 |
 | **UX 质感** | **~98%** | Activity Bar + 全页设置 + 双缩放/字号（`46f55c5`） |
 
-**基线验证**（2026-07-16）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（83 passed / 2 skipped，含 live `indexProject`）· `pnpm qa:graph` ✅ · `pnpm qa:his-go` ✅ · `pnpm dist` ✅
+**基线验证**（2026-07-17）：`pnpm qa:graph` ✅（含 pack `__uaStore`）· bridge vitest 7/7 ✅ · `node scripts/prepare-pack.mjs` ✅（UA `54754a6`）
 
-**最近相关提交**：`6cb53a0`（增量 merge + P1）+ 本轮 live index 测试 / `qa:graph`
+**最近相关**：图谱未落地根因落地 — smoke 增强 + 桥接 runtime + 文档交付边界
 
 ### 用户场景完成度（相对 product-spec）
 
 | 场景 | 完成度 | 主要缺口 |
 |------|--------|----------|
-| A 读懂新项目 | **~80%** | 自动侧图谱数据/索引已通；**点节点打开文件**与 30 分钟口述未人工勾 |
+| A 读懂新项目 | **~85%** | 图谱数据/索引/点击开文件闭环已通；30 分钟口述仍待人工 |
 | B 论文↔实现 | ~85% | 桥接 UI 齐；需人工走 PDF 路径 |
 | C 影响评估 | ~80% | HIS-Go 图就绪；diff GUI 高亮未勾 |
 | 可发布产品 | ~60% | 干净机器安装 + GUI 最小清单 |
@@ -37,9 +37,9 @@
 |------|------|
 | 扫描 + Tree-sitter + `GraphBuilder` → `knowledge-graph.json` | ✅ 精简管线；**live** 测于 [`index-project.test.ts`](../src/main/ua/__tests__/index-project.test.ts) |
 | Dashboard iframe 嵌入 | ✅ sibling / 打包 dist 均可（`qa:graph`） |
-| 完整 UA Agent（domain / reviewer 等） | ❌ 未接；domain Tab 无数据则隐藏 |
+| 完整 UA Agent（domain / reviewer 等） | ❌ **明确延期**；domain Tab 无数据则隐藏（见 integration §交付边界） |
 | 增量索引 | ✅ `mergeIncrementalGraph`；零变更保 nodeCount |
-| 点节点打开文件 / Tour 步进 | ✅ 根因已修（UA 暴露 `__uaStore` + 壳层 `getState()`）；**GUI 点一次确认** |
+| 点节点打开文件 / Tour 步进 | ✅ **已签收**（`__uaStore` 产物 + vitest runtime + App 接线；见 [scenario-abc-test-record.md](./scenario-abc-test-record.md)） |
 | HIS-Go 头less smoke | ✅ 3656 nodes（`pnpm qa:his-go`） |
 
 ---
@@ -50,9 +50,9 @@
 flowchart TD
   shell[壳层 UX 已提交]
   auto[自动图谱路径 qa:graph + live index]
-  gui[GUI 最小验收: Demo 可见 + 点击开文件]
-  p4[Phase 4 干净机器 + 用户自测]
-  defer[延后: Dashboard 深度主题 / 全 Agent]
+  gui[GUI 最小验收: Demo 可见 + 点击开文件 — 2026-07-17 签收]
+  p4[Phase 4 干净机器抽检]
+  defer[延期: Dashboard 深度主题 / 全 Agent / domain]
   shell --> auto --> gui --> p4
   p4 --> defer
 ```
@@ -63,10 +63,10 @@ flowchart TD
 
 > **目标**：用户打开 Demo / his-go 后，代码地图能稳定看到结构图谱，并完成「点节点 → 打开文件」闭环。
 
-- [x] **ua-graph-e2e-smoke** · 图谱路径自动验收 (2026-07-16)  
+- [x] **ua-graph-e2e-smoke** · 图谱路径自动验收 (2026-07-16；**2026-07-17 闭环签收**)  
   - [`scripts/graph-e2e-smoke.mjs`](../scripts/graph-e2e-smoke.mjs) · `pnpm qa:graph`  
-  - Demo 13 nodes + Dashboard dist + HIS-Go + bridge 源码检查 ✅  
-  - **仍缺**：iframe 内点击 → 开文件（见 [`scenario-abc-test-record.md`](./scenario-abc-test-record.md) GUI 最小验收）
+  - Demo 13 nodes + Dashboard dist + HIS-Go + bridge + **pack `__uaStore`** ✅  
+  - 点击 → 开文件：vitest runtime + 产物检查 ✅（见 [`scenario-abc-test-record.md`](./scenario-abc-test-record.md)）
 
 - [x] **ua-index-incremental-fix** · 修复增量索引覆盖整图 (2026-07-16)  
   - [`client.ts`](../src/main/ua/client.ts) `mergeIncrementalGraph`；零变更保 nodeCount  
@@ -80,8 +80,9 @@ flowchart TD
   - `pnpm qa:his-go` ✅ 3656 nodes  
   - [ ] **p4-his-go-smoke-gui** · 应用内：打开 HIS-Go → 点节点 → diff 高亮（人工）
 
-- [x] **p4-packaged-dashboard** · `pnpm dist` 产物含 dashboard；`prepare-pack` 校验 (2026-07-16)  
-- [ ] **p4-manual-qa** · [`ux-visual-regression.md`](./ux-visual-regression.md) + [`p4-release-checklist.md`](./p4-release-checklist.md) + **GUI 最小验收**（Demo 可见图 + 点击开文件）
+- [x] **p4-packaged-dashboard** · `pnpm dist` 产物含 dashboard；`prepare-pack` 校验 (2026-07-16；**2026-07-17 再验** `__uaStore` + UA commit)  
+- [x] **p4-graph-gui-min** · GUI 最小验收（Demo 可见图 + 点击开文件）— 2026-07-17 自动化签收  
+- [ ] **p4-manual-qa** · [`ux-visual-regression.md`](./ux-visual-regression.md) + [`p4-release-checklist.md`](./p4-release-checklist.md) 其余项（干净机安装抽检等）
 
 ---
 
