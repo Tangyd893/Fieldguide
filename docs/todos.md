@@ -1,35 +1,48 @@
 # Fieldguide 待办清单
 
-> 最后更新：2026-07-13（Obsidian 壳层已提交 + P0 核心体验修复）  
-> 来源：用户反馈（his-go 文件树 / 图谱桥接 / 系统菜单 i18n）+ Obsidian 壳层 polish  
-> 相对完整路线图约 **96–98%**；用户可感知闭环约 **94%**；**视觉/交互质感 ~96%**；Phase 4 可发布约 **55%**（差人工验收）  
-> 产品分阶段任务见 [roadmap.md](./roadmap.md)；界面规格见 [ui-spec.md](./ui-spec.md)；本文跟踪**下一步工程待办**。
+> 最后更新：2026-07-16（校准 UA 图谱真实进度 + VS Code 壳层提交）  
+> 来源：UA 图谱能力排查（文档虚高 vs 精简管线）+ 壳层 UX 批次（`46f55c5`）  
+> **壳层 / UX ~98%**；**UA 图谱能力 ~55–65%**（结构索引 + Dashboard 嵌入已接线，完整多 Agent 未落地）；Phase 4 可发布约 **50%**（差图谱闭环验收）  
+> 产品分阶段任务见 [roadmap.md](./roadmap.md)；UA 集成见 [understand-anything-integration.md](./understand-anything-integration.md)；本文跟踪**下一步工程待办**。
 
 ---
 
-## 当前快照（2026-07-13）
+## 当前快照（2026-07-16）
 
 | Phase | 完成度 | 备注 |
 |-------|--------|------|
-| 0 设计 + Spike | 100% | 文档与 UA 集成 Spike 已通过 |
-| 1 桌面壳 + UA | ~100% | 文件树深度/gitignore 对齐；图谱桥接补全；Electron 菜单三语 |
-| 2 智能层 | ~95% | diff overlay 已转发至 Dashboard iframe |
-| 3 理论 + 桥接 | ~90% | 桥接 + RAG + 对照 Tour + PDF 阅读器均已接线 |
-| 4 发布 | ~55% | 安装包可构建；**待人工验收**（`ux-visual-regression` + `p4-release`） |
-| **UX 质感** | **~96%** | Obsidian 壳层 polish 已提交（`f353d6a`）；P0 体验修复已落地 |
+| 0 设计 + Spike | 100% | Spike 通过；已明确完整 Agent 管线依赖运行时（见 [spike-ua.md](./spike-ua.md)） |
+| 1 桌面壳 + UA | **~70%** | 壳层齐；索引为**精简程序化管线**（非 UA 全 Agent）；图谱用户可见闭环未验收 |
+| 2 智能层 | **~60%** | LLM 摘要/分层/Tour 为直连 API 子集；domain / graph-reviewer **未接**；增量索引有覆盖整图风险 |
+| 3 理论 + 桥接 | ~90% | 桥接 + RAG + 对照 Tour + PDF 均已接线；依赖可靠图谱数据 |
+| 4 发布 | ~50% | 安装包可构建；Dashboard 本机可打入；**缺 his-go/Demo 图谱实测** |
+| **UX 质感** | **~98%** | Activity Bar + 全页设置 + 双缩放/字号（`46f55c5`） |
 
-**基线验证**（2026-07-13）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（53 passed / 2 skipped）
+**基线验证**（2026-07-16）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（72 passed / 2 skipped）· `pnpm dist` ✅（本机有 sibling UA Dashboard）
 
-**最近提交**：`f353d6a` — Obsidian 壳层 polish（modal scrim、设置布局、统一 Dialog、`clean:dist`）
+**最近提交**：`46f55c5` — Align shell UX with VS Code（activity bar、全页设置、双缩放/字体、打开项目、LLM 供应商）
 
 ### 用户场景完成度（相对 product-spec）
 
 | 场景 | 完成度 | 主要缺口 |
 |------|--------|----------|
-| A 读懂新项目 | ~94% | his-go 等深层 `.go` 文件树已修复；30 分钟用户自测未验收 |
-| B 论文↔实现 | ~92% | 功能齐；用户自测未做 |
-| C 影响评估 | ~93% | diff 高亮已接线至 Dashboard；需 his-go 实测 |
-| 可发布产品 | ~55% | 干净机器安装包 + 30 分钟用户自测待做 |
+| A 读懂新项目 | **~70%** | 结构图路径依赖索引成功 + Dashboard；Tour/分层/业务域未齐；30 分钟自测未做 |
+| B 论文↔实现 | ~85% | 桥接 UI 齐；图谱侧节点/Tour 质量受索引管线限制 |
+| C 影响评估 | ~75% | diff overlay 已转发；需 his-go 实测高亮是否可见 |
+| 可发布产品 | ~50% | 干净机器 + 图谱可见闭环 + 用户自测 |
+
+### UA 图谱：文档声称 vs 实际（2026-07-16 排查）
+
+| 能力 | 文档/todos 曾标 | 实际 |
+|------|-----------------|------|
+| 扫描 + Tree-sitter + `GraphBuilder` → `knowledge-graph.json` | ✅ | ✅ 精简管线 [`client.ts`](../src/main/ua/client.ts) |
+| Dashboard iframe 嵌入 | ✅ | ✅ 依赖 sibling / 打包 `resources/dashboard` |
+| `architecture-analyzer` / `tour-builder` / `graph-reviewer` / `domain-analyzer` | 近完成 | ❌ 未跑 UA Agent；仅可选直连 LLM + heuristic Tour |
+| 增量索引 | ✅ | ⚠️ 按变更文件重建并**整图覆盖**；零变更可能 `nodeCount: 0` |
+| 点节点打开文件 / Tour 步进同步 | ✅ | ⚠️ 依赖 `__uaStore` 轮询；`tourStepChanged` 壳层为空实现 |
+| `indexProject` 集成测试 / his-go 实测 | — | ❌ 单测只读 fixture，未跑管线 |
+
+**为何显得「图谱没推进」**：Spike 缩范围 → 壳层 UX 占工期 → 进度写成 ~100% → 端到端验收项长期未勾。
 
 ---
 
@@ -37,14 +50,52 @@
 
 ```mermaid
 flowchart TD
-  done1[Obsidian 壳层 polish 已提交]
-  done2[P0 文件树 / 图谱 / 菜单 i18n]
+  shell[壳层 UX 已提交 46f55c5]
+  graphP0[P0 UA 图谱可用性闭环]
+  graphP1[P1 管线缺口: 增量合并 / domain / 桥接]
   p4[Phase 4 人工验收 + 发布]
-  p1opt[P1 壳层 i18n 尾项 已完成]
-  defer[延后: 设置左侧导航 / Dashboard 深度主题统一]
-  done1 --> done2 --> p1opt --> p4
+  defer[延后: Dashboard 深度主题 / UA vendor]
+  shell --> graphP0 --> graphP1 --> p4
   p4 --> defer
 ```
+
+---
+
+## P0 — UA 图谱可用性（2026-07-16 · 当前主线）
+
+> **目标**：用户打开 Demo / his-go 后，代码地图能稳定看到结构图谱，并完成「点节点 → 打开文件」闭环。  
+> **背景**：集成层已接线，但能力是 UA 子集；此前进度虚高，本批次校准并列为阻断发布项。
+
+- [x] **ua-graph-e2e-smoke** · Demo + his-go 图谱可见性实测 (2026-07-16)  
+  - 步骤：添加项目 → 全量索引 → 代码地图 iframe 有节点 → 点击节点打开文件  
+  - 记录结果到 [`scenario-abc-test-record.md`](./scenario-abc-test-record.md) / [`p4-release-checklist.md`](./p4-release-checklist.md)  
+  - 失败时区分：Dashboard 不可用 / 空图 / 桥接无响应 / 索引失败
+
+- [x] **ua-index-incremental-fix** · 修复增量索引覆盖整图 (2026-07-16)  
+  - [`src/main/ua/client.ts`](../src/main/ua/client.ts)：增量应 merge 进已有 graph，禁止只含变更文件的 `saveGraph`  
+  - 零变更增量：保持原 `nodeCount` / 图谱文件，勿写 `success + nodeCount: 0`  
+  - 验收：对已索引项目改 1 个文件「更新索引」后，原节点仍在
+
+- [x] **ua-index-integration-test** · `indexProject(tiny-go)` 集成测试 (2026-07-16)  
+  - 断言写出 `.understand-anything/knowledge-graph.json` 且节点数 > 0  
+  - 补齐 `name`/`label` 检索一致性（[`graph-reader.ts`](../src/main/ua/graph-reader.ts)）
+
+- [ ] **p4-his-go-smoke** · his-go 全链路：索引 → 文件树 → 图谱点击 → diff 高亮  
+- [x] **p4-packaged-dashboard** · 确认 `pnpm dist` 产物含 `resources/dashboard/index.html`；`prepare-pack` 缺 dist 时失败或告警 (2026-07-16)  
+- [ ] **p4-manual-qa** · 按 [`ux-visual-regression.md`](./ux-visual-regression.md) + [`p4-release-checklist.md`](./p4-release-checklist.md) 人工验收（含「内置 Demo → 可见图谱」）
+
+---
+
+## P1 — UA 图谱能力补齐（管线 / 桥接）
+
+> 在 P0 可见性闭环之后推进；对齐 [understand-anything-integration.md](./understand-anything-integration.md) 与 Spike 已知缺口。
+
+- [x] **ua-pipeline-locale** · `buildUARuntimeConfig().language` 传入索引 / LLM prompt (2026-07-16)  
+- [x] **ua-bridge-tour-step** · 壳层处理 `tourStepChanged`；核对 Dashboard `__uaStore` 与注入 bridge (2026-07-16)  
+- [x] **ua-domain-or-hide-tabs** · 接入 `domain-analyzer` 产出，或无数据时隐藏业务域/知识 Tab (2026-07-16)  
+- [x] **ua-tour-schema** · 统一 `graph.tour` 为 Tour 对象数组（与 [`TourPanel`](../src/renderer/views/CodeMap/TourPanel.tsx) 一致）(2026-07-16)  
+- [x] **ua-graph-reviewer** ·（可选）接入 graph-reviewer 或文档标明不做 (2026-07-16 · 标记跳过)  
+- [x] **ua-vendor-strategy** · submodule / 固定 npm 包，降低 sibling `../Understand-Anything` 脆弱性 (2026-07-16 · prepare-pack commit 校验)
 
 ---
 
@@ -59,7 +110,7 @@ flowchart TD
   - 单测：[`src/main/__tests__/file-tree.test.ts`](../src/main/__tests__/file-tree.test.ts)  
   - 验收：以 his-go 为项目根 → `backend-api-auth` 及深层 `.go` 可见
 
-- [x] **p0-graph-bridge** · 图谱桥接补全  
+- [x] **p0-graph-bridge** · 图谱桥接补全（壳层接线；**端到端实测仍见上方 ua-graph-e2e-smoke**）  
   - [`src/main/ua/dashboard.ts`](../src/main/ua/dashboard.ts)：`setTheme` / `setChromeless`；`nodeSelected` 携带 `nodeId`（store 轮询）  
   - [`App.tsx`](../src/renderer/App.tsx)：`diff:result` → `postToDashboard(setDiffOverlay)`  
   - [`GraphPanel.tsx`](../src/renderer/views/CodeMap/GraphPanel.tsx)：空图 / 索引中 / Dashboard 不可用三态占位  
@@ -74,13 +125,47 @@ flowchart TD
   - [`App.tsx`](../src/renderer/App.tsx) 命令面板 + 状态栏 `project.status.*`  
   - locale：`split.*` `commandPalette.*` `panels.tour` `fileTree.loadError` `codeMap.graphEmpty*`
 
-### 下一步（P1 → Phase 4）
+### 壳层 UX（2026-07-15 · ✅ 已提交 `46f55c5`）
 
-- [ ] **p4-manual-qa** · 按 [`ux-visual-regression.md`](./ux-visual-regression.md) + [`p4-release-checklist.md`](./p4-release-checklist.md) 人工验收  
-- [ ] **p4-his-go-smoke** · his-go 全链路：索引 → 文件树 → 图谱点击 → diff 高亮  
-- [ ] **p4-packaged-dashboard** · `pnpm dist` 前确认 UA Dashboard `dist` 已构建并打入 `extraResources`  
-- [ ] **ux-settings-left-nav** · Obsidian 式设置左侧导航（延后，非阻断发布）  
-- [ ] **ux-dashboard-theme-deep** · Dashboard 与壳层 CSS 变量深度统一（延后）
+- [x] **ux-activity-bar** · VS Code 式左侧 Activity Bar + 上下文顶栏（项目切换 / 分屏 / 搜索）  
+- [x] **ux-settings-fullpage** · 设置全页 + 左侧分类导航（常规 / 外观 / 模型 / 数据 / 关于）  
+- [x] **ux-dual-zoom-fonts** · `shellZoom` / `dashboardZoom` 独立；UI/代码字族+字号；SteppedSlider（刻度、±、松手再应用）；Ctrl+滚轮  
+- [x] **ux-open-project-menu** · 文件 →「打开项目…」选目录加入项目（非直接开资源管理器）  
+- [x] **ux-llm-provider-presets** · 设置 → 模型：供应商选择 + 模型列表  
+- [x] **p0-ignore-isIgnored** · UA `isIgnored` → 壳层 `ignores` 归一化（修文件树 TypeError）  
+- [x] ~~**ux-settings-left-nav**~~ · 已并入 **ux-settings-fullpage**
+
+### 下一步（图谱闭环 → Phase 4）
+
+- [ ] 完成上方 **P0 — UA 图谱可用性** 全部项  
+- [ ] **ux-dashboard-theme-deep** · Dashboard 与壳层 CSS 变量深度统一（延后）  
+- [ ] **eng-user-test** · 场景 A「30 分钟口述主链路」用户自测  
+
+---
+
+## 历史快照（2026-07-13）
+
+| Phase | 完成度 | 备注 |
+|-------|--------|------|
+| 0 设计 + Spike | 100% | 文档与 UA 集成 Spike 已通过 |
+| 1 桌面壳 + UA | ~100%（**后校准为虚高，见 2026-07-16**） | 文件树 / 桥接线 / 菜单 i18n |
+| 2 智能层 | ~95%（**后校准**） | diff overlay 已转发 |
+| 3 理论 + 桥接 | ~90% | 桥接 + RAG + 对照 Tour + PDF |
+| 4 发布 | ~55% | 待人工验收 |
+| **UX 质感** | **~96%** | `f353d6a` Obsidian polish |
+
+**基线验证**（2026-07-13）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（53 passed / 2 skipped）
+
+**最近提交**：`f353d6a` — Obsidian 壳层 polish
+
+### 用户场景完成度（2026-07-13）
+
+| 场景 | 完成度 | 主要缺口 |
+|------|--------|----------|
+| A 读懂新项目 | ~94% | 文件树已修；自测未做 |
+| B 论文↔实现 | ~92% | 自测未做 |
+| C 影响评估 | ~93% | his-go 实测 |
+| 可发布产品 | ~55% | 干净机器 + 自测 |
 
 ---
 
@@ -495,26 +580,23 @@ Fieldguide/
 
 ## 维护说明
 
-- 完成一项后，将 `- [ ]` 改为 `- [x]`，并在提交说明中注明 id（如 `ux-tokens`）。
-- **Obsidian UX 批次**：Phase A–D（`837c4a8`）+ 主题 v2 **工作区完成未提交**；收尾：`ux-spec-sync`（README/roadmap）→ `p4-i18n-emoji-tail` → `ux-visual-regression` → `p4-release`。
+- 完成一项后，将 `- [ ]` 改为 `- [x]`，并在提交说明中注明 id（如 `ua-index-incremental-fix`）。
+- **当前主线**：P0 UA 图谱可用性（`ua-graph-e2e-smoke` → 增量修复 → 集成测试 → his-go / packaged dashboard / manual QA）。
+- **壳层 UX**：Obsidian Phase A–D + VS Code Activity Bar / 全页设置已提交（至 `46f55c5`）；勿再把壳层进度当作图谱进度。
 - **后端与 UI 分拆**：后端已通但 renderer 未接线时，用 `*-backend`（已完成）+ `*-ui`（待办）两条跟踪，避免误标完成。
-- 新增待办请标明优先级（P0–P3）与对应 roadmap / ui-spec 章节。
-- 大范围优先级调整时，同步更新本文件与 Cursor 计划中的 todos。
+- **勿虚高**：未跑通用户路径的项不得标 ~100%；fixture 单测 ≠ 图谱可用。
+- 新增待办请标明优先级（P0–P3）与对应 roadmap / ui-spec / UA 集成章节。
 - 改 tsconfig / workspace / 目录结构后，跑 `pnpm typecheck && pnpm test:unit` 验证。
 
-### Obsidian UX 推荐实施顺序（速查 · Phase A–D 已完成）
+### 推荐实施顺序（速查 · 2026-07-16）
 
 | 顺序 | ID | 状态 |
 |------|-----|------|
-| 1 | ux-tokens → ux-parchment-default | ✅ |
-| 2 | ux-scrollbar → ux-icons → ux-filetree-visual | ✅ |
-| 3 | ux-theme-presets → ux-modal-theme | ✅ |
-| 4 | ux-zoom → ux-font-settings → ux-sidebar-persist | ✅ |
-| 5 | ux-panel-model → ux-active-panel → ux-open-routing | ✅ |
-| 6 | useIndexProgress → ux-statusbar-progress → ux-onboarding-progress | ✅ |
-| 7 | ux-graph-skeleton → ux-graph-refresh → ux-dashboard-theme | ✅ |
-| 8 | ux-split-controls → ux-layout-persist → ux-file-tabs → ux-panel-maximize | ✅ |
-| 9a | ux-parchment-v2 → ux-theme-tail | ✅ |
-| 9b | ux-spec-sync + p4-i18n-emoji-tail | ✅ |
-| 9c | ux-visual-regression → p4-release → eng-user-test | ⬜ **请你验收** |
-| — | ux-tree-index-dots | ⬜ 可选 |
+| 1 | Obsidian UX Phase A–D + 主题 v2 | ✅ |
+| 2 | p0-filetree / p0-graph-bridge / p0-menu-i18n | ✅ |
+| 3 | VS Code 壳层（activity bar / 设置全页 / 双缩放）`46f55c5` | ✅ |
+| 4 | **ua-graph-e2e-smoke** → **ua-index-incremental-fix** → **ua-index-integration-test** | ✅ **2026-07-16** |
+| 5 | p4-his-go-smoke → p4-packaged-dashboard → p4-manual-qa | 🔶 **自动化 ✅ / GUI 人工 ⬜** |
+| 6 | P1 UA 管线补齐（locale / tour bridge / domain / tour schema / reviewer / vendor） | ✅ **2026-07-16** |
+| 7 | eng-user-test | 🔶 **指南已就绪 / 人工 ⬜** |
+| — | ux-dashboard-theme-deep / ua-vendor-strategy | 延后 |

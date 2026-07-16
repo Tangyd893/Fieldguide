@@ -360,7 +360,7 @@ export interface LLMEnrichConfig {
 /**
  * Call the configured LLM with a prompt and return the response text.
  */
-async function callLLM(prompt: string, config: LLMEnrichConfig): Promise<string> {
+async function callLLM(prompt: string, config: LLMEnrichConfig, language?: string): Promise<string> {
   const url = `${config.baseUrl}/v1/chat/completions`
     .replace(/\/+$/, '')
     .replace(/\/v1\/chat\/completions\/v1\/chat\/completions/, '/v1/chat/completions')
@@ -374,7 +374,9 @@ async function callLLM(prompt: string, config: LLMEnrichConfig): Promise<string>
     body: JSON.stringify({
       model: config.chatModel,
       messages: [
-        { role: 'system', content: 'You are a code analysis assistant. Respond with valid JSON only. Do not include markdown fences or extra commentary.' },
+        { role: 'system', content: language === 'en'
+          ? 'You are a code analysis assistant. Respond with valid JSON only. Do not include markdown fences or extra commentary.'
+          : '你是一个代码分析助手。只回复合法的 JSON，不要包含 markdown 代码块或额外解释。' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.3,
@@ -406,6 +408,7 @@ async function enrichWithLLM(
   rootPath: string,
   projectName: string,
   llmConfig: LLMEnrichConfig,
+  language?: string,
   onPhase?: (phase: string) => void,
   onProgress?: (current: number, total: number) => void,
 ): Promise<void> {
@@ -447,7 +450,7 @@ async function enrichWithLLM(
 
       try {
         const prompt = buildFileAnalysisPrompt(file.path, truncated, `Project: ${projectName}`)
-        const response = await callLLM(prompt, llmConfig)
+        const response = await callLLM(prompt, llmConfig, language)
         const parsed = parseFileAnalysisResponse(response)
 
         if (parsed) {
@@ -518,6 +521,65 @@ async function enrichWithLLM(
   }
 }
 
+/**
+ * Merge an incremental (partial) graph into the existing full graph on disk.
+ *
+ * The `partialGraph` only contains nodes and edges for files that changed.
+ * This function loads the existing graph from disk, removes old nodes/edges
+ * for the changed files, and inserts the new ones.  The partial graph is
+ * mutated in-place.
+ *
+ * If the existing graph is missing or corrupt, the partial graph is kept as-is
+ * (treated as a full index).
+ */
+export function mergeIncrementalGraph(
+  rootPath: string,
+  partialGraph: { nodes: any[]; edges: any[]; layers?: any[]; tour?: any[] },
+  changedFiles: { path: string }[],
+): void {
+  const graphPath = join(rootPath, '.understand-anything', 'knowledge-graph.json')
+  if (!existsSync(graphPath)) return // no existing graph — partial is the full graph
+
+  let existingGraph: any
+  try {
+    existingGraph = JSON.parse(readFileSync(graphPath, 'utf-8'))
+  } catch {
+    return // corrupt — treat partial as full
+  }
+
+  if (!existingGraph?.nodes) return
+
+  const changedPaths = new Set(changedFiles.map(f => f.path))
+
+  // Remove old nodes whose filePath matches a changed file
+  const removedIds = new Set<string>()
+  const keptNodes = existingGraph.nodes.filter((n: any) => {
+    if (n.filePath && changedPaths.has(n.filePath)) {
+      removedIds.add(n.id)
+      return false
+    }
+    return true
+  })
+
+  // Remove edges that reference removed nodes
+  const keptEdges = (existingGraph.edges || []).filter(
+    (e: any) => !removedIds.has(e.source) && !removedIds.has(e.target),
+  )
+
+  // Merge: kept nodes/edges + new nodes/edges from changed files
+  partialGraph.nodes = [...keptNodes, ...partialGraph.nodes]
+  partialGraph.edges = [...keptEdges, ...partialGraph.edges]
+
+  // Preserve existing layers and tours unless the new build
+  // produced its own (LLM enrichment may regenerate them)
+  if (!partialGraph.layers?.length && existingGraph.layers?.length) {
+    partialGraph.layers = existingGraph.layers
+  }
+  if (!partialGraph.tour?.length && existingGraph.tour?.length) {
+    partialGraph.tour = existingGraph.tour
+  }
+}
+
 export async function indexProject(
   rootPath: string,
   projectName: string,
@@ -526,6 +588,7 @@ export async function indexProject(
   incremental?: boolean,
   llmConfig?: LLMEnrichConfig,
   signal?: AbortSignal,
+  language?: string,
 ): Promise<IndexResult> {
   try {
     if (signal?.aborted) {
@@ -548,7 +611,19 @@ export async function indexProject(
     const scanResult = await scanProject(rootPath, changedAfter)
     if (scanResult.files.length === 0) {
       if (incremental) {
-        return { success: true, graphPath: join(rootPath, '.understand-anything', 'knowledge-graph.json'), nodeCount: 0, edgeCount: 0 }
+        // Zero changes: return the actual node/edge count from the existing graph.
+        // Do NOT report nodeCount: 0 when the graph is still valid.
+        const graphPath = join(rootPath, '.understand-anything', 'knowledge-graph.json')
+        let nodeCount = 0
+        let edgeCount = 0
+        if (existsSync(graphPath)) {
+          try {
+            const existing = JSON.parse(readFileSync(graphPath, 'utf-8'))
+            nodeCount = existing?.nodes?.length || 0
+            edgeCount = existing?.edges?.length || 0
+          } catch { /* corrupt graph — return 0 counts */ }
+        }
+        return { success: true, graphPath, nodeCount, edgeCount }
       }
       return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: '未发现可解析的文件' }
     }
@@ -623,6 +698,15 @@ export async function indexProject(
 
     const graph = builder.build()
 
+    // ── Incremental merge ──────────────────────────────────────────
+    // When indexing incrementally, the builder only contains the changed
+    // files.  saveGraph() overwrites the entire file, so we must merge
+    // the new partial graph into the existing one to preserve unchanged
+    // nodes and edges.
+    if (incremental) {
+      mergeIncrementalGraph(rootPath, graph, scanResult.files)
+    }
+
     // Phase 4: LLM enrichment (conditional on API key)
     let llmEnriched = false
     const hasLLM = llmConfig && llmConfig.apiKey && llmConfig.baseUrl && llmConfig.chatModel
@@ -635,6 +719,7 @@ export async function indexProject(
           rootPath,
           projectName,
           llmConfig!,
+          language,
           onPhase,
           (current, total) => {
             // Map enrichment progress to overall progress (70% → 95%)

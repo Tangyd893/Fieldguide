@@ -23,9 +23,10 @@ interface Tour {
 interface Props {
   projectId: string
   t: (key: string, opts?: Record<string, unknown>) => string
+  externalStepIndex?: number | null
 }
 
-export default function TourPanel({ projectId, t }: Props) {
+export default function TourPanel({ projectId, t, externalStepIndex }: Props) {
   const [tours, setTours] = useState<Tour[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
@@ -35,6 +36,14 @@ export default function TourPanel({ projectId, t }: Props) {
   useEffect(() => {
     loadTours()
   }, [projectId])
+
+  // Sync with Dashboard-initiated tour step changes
+  useEffect(() => {
+    if (externalStepIndex != null && tours.length > 0) {
+      setActiveStepIndex(externalStepIndex)
+      if (activeTourIndex == null) setActiveTourIndex(0)
+    }
+  }, [externalStepIndex])
 
   async function loadTours() {
     setLoading(true)

@@ -95,6 +95,7 @@ export default function App() {
   const [showProjectMenu, setShowProjectMenu] = useState(false)
   const indexProgress = useIndexProgress(selectedProject?.id)
   const [pendingIndex, setPendingIndex] = useState<string | null>(null)
+  const [dashboardTourStep, setDashboardTourStep] = useState<number | null>(null)
   const [appearance, setAppearance] = useState<AppearanceState>(() => normalizeAppearance())
   const fileTreeWidthRef = useRef(260)
   const { toasts, removeToast } = useToast()
@@ -418,6 +419,7 @@ export default function App() {
         break
       }
       case 'tourStepChanged':
+        setDashboardTourStep((msg as unknown as { step: number }).step)
         break
     }
   }
@@ -565,6 +567,7 @@ export default function App() {
                     t={t}
                     onDashboardMessage={handleDashboardMessage}
                     onNodeRefClick={handleNodeRef}
+                    dashboardTourStep={dashboardTourStep}
                   />
                 </div>
               </div>
@@ -785,12 +788,14 @@ function CodeMapLayout({
   t,
   onDashboardMessage,
   onNodeRefClick,
+  dashboardTourStep,
 }: {
   project: Project | null
   workspaceLayout: ReturnType<typeof useWorkspaceLayout>
   t: (key: string) => string
   onDashboardMessage?: (msg: DashboardMessage) => void
   onNodeRefClick?: (nodeId: string) => void
+  dashboardTourStep?: number | null
 }) {
   if (!project) {
     return (
@@ -804,7 +809,7 @@ function CodeMapLayout({
       renderGraph={() => <GraphPanel t={t} projectRoot={project.root_path} projectId={project.id} onDashboardMessage={onDashboardMessage} />}
       renderCode={(path) => <CodeViewer projectId={project.id} filePath={path} t={t} />}
       renderChat={() => <ChatPanel projectId={project.id} projectName={project.name} t={t} onNodeRefClick={onNodeRefClick} />}
-      renderTour={() => <TourPanel projectId={project.id} t={t} />}
+      renderTour={() => <TourPanel projectId={project.id} t={t} externalStepIndex={dashboardTourStep} />}
       layout={workspaceLayout}
       t={t}
       hideChromeControls

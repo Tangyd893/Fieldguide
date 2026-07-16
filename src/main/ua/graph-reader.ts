@@ -22,6 +22,7 @@ export interface GraphNode {
   id: string
   type: string
   label: string
+  name?: string
   filePath?: string
   lineRange?: [number, number]
   metadata?: {
@@ -129,7 +130,7 @@ export function getNeighbors(
   return { nodes: resultNodes, edges: resultEdges }
 }
 
-/** Text search across node labels and metadata. */
+/** Text search across node labels, names, and metadata. */
 export function searchNodes(
   graph: KnowledgeGraph,
   query: string,
@@ -138,7 +139,7 @@ export function searchNodes(
   const q = query.toLowerCase()
   return graph.nodes
     .filter(n => {
-      const label = (n.label || n.id).toLowerCase()
+      const label = (n.label || n.name || n.id).toLowerCase()
       const summary = n.metadata?.summary?.toLowerCase() || ''
       return label.includes(q) || summary.includes(q)
     })

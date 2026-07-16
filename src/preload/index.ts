@@ -39,6 +39,8 @@ const api = {
     ipcRenderer.invoke('graph:getSource', { projectId, ...opts }),
   graphStats: (projectId: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('graph:stats', { projectId }),
+  graphMeta: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('graph:meta', { projectId }),
 
   // Index
   projectIndex: (projectId: string, incremental?: boolean): Promise<IpcResult<unknown>> =>

@@ -54,4 +54,5 @@ pnpm dist
 | 日期 | 环境 | 结果 | 备注 |
 |------|------|------|------|
 | 2026-07-13 | 开发机 | ✅ 自动化基线 | `pnpm qa:baseline` + `pnpm qa:scenario` 通过 |
+| 2026-07-16 | 开发机 | ✅ 自动化基线 | typecheck + 81 tests + fixture + HIS-Go smoke (3656 nodes) + prepare-pack guards |
 | | Win11 干净 VM | ⬜ 待验收 | 需人工安装 NSIS 包 |

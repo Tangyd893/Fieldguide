@@ -1,5 +1,8 @@
 /**
  * Integration smoke: graph-reader against committed tiny-go fixture.
+ *
+ * Verifies the knowledge-graph.json written by indexProject (or the
+ * spike script) is well-formed and queryable.
  */
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'
@@ -18,6 +21,16 @@ describe('ua/client integration (fixture graph)', () => {
   it('loads knowledge-graph.json from tiny-go fixture', () => {
     expect(graph).not.toBeNull()
     expect(graph!.nodes.length).toBeGreaterThan(0)
+    expect(graph!.edges.length).toBeGreaterThan(0)
+  })
+
+  it('all nodes have an id and at least one of name/label', () => {
+    expect(graph).not.toBeNull()
+    for (const node of graph!.nodes) {
+      expect(node.id).toBeTruthy()
+      // Each node must have either label or name for display/search
+      expect(node.label || node.name).toBeTruthy()
+    }
   })
 
   it('finds entry file node', () => {
@@ -26,9 +39,16 @@ describe('ua/client integration (fixture graph)', () => {
     expect(main).toBeDefined()
   })
 
-  it('searchNodes finds handler-related symbols', () => {
+  it('searchNodes finds handler-related symbols by name or label', () => {
     expect(graph).not.toBeNull()
     const hits = searchNodes(graph!, 'handler')
+    expect(hits.length).toBeGreaterThan(0)
+  })
+
+  it('searchNodes finds symbols by name field', () => {
+    expect(graph).not.toBeNull()
+    // Nodes in the fixture use "name" not "label" — verify fallback works
+    const hits = searchNodes(graph!, 'main')
     expect(hits.length).toBeGreaterThan(0)
   })
 
@@ -36,6 +56,7 @@ describe('ua/client integration (fixture graph)', () => {
     expect(graph).not.toBeNull()
     const stats = getGraphStats(graph!)
     expect(stats.nodeCount).toBeGreaterThan(0)
+    expect(stats.edgeCount).toBeGreaterThan(0)
   })
 
   it('getNode returns node by id', () => {

@@ -148,6 +148,19 @@ describe('searchNodes', () => {
     expect(results.some(n => n.id.includes('user'))).toBe(true)
   })
 
+  it('finds nodes by name field (fallback when label is empty)', () => {
+    const graphWithNames: KnowledgeGraph = {
+      ...graph,
+      nodes: [
+        { id: 'file:a.go', type: 'file', label: '', name: 'alpha.go', filePath: 'a.go' },
+        { id: 'file:b.go', type: 'file', label: '', name: 'beta.go', filePath: 'b.go' },
+      ],
+    }
+    const results = searchNodes(graphWithNames, 'alpha')
+    expect(results.length).toBe(1)
+    expect(results[0].id).toBe('file:a.go')
+  })
+
   it('finds nodes by metadata summary', () => {
     const results = searchNodes(graph, 'Entry')
     expect(results.length).toBeGreaterThan(0)

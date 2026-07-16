@@ -292,6 +292,18 @@ ipcMain.handle('graph:get', (_e, { projectId }: { projectId: string }): IpcResul
   const graph = loadGraph(project.root_path)
   if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
 
+  // Normalize tour: UA Core pipeline produces flat TourStep[], but shell
+  // consumers (TourPanel) expect Tour[] with { name, description, steps }.
+  // The Dashboard reads the raw file directly via custom protocol and is
+  // compatible with TourStep[] — we only normalize for the shell side.
+  if (Array.isArray(graph.tour) && graph.tour.length > 0) {
+    const first = graph.tour[0]
+    // A TourStep has 'order'; a Tour has 'steps'. Only normalize flat arrays.
+    if (first && typeof first === 'object' && 'order' in first && !('steps' in first)) {
+      graph.tour = [{ name: 'Guided Tour', steps: graph.tour }] as unknown as typeof graph.tour
+    }
+  }
+
   return ipcOk(graph)
 })
 
@@ -381,6 +393,23 @@ ipcMain.handle('graph:stats', (_e, { projectId }: { projectId: string }): IpcRes
   if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
 
   return ipcOk(getGraphStats(graph))
+})
+
+ipcMain.handle('graph:meta', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+
+  const graph = loadGraph(project.root_path)
+  const domainPath = join(project.root_path, '.understand-anything', 'domain-graph.json')
+  const hasDomain = existsSync(domainPath)
+
+  return ipcOk({
+    hasNodes: (graph?.nodes?.length ?? 0) > 0,
+    hasEdges: (graph?.edges?.length ?? 0) > 0,
+    hasLayers: (graph?.layers?.length ?? 0) > 0,
+    hasTour: Array.isArray(graph?.tour) && graph.tour.length > 0,
+    hasDomain,
+  })
 })
 
 /* ──────────── File Tree & Code ──────────── */
@@ -541,6 +570,7 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental }: { project
         chatModel: config.llm.chatModel,
       } : undefined,
       signal,
+      config.ua?.language,
     )
 
     if (result.error === 'INDEX_CANCELLED') {

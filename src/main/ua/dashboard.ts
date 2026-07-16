@@ -173,6 +173,7 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
 
   // ── Poll store for node selection changes ──
   var lastSelectedNodeId = null;
+  var lastTourStep = null;
   setInterval(function() {
     if (window.parent === window) return;
     var store = window.__uaStore;
@@ -183,6 +184,14 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
       lastSelectedNodeId = nodeId;
       if (nodeId) {
         window.parent.postMessage({ source: 'ua-dashboard', type: 'nodeSelected', nodeId: nodeId }, '*');
+      }
+    }
+    // ── Poll tour step changes ──
+    var tourStep = state.tourStep ?? state.tourStepIndex ?? state.currentTourStep ?? null;
+    if (tourStep !== lastTourStep) {
+      lastTourStep = tourStep;
+      if (tourStep != null) {
+        window.parent.postMessage({ source: 'ua-dashboard', type: 'tourStepChanged', step: tourStep }, '*');
       }
     }
   }, 150);

@@ -51,6 +51,8 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
   const [iframeLoading, setIframeLoading] = useState(true)
 
   const [graphEmpty, setGraphEmpty] = useState(false)
+  const [hasDomain, setHasDomain] = useState(false)
+  const [hasKnowledge, setHasKnowledge] = useState(false)
 
   const idxProgress = useIndexProgress(projectId)
   const prevComplete = useRef(false)
@@ -115,6 +117,8 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
   useEffect(() => {
     if (!projectId) {
       setGraphEmpty(false)
+      setHasDomain(false)
+      setHasKnowledge(false)
       return
     }
     window.fieldguide.graphGet?.(projectId).then((result) => {
@@ -125,6 +129,13 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
         setGraphEmpty(true)
       }
     }).catch(() => setGraphEmpty(true))
+
+    window.fieldguide.graphMeta?.(projectId).then((result) => {
+      if (result.ok && result.data) {
+        setHasDomain(result.data.hasDomain)
+        setHasKnowledge(result.data.hasLayers || result.data.hasTour)
+      }
+    }).catch(() => { /* meta is optional */ })
   }, [projectId, iframeKey])
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.dashboardLoading')}</div>
@@ -149,7 +160,11 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
   return (
     <div className="h-full flex flex-col relative bg-[var(--fg-bg)]" data-fg-surface>
       <div className="flex items-center gap-1 px-2 py-1 border-b border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0">
-        {(['structural', 'domain', 'knowledge'] as const).map(mode => (
+        {(['structural', 'domain', 'knowledge'] as const).filter(mode => {
+          if (mode === 'domain') return hasDomain
+          if (mode === 'knowledge') return hasKnowledge
+          return true // structural always visible
+        }).map(mode => (
           <button
             key={mode}
             onClick={() => {

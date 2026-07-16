@@ -33,6 +33,14 @@ interface ConceptLinkRow {
   node_id: string; anchor_text: string; note: string; created_at: string
 }
 
+interface GraphMeta {
+  hasNodes: boolean
+  hasEdges: boolean
+  hasLayers: boolean
+  hasTour: boolean
+  hasDomain: boolean
+}
+
 interface FieldguideAPI {
   // Config
   configGet(): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: { message: string } }>
@@ -53,6 +61,7 @@ interface FieldguideAPI {
   graphSearch(projectId: string, query: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   graphGetSource(projectId: string, opts: { nodeId?: string; path?: string; lineStart?: number; lineEnd?: number }): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   graphStats(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  graphMeta(projectId: string): Promise<{ ok: boolean; data?: GraphMeta; error?: { message: string } }>
 
   // Index
   projectIndex(projectId: string, incremental?: boolean): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
