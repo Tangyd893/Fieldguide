@@ -1,8 +1,6 @@
 /**
- * Integration smoke: graph-reader against committed tiny-go fixture.
- *
- * Verifies the knowledge-graph.json written by indexProject (or the
- * spike script) is well-formed and queryable.
+ * Fixture-only smoke: graph-reader against committed tiny-go knowledge-graph.json.
+ * For live indexProject pipeline coverage see index-project.test.ts.
  */
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'

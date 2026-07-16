@@ -1,8 +1,8 @@
 # Fieldguide 待办清单
 
-> 最后更新：2026-07-16（校准 UA 图谱真实进度 + VS Code 壳层提交）  
-> 来源：UA 图谱能力排查（文档虚高 vs 精简管线）+ 壳层 UX 批次（`46f55c5`）  
-> **壳层 / UX ~98%**；**UA 图谱能力 ~55–65%**（结构索引 + Dashboard 嵌入已接线，完整多 Agent 未落地）；Phase 4 可发布约 **50%**（差图谱闭环验收）  
+> 最后更新：2026-07-16（图谱路径自动验收 + 真跑 indexProject 集成测）  
+> 来源：UA 图谱能力排查 + 壳层 UX + P0/P1 管线补齐 + `qa:graph` / live index 测试  
+> **壳层 / UX ~98%**；**UA 图谱能力 ~75%**（结构索引 + Dashboard + 增量合并 + 自动 smoke；**GUI 点击仍需人工**）；Phase 4 可发布约 **60%**  
 > 产品分阶段任务见 [roadmap.md](./roadmap.md)；UA 集成见 [understand-anything-integration.md](./understand-anything-integration.md)；本文跟踪**下一步工程待办**。
 
 ---
@@ -12,37 +12,35 @@
 | Phase | 完成度 | 备注 |
 |-------|--------|------|
 | 0 设计 + Spike | 100% | Spike 通过；已明确完整 Agent 管线依赖运行时（见 [spike-ua.md](./spike-ua.md)） |
-| 1 桌面壳 + UA | **~70%** | 壳层齐；索引为**精简程序化管线**（非 UA 全 Agent）；图谱用户可见闭环未验收 |
-| 2 智能层 | **~60%** | LLM 摘要/分层/Tour 为直连 API 子集；domain / graph-reviewer **未接**；增量索引有覆盖整图风险 |
-| 3 理论 + 桥接 | ~90% | 桥接 + RAG + 对照 Tour + PDF 均已接线；依赖可靠图谱数据 |
-| 4 发布 | ~50% | 安装包可构建；Dashboard 本机可打入；**缺 his-go/Demo 图谱实测** |
+| 1 桌面壳 + UA | **~80%** | 壳层齐；精简索引管线已有 **live** 集成测；图谱 iframe GUI 点击未人工勾 |
+| 2 智能层 | **~75%** | 增量 merge ✅；locale/Tour schema/bridge ✅；domain 为隐藏策略；无完整 UA Agent |
+| 3 理论 + 桥接 | ~90% | 桥接 + RAG + 对照 Tour + PDF 均已接线 |
+| 4 发布 | **~60%** | 安装包+Dashboard 本机齐；`qa:graph`/`qa:his-go` ✅；**p4-manual-qa GUI 未勾** |
 | **UX 质感** | **~98%** | Activity Bar + 全页设置 + 双缩放/字号（`46f55c5`） |
 
-**基线验证**（2026-07-16）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（72 passed / 2 skipped）· `pnpm dist` ✅（本机有 sibling UA Dashboard）
+**基线验证**（2026-07-16）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（83 passed / 2 skipped，含 live `indexProject`）· `pnpm qa:graph` ✅ · `pnpm qa:his-go` ✅ · `pnpm dist` ✅
 
-**最近提交**：`46f55c5` — Align shell UX with VS Code（activity bar、全页设置、双缩放/字体、打开项目、LLM 供应商）
+**最近相关提交**：`6cb53a0`（增量 merge + P1）+ 本轮 live index 测试 / `qa:graph`
 
 ### 用户场景完成度（相对 product-spec）
 
 | 场景 | 完成度 | 主要缺口 |
 |------|--------|----------|
-| A 读懂新项目 | **~70%** | 结构图路径依赖索引成功 + Dashboard；Tour/分层/业务域未齐；30 分钟自测未做 |
-| B 论文↔实现 | ~85% | 桥接 UI 齐；图谱侧节点/Tour 质量受索引管线限制 |
-| C 影响评估 | ~75% | diff overlay 已转发；需 his-go 实测高亮是否可见 |
-| 可发布产品 | ~50% | 干净机器 + 图谱可见闭环 + 用户自测 |
+| A 读懂新项目 | **~80%** | 自动侧图谱数据/索引已通；**点节点打开文件**与 30 分钟口述未人工勾 |
+| B 论文↔实现 | ~85% | 桥接 UI 齐；需人工走 PDF 路径 |
+| C 影响评估 | ~80% | HIS-Go 图就绪；diff GUI 高亮未勾 |
+| 可发布产品 | ~60% | 干净机器安装 + GUI 最小清单 |
 
-### UA 图谱：文档声称 vs 实际（2026-07-16 排查）
+### UA 图谱：文档声称 vs 实际（2026-07-16）
 
-| 能力 | 文档/todos 曾标 | 实际 |
-|------|-----------------|------|
-| 扫描 + Tree-sitter + `GraphBuilder` → `knowledge-graph.json` | ✅ | ✅ 精简管线 [`client.ts`](../src/main/ua/client.ts) |
-| Dashboard iframe 嵌入 | ✅ | ✅ 依赖 sibling / 打包 `resources/dashboard` |
-| `architecture-analyzer` / `tour-builder` / `graph-reviewer` / `domain-analyzer` | 近完成 | ❌ 未跑 UA Agent；仅可选直连 LLM + heuristic Tour |
-| 增量索引 | ✅ | ⚠️ 按变更文件重建并**整图覆盖**；零变更可能 `nodeCount: 0` |
-| 点节点打开文件 / Tour 步进同步 | ✅ | ⚠️ 依赖 `__uaStore` 轮询；`tourStepChanged` 壳层为空实现 |
-| `indexProject` 集成测试 / his-go 实测 | — | ❌ 单测只读 fixture，未跑管线 |
-
-**为何显得「图谱没推进」**：Spike 缩范围 → 壳层 UX 占工期 → 进度写成 ~100% → 端到端验收项长期未勾。
+| 能力 | 实际 |
+|------|------|
+| 扫描 + Tree-sitter + `GraphBuilder` → `knowledge-graph.json` | ✅ 精简管线；**live** 测于 [`index-project.test.ts`](../src/main/ua/__tests__/index-project.test.ts) |
+| Dashboard iframe 嵌入 | ✅ sibling / 打包 dist 均可（`qa:graph`） |
+| 完整 UA Agent（domain / reviewer 等） | ❌ 未接；domain Tab 无数据则隐藏 |
+| 增量索引 | ✅ `mergeIncrementalGraph`；零变更保 nodeCount |
+| 点节点打开文件 / Tour 步进 | ⚠️ 源码已接；**GUI 人工未勾** |
+| HIS-Go 头less smoke | ✅ 3656 nodes（`pnpm qa:his-go`） |
 
 ---
 
@@ -50,52 +48,53 @@
 
 ```mermaid
 flowchart TD
-  shell[壳层 UX 已提交 46f55c5]
-  graphP0[P0 UA 图谱可用性闭环]
-  graphP1[P1 管线缺口: 增量合并 / domain / 桥接]
-  p4[Phase 4 人工验收 + 发布]
-  defer[延后: Dashboard 深度主题 / UA vendor]
-  shell --> graphP0 --> graphP1 --> p4
+  shell[壳层 UX 已提交]
+  auto[自动图谱路径 qa:graph + live index]
+  gui[GUI 最小验收: Demo 可见 + 点击开文件]
+  p4[Phase 4 干净机器 + 用户自测]
+  defer[延后: Dashboard 深度主题 / 全 Agent]
+  shell --> auto --> gui --> p4
   p4 --> defer
 ```
 
 ---
 
-## P0 — UA 图谱可用性（2026-07-16 · 当前主线）
+## P0 — UA 图谱可用性（2026-07-16 · 主线收尾）
 
-> **目标**：用户打开 Demo / his-go 后，代码地图能稳定看到结构图谱，并完成「点节点 → 打开文件」闭环。  
-> **背景**：集成层已接线，但能力是 UA 子集；此前进度虚高，本批次校准并列为阻断发布项。
+> **目标**：用户打开 Demo / his-go 后，代码地图能稳定看到结构图谱，并完成「点节点 → 打开文件」闭环。
 
-- [x] **ua-graph-e2e-smoke** · Demo + his-go 图谱可见性实测 (2026-07-16)  
-  - 步骤：添加项目 → 全量索引 → 代码地图 iframe 有节点 → 点击节点打开文件  
-  - 记录结果到 [`scenario-abc-test-record.md`](./scenario-abc-test-record.md) / [`p4-release-checklist.md`](./p4-release-checklist.md)  
-  - 失败时区分：Dashboard 不可用 / 空图 / 桥接无响应 / 索引失败
+- [x] **ua-graph-e2e-smoke** · 图谱路径自动验收 (2026-07-16)  
+  - [`scripts/graph-e2e-smoke.mjs`](../scripts/graph-e2e-smoke.mjs) · `pnpm qa:graph`  
+  - Demo 13 nodes + Dashboard dist + HIS-Go + bridge 源码检查 ✅  
+  - **仍缺**：iframe 内点击 → 开文件（见 [`scenario-abc-test-record.md`](./scenario-abc-test-record.md) GUI 最小验收）
 
 - [x] **ua-index-incremental-fix** · 修复增量索引覆盖整图 (2026-07-16)  
-  - [`src/main/ua/client.ts`](../src/main/ua/client.ts)：增量应 merge 进已有 graph，禁止只含变更文件的 `saveGraph`  
-  - 零变更增量：保持原 `nodeCount` / 图谱文件，勿写 `success + nodeCount: 0`  
-  - 验收：对已索引项目改 1 个文件「更新索引」后，原节点仍在
+  - [`client.ts`](../src/main/ua/client.ts) `mergeIncrementalGraph`；零变更保 nodeCount  
+  - live 测：[`index-project.test.ts`](../src/main/ua/__tests__/index-project.test.ts) 第二例
 
-- [x] **ua-index-integration-test** · `indexProject(tiny-go)` 集成测试 (2026-07-16)  
-  - 断言写出 `.understand-anything/knowledge-graph.json` 且节点数 > 0  
-  - 补齐 `name`/`label` 检索一致性（[`graph-reader.ts`](../src/main/ua/graph-reader.ts)）
+- [x] **ua-index-integration-test** · **真跑** `indexProject(tiny-go)` (2026-07-16)  
+  - [`index-project.test.ts`](../src/main/ua/__tests__/index-project.test.ts)：临时目录全量索引 → nodes>0；增量零变更保节点  
+  - fixture 只读测保留于 [`client.integration.test.ts`](../src/main/ua/__tests__/client.integration.test.ts)
 
-- [ ] **p4-his-go-smoke** · his-go 全链路：索引 → 文件树 → 图谱点击 → diff 高亮  
-- [x] **p4-packaged-dashboard** · 确认 `pnpm dist` 产物含 `resources/dashboard/index.html`；`prepare-pack` 缺 dist 时失败或告警 (2026-07-16)  
-- [ ] **p4-manual-qa** · 按 [`ux-visual-regression.md`](./ux-visual-regression.md) + [`p4-release-checklist.md`](./p4-release-checklist.md) 人工验收（含「内置 Demo → 可见图谱」）
+- [x] **p4-his-go-smoke**（头less）· HIS-Go 图谱结构 / 可点击性 (2026-07-16)  
+  - `pnpm qa:his-go` ✅ 3656 nodes  
+  - [ ] **p4-his-go-smoke-gui** · 应用内：打开 HIS-Go → 点节点 → diff 高亮（人工）
+
+- [x] **p4-packaged-dashboard** · `pnpm dist` 产物含 dashboard；`prepare-pack` 校验 (2026-07-16)  
+- [ ] **p4-manual-qa** · [`ux-visual-regression.md`](./ux-visual-regression.md) + [`p4-release-checklist.md`](./p4-release-checklist.md) + **GUI 最小验收**（Demo 可见图 + 点击开文件）
 
 ---
 
 ## P1 — UA 图谱能力补齐（管线 / 桥接）
 
-> 在 P0 可见性闭环之后推进；对齐 [understand-anything-integration.md](./understand-anything-integration.md) 与 Spike 已知缺口。
+> 在 P0 GUI 勾选之后可继续加深；对齐 [understand-anything-integration.md](./understand-anything-integration.md)。
 
 - [x] **ua-pipeline-locale** · `buildUARuntimeConfig().language` 传入索引 / LLM prompt (2026-07-16)  
 - [x] **ua-bridge-tour-step** · 壳层处理 `tourStepChanged`；核对 Dashboard `__uaStore` 与注入 bridge (2026-07-16)  
-- [x] **ua-domain-or-hide-tabs** · 接入 `domain-analyzer` 产出，或无数据时隐藏业务域/知识 Tab (2026-07-16)  
-- [x] **ua-tour-schema** · 统一 `graph.tour` 为 Tour 对象数组（与 [`TourPanel`](../src/renderer/views/CodeMap/TourPanel.tsx) 一致）(2026-07-16)  
-- [x] **ua-graph-reviewer** ·（可选）接入 graph-reviewer 或文档标明不做 (2026-07-16 · 标记跳过)  
-- [x] **ua-vendor-strategy** · submodule / 固定 npm 包，降低 sibling `../Understand-Anything` 脆弱性 (2026-07-16 · prepare-pack commit 校验)
+- [x] **ua-domain-or-hide-tabs** · 无 `domain-graph.json` 时隐藏业务域 Tab (2026-07-16)  
+- [x] **ua-tour-schema** · 统一 `graph.tour` 为 Tour 对象数组 (2026-07-16)  
+- [x] **ua-graph-reviewer** · 标记跳过 (2026-07-16)  
+- [x] **ua-vendor-strategy** · prepare-pack commit 校验 (2026-07-16 · 仍依赖 sibling UA)
 
 ---
 
@@ -137,9 +136,10 @@ flowchart TD
 
 ### 下一步（图谱闭环 → Phase 4）
 
-- [ ] 完成上方 **P0 — UA 图谱可用性** 全部项  
-- [ ] **ux-dashboard-theme-deep** · Dashboard 与壳层 CSS 变量深度统一（延后）  
-- [ ] **eng-user-test** · 场景 A「30 分钟口述主链路」用户自测  
+- [ ] **GUI 最小验收**（`scenario-abc-test-record.md`）：Demo 可见图 + 点击节点打开文件  
+- [ ] **p4-his-go-smoke-gui** · 应用内 HIS-Go 点节点 + diff 高亮  
+- [ ] **p4-manual-qa** / **eng-user-test**  
+- [ ] **ux-dashboard-theme-deep** · Dashboard 与壳层 CSS 变量深度统一（延后） 
 
 ---
 
@@ -572,7 +572,10 @@ Fieldguide/
 | 命令 | 检查范围 |
 |------|----------|
 | `pnpm typecheck` | renderer + main/preload/shared + 测试文件 |
-| `pnpm test:unit` | `src/**/__tests__/**/*.test.ts` |
+| `pnpm test:unit` | `src/**/__tests__/**/*.test.ts`（含 live indexProject） |
+| `pnpm qa:graph` | Demo + Dashboard + HIS-Go + bridge |
+| `pnpm qa:his-go` | HIS-Go 图谱头less |
+| `pnpm qa:scenario` | 场景 A/B/C 模块检查 |
 | `pnpm dev` | electron-vite 开发（依赖 sibling UA workspace） |
 | `pnpm dist` | NSIS 安装包（需 `resources/icon.ico`） |
 
@@ -581,22 +584,24 @@ Fieldguide/
 ## 维护说明
 
 - 完成一项后，将 `- [ ]` 改为 `- [x]`，并在提交说明中注明 id（如 `ua-index-incremental-fix`）。
-- **当前主线**：P0 UA 图谱可用性（`ua-graph-e2e-smoke` → 增量修复 → 集成测试 → his-go / packaged dashboard / manual QA）。
-- **壳层 UX**：Obsidian Phase A–D + VS Code Activity Bar / 全页设置已提交（至 `46f55c5`）；勿再把壳层进度当作图谱进度。
-- **后端与 UI 分拆**：后端已通但 renderer 未接线时，用 `*-backend`（已完成）+ `*-ui`（待办）两条跟踪，避免误标完成。
-- **勿虚高**：未跑通用户路径的项不得标 ~100%；fixture 单测 ≠ 图谱可用。
+- **当前主线**：**GUI 最小验收**（Demo 可见图 + 点击开文件）→ `p4-his-go-smoke-gui` → `p4-manual-qa`。
+- **自动化**：`pnpm qa:graph` · `pnpm qa:his-go` · live `index-project.test.ts` 已覆盖数据/索引路径。
+- **勿虚高**：fixture 只读测 ≠ live index；头less HIS-Go ≠ GUI 点击。
 - 新增待办请标明优先级（P0–P3）与对应 roadmap / ui-spec / UA 集成章节。
 - 改 tsconfig / workspace / 目录结构后，跑 `pnpm typecheck && pnpm test:unit` 验证。
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm qa:graph` | Demo + Dashboard + HIS-Go + bridge 源码 |
+| `pnpm qa:his-go` | HIS-Go 图谱结构头less |
+| `pnpm qa:scenario` | 场景 A/B/C 模块存在性 |
 
 ### 推荐实施顺序（速查 · 2026-07-16）
 
 | 顺序 | ID | 状态 |
 |------|-----|------|
-| 1 | Obsidian UX Phase A–D + 主题 v2 | ✅ |
-| 2 | p0-filetree / p0-graph-bridge / p0-menu-i18n | ✅ |
-| 3 | VS Code 壳层（activity bar / 设置全页 / 双缩放）`46f55c5` | ✅ |
-| 4 | **ua-graph-e2e-smoke** → **ua-index-incremental-fix** → **ua-index-integration-test** | ✅ **2026-07-16** |
-| 5 | p4-his-go-smoke → p4-packaged-dashboard → p4-manual-qa | 🔶 **自动化 ✅ / GUI 人工 ⬜** |
-| 6 | P1 UA 管线补齐（locale / tour bridge / domain / tour schema / reviewer / vendor） | ✅ **2026-07-16** |
-| 7 | eng-user-test | 🔶 **指南已就绪 / 人工 ⬜** |
-| — | ux-dashboard-theme-deep / ua-vendor-strategy | 延后 |
+| 1–3 | 壳层 UX + 增量 merge + P1 bridge | ✅ |
+| 4 | live `indexProject` + `pnpm qa:graph` / `qa:his-go` | ✅ |
+| 5 | **GUI 最小验收**（Demo 可见 + 点击开文件） | ⬜ **当前** |
+| 6 | p4-his-go-smoke-gui → p4-manual-qa → eng-user-test | ⬜ |
+| — | ux-dashboard-theme-deep / 全 UA Agent | 延后 |

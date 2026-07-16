@@ -14,7 +14,7 @@ pnpm dist
 
 产出：`dist/Fieldguide Setup x.y.z.exe`
 
-> **自动化基线**（2026-07-13）：`pnpm qa:baseline` 覆盖 typecheck + unit tests + fixture 存在性。干净机器安装仍需人工勾选。
+> **自动化基线**（2026-07-16）：`pnpm qa:baseline` · `pnpm qa:graph` · `pnpm qa:his-go` · live `indexProject` 单测。干净机器安装与 **GUI 点击开文件** 仍需人工勾选。
 
 ## 干净机器安装（Win10/11）
 
@@ -23,6 +23,7 @@ pnpm dist
 - [ ] 桌面/开始菜单快捷方式可启动
 - [ ] 首次启动显示 Onboarding 向导
 - [ ] 选择「内置 Demo」→ 索引完成 → 代码地图可见图谱
+- [ ] （开发机已自动验证）Demo 预置图谱 13 nodes + 打包内 Dashboard dist 存在 — 见 `pnpm qa:graph`
 
 ## 场景 A：读懂新项目（30 分钟自测）
 
