@@ -1,14 +1,14 @@
 {
   "version": "1.0.0",
   "project": {
-    "name": "tiny-go",
+    "name": "sample-project",
     "languages": [
       "go",
       "json"
     ],
     "frameworks": [],
     "description": "",
-    "analyzedAt": "2026-06-30T04:27:19.710Z",
+    "analyzedAt": "2026-07-16T16:59:16.953Z",
     "gitCommitHash": ""
   },
   "nodes": [
@@ -19,7 +19,17 @@
       "filePath": "cmd/main.go",
       "summary": "",
       "tags": [],
-      "complexity": "moderate"
+      "complexity": "moderate",
+      "metadata": {
+        "summary": "This file is the entry point for the application, initializing a database and HTTP handler, registering routes, and starting the server on port 8080.",
+        "tags": [
+          "main",
+          "entrypoint",
+          "http",
+          "server"
+        ],
+        "complexity": "simple"
+      }
     },
     {
       "id": "function:cmd/main.go:main",
@@ -41,7 +51,16 @@
       "filePath": "internal/service/handler.go",
       "summary": "",
       "tags": [],
-      "complexity": "moderate"
+      "complexity": "moderate",
+      "metadata": {
+        "summary": "This file defines an HTTP handler that provides endpoints for a greeting and listing items from a store.",
+        "tags": [
+          "http",
+          "handler",
+          "api"
+        ],
+        "complexity": "simple"
+      }
     },
     {
       "id": "function:internal/service/handler.go:NewHandler",
@@ -102,7 +121,16 @@
       "filePath": "internal/store/db.go",
       "summary": "",
       "tags": [],
-      "complexity": "moderate"
+      "complexity": "moderate",
+      "metadata": {
+        "summary": "This file defines a simple in-memory data store with thread-safe read access, providing a basic Item struct and a DB struct with initialization and retrieval methods.",
+        "tags": [
+          "store",
+          "in-memory",
+          "concurrency"
+        ],
+        "complexity": "simple"
+      }
     },
     {
       "id": "function:internal/store/db.go:NewDB",
@@ -231,6 +259,77 @@
       "weight": 1
     }
   ],
-  "layers": [],
-  "tour": []
+  "layers": [
+    {
+      "id": "layer:entry",
+      "name": "Entry",
+      "description": "Application entry point and startup logic.",
+      "nodeIds": [
+        "file:cmd/main.go"
+      ]
+    },
+    {
+      "id": "layer:service",
+      "name": "Service",
+      "description": "Business logic and request handling for the application.",
+      "nodeIds": [
+        "file:internal/service/handler.go"
+      ]
+    },
+    {
+      "id": "layer:data",
+      "name": "Data",
+      "description": "Data access and persistence layer, including database interactions.",
+      "nodeIds": [
+        "file:internal/store/db.go"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Application Entry Point",
+      "description": "Start your tour at the main.go file in the cmd directory. This is where the application begins execution, and you'll see how the program is initialized and launched.",
+      "nodeIds": [
+        "file:cmd/main.go",
+        "function:cmd/main.go:main"
+      ],
+      "languageLesson": "In Go, the main function in package main is the entry point. The file is placed in a cmd/ directory, a common pattern for separating executable code from library code."
+    },
+    {
+      "order": 2,
+      "title": "Service Layer: Handler and Business Logic",
+      "description": "Explore the handler.go file in the internal/service directory. This file defines the Handler struct and its methods (Hello, ListItems) that process incoming requests and implement the core business logic.",
+      "nodeIds": [
+        "file:internal/service/handler.go",
+        "class:internal/service/handler.go:Handler",
+        "function:internal/service/handler.go:NewHandler",
+        "function:internal/service/handler.go:Hello",
+        "function:internal/service/handler.go:ListItems"
+      ],
+      "languageLesson": "Go uses exported functions (capitalized) like NewHandler to create instances. The Handler struct groups related methods, following a common pattern for organizing HTTP handlers."
+    },
+    {
+      "order": 3,
+      "title": "Data Layer: Database Access",
+      "description": "Move to the db.go file in the internal/store directory. This file contains the DB struct and Item type, along with functions like NewDB and All for interacting with the data store.",
+      "nodeIds": [
+        "file:internal/store/db.go",
+        "class:internal/store/db.go:DB",
+        "class:internal/store/db.go:Item",
+        "function:internal/store/db.go:NewDB",
+        "function:internal/store/db.go:All"
+      ],
+      "languageLesson": "Go uses structs to define data models (Item) and repositories (DB). The NewDB function is a constructor that returns a pointer to DB, a common pattern for managing dependencies."
+    },
+    {
+      "order": 4,
+      "title": "Configuration File",
+      "description": "Finally, examine the scan-result.json file at the project root. This configuration file likely contains metadata or settings used by the application, such as scan results or environment parameters.",
+      "nodeIds": [
+        "config:scan-result.json"
+      ],
+      "languageLesson": "JSON is used for configuration in Go projects due to its simplicity and native support via encoding/json. This file may be read at startup to configure the application."
+    }
+  ]
 }

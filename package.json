@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "qa:baseline": "node scripts/qa-baseline.mjs",
     "qa:scenario": "node scripts/scenario-smoke.mjs",
+    "bootstrap:ua": "node scripts/bootstrap-ua.mjs",
     "qa:graph": "node scripts/graph-e2e-smoke.mjs",
     "qa:his-go": "node scripts/his-go-smoke.mjs",
     "clean:dist": "node scripts/clean-dist.mjs",
@@ -101,7 +102,7 @@
     },
     "extraResources": [
       {
-        "from": "../Understand-Anything/understand-anything-plugin/packages/dashboard/dist",
+        "from": "resources/dashboard",
         "to": "dashboard",
         "filter": [
           "**/*"
