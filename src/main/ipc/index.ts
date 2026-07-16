@@ -4,10 +4,11 @@
  * Registers all invoke handlers and event emitters.
  * Renderer communicates exclusively through these channels.
  */
-import { ipcMain, BrowserWindow, shell, app } from 'electron'
+import { ipcMain, BrowserWindow, shell, app, type IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs'
 import { loadConfig, updateConfig } from '../config'
+import { joinLlmUrl } from '../../shared/llm-url'
 import {
   listProjects,
   getProject,
@@ -33,7 +34,7 @@ import {
 import type { PaperRow } from '../db'
 import { readProjectTree } from '../file-tree'
 import { getProjectIgnoreFilter } from '../project-ignore'
-import { setApplicationMenu } from '../menu'
+import { setApplicationMenu, popupTopLevelMenu, getTopLevelMenuLabels, type TopLevelMenuId } from '../menu'
 import { cloneRepo } from '../git'
 import { installDemoProject } from '../sample-project'
 import { indexProject, beginIndex, cancelIndex } from '../ua/client'
@@ -101,9 +102,7 @@ ipcMain.handle('config:testLlm', async (): Promise<IpcResult<unknown>> => {
   if (!isLLMConfigured()) {
     return ipcErr('LLM_NOT_CONFIGURED', '请先配置 LLM', true)
   }
-  const url = `${config.llm.baseUrl}/v1/chat/completions`
-    .replace(/\/+$/, '')
-    .replace(/\/v1\/chat\/completions\/v1\/chat\/completions/, '/v1/chat/completions')
+  const url = joinLlmUrl(config.llm.baseUrl, '/v1/chat/completions')
   try {
     const resp = await fetch(url, {
       method: 'POST',
@@ -186,6 +185,61 @@ ipcMain.handle('dialog:openFolder', async (): Promise<IpcResult<string | null>> 
       return ipcOk(null)
     }
     return ipcOk(result.filePaths[0])
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Window chrome (custom title bar) ──────────── */
+
+function targetWindow(e: IpcMainInvokeEvent): BrowserWindow | null {
+  return BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+}
+
+ipcMain.handle('window:minimize', (e): IpcResult<null> => {
+  targetWindow(e)?.minimize()
+  return ipcOk(null)
+})
+
+ipcMain.handle('window:maximize', (e): IpcResult<{ maximized: boolean }> => {
+  const win = targetWindow(e)
+  if (!win) return ipcOk({ maximized: false })
+  if (win.isMaximized()) win.unmaximize()
+  else win.maximize()
+  return ipcOk({ maximized: win.isMaximized() })
+})
+
+ipcMain.handle('window:close', (e): IpcResult<null> => {
+  targetWindow(e)?.close()
+  return ipcOk(null)
+})
+
+ipcMain.handle('window:isMaximized', (e): IpcResult<{ maximized: boolean }> => {
+  const win = targetWindow(e)
+  return ipcOk({ maximized: win?.isMaximized() ?? false })
+})
+
+ipcMain.handle('window:platform', (): IpcResult<{ platform: NodeJS.Platform; customTitleBar: boolean }> => {
+  return ipcOk({ platform: process.platform, customTitleBar: process.platform === 'win32' })
+})
+
+ipcMain.handle(
+  'menu:popupTopLevel',
+  (e, { id, x, y }: { id: TopLevelMenuId; x: number; y: number }): IpcResult<null> => {
+    try {
+      // Coordinates from renderer getBoundingClientRect are window-relative;
+      // Menu.popup expects window content coordinates.
+      popupTopLevelMenu(id, x, y)
+      return ipcOk(null)
+    } catch (err) {
+      return ipcErr('UNKNOWN', String(err))
+    }
+  },
+)
+
+ipcMain.handle('menu:topLevelLabels', (): IpcResult<Record<TopLevelMenuId, string>> => {
+  try {
+    return ipcOk(getTopLevelMenuLabels(loadConfig().locale))
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }
@@ -531,7 +585,7 @@ ipcMain.handle('chat:clear', (_e, { projectId }: { projectId: string }): IpcResu
   }
 })
 
-ipcMain.handle('project:index', async (_e, { projectId, incremental }: { projectId: string; incremental?: boolean }): Promise<IpcResult<unknown>> => {
+ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: { projectId: string; incremental?: boolean; skipLlm?: boolean }): Promise<IpcResult<unknown>> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
   if (project.status === 'indexing') return ipcErr('INDEX_IN_PROGRESS', '索引正在进行中', true)
@@ -545,7 +599,7 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental }: { project
     logIndexStart(project.name, 0, !!incremental)
 
     const config = loadConfig()
-    const hasLLM = isLLMConfigured()
+    const useLlm = !skipLlm && isLLMConfigured()
     const signal = beginIndex()
 
     const result = await indexProject(
@@ -564,7 +618,7 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental }: { project
         })
       },
       incremental,
-      hasLLM ? {
+      useLlm ? {
         baseUrl: config.llm.baseUrl,
         apiKey: config.llm.apiKey,
         chatModel: config.llm.chatModel,

@@ -357,13 +357,13 @@ export interface LLMEnrichConfig {
   chatModel: string
 }
 
+import { joinLlmUrl } from '../../shared/llm-url'
+
 /**
  * Call the configured LLM with a prompt and return the response text.
  */
 async function callLLM(prompt: string, config: LLMEnrichConfig, language?: string): Promise<string> {
-  const url = `${config.baseUrl}/v1/chat/completions`
-    .replace(/\/+$/, '')
-    .replace(/\/v1\/chat\/completions\/v1\/chat\/completions/, '/v1/chat/completions')
+  const url = joinLlmUrl(config.baseUrl, '/v1/chat/completions')
 
   const resp = await fetch(url, {
     method: 'POST',

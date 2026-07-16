@@ -6,6 +6,7 @@ import { loadConfig } from '../config'
 import { listPapers } from '../db'
 import { AGENT_TOOLS, executeTool, extractNodeRefsFromObservation, buildGraphOverview } from './tools'
 import type { AgentContext, AgentResult, AgentStep } from './types'
+import { joinLlmUrl } from '../../shared/llm-url'
 
 const MAX_ITERATIONS = 4
 
@@ -21,9 +22,7 @@ interface LLMMessage {
 }
 
 function chatCompletionsUrl(baseUrl: string): string {
-  return `${baseUrl}/v1/chat/completions`
-    .replace(/\/+$/, '')
-    .replace(/\/v1\/chat\/completions\/v1\/chat\/completions/, '/v1/chat/completions')
+  return joinLlmUrl(baseUrl, '/v1/chat/completions')
 }
 
 function localeHint(locale: string): string {

@@ -9,6 +9,28 @@ import { join, extname } from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'
 
 const DASHBOARD_SCHEME = 'ua-dashboard'
+/** Fixed embed token — Fieldguide protocol does not enforce auth; this bypasses UA TokenGate. */
+export const DASHBOARD_EMBED_TOKEN = 'fieldguide-embed'
+
+/**
+ * MUST run before app.ready(). Without privileged registration, Chromium will
+ * refuse ES module scripts / fetch under ua-dashboard:// — iframe stays blank
+ * while the Fieldguide shell still shows node counts from IPC.
+ */
+export function registerDashboardScheme(): void {
+  protocol.registerSchemesAsPrivileged([
+    {
+      scheme: DASHBOARD_SCHEME,
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+        stream: true,
+      },
+    },
+  ])
+}
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -49,9 +71,14 @@ export function setDashboardDiffOverlay(projectRoot: string): void {
 
 function findDashboardDist(): string {
   const candidates = [
+    // Dev / bootstrap: Fieldguide resources/dashboard (pnpm bootstrap:ua)
+    join(process.cwd(), 'resources', 'dashboard'),
+    join(app.getAppPath(), 'resources', 'dashboard'),
+    join(app.getAppPath(), '..', '..', 'resources', 'dashboard'),
     // Packaged app: electron-builder extraResources → resources/dashboard
     join(process.resourcesPath, 'dashboard'),
     join(app.getAppPath(), '..', 'dashboard'),
+    // Sibling UA build (dev without live local copy)
     join(app.getAppPath(), '..', 'Understand-Anything', 'understand-anything-plugin', 'packages', 'dashboard', 'dist'),
     join(app.getAppPath(), '..', '..', 'Understand-Anything', 'understand-anything-plugin', 'packages', 'dashboard', 'dist'),
     join(process.cwd(), '..', 'Understand-Anything', 'understand-anything-plugin', 'packages', 'dashboard', 'dist'),
@@ -59,46 +86,51 @@ function findDashboardDist(): string {
   for (const p of candidates) {
     if (existsSync(join(p, 'index.html'))) return p
   }
-  throw new Error('Dashboard dist not found. Build it: cd ../Understand-Anything/.../dashboard && npm run build')
+  throw new Error(
+    'Dashboard dist not found. Run: pnpm bootstrap:ua\n' +
+      '(clones Understand-Anything at ua.commit, builds Dashboard, copies to resources/dashboard)',
+  )
 }
+
+function findSampleGraph(): string | null {
+  const candidates = [
+    join(process.cwd(), 'resources', 'sample-project', '.understand-anything', 'knowledge-graph.json'),
+    join(process.resourcesPath, 'sample-project', '.understand-anything', 'knowledge-graph.json'),
+    join(app.getAppPath(), '..', '..', 'resources', 'sample-project', '.understand-anything', 'knowledge-graph.json'),
+  ]
+  return candidates.find((p) => existsSync(p)) ?? null
+}
+
+/**
+ * Injected early — bypass UA TokenGate when embedded in Fieldguide.
+ * Must run before the Dashboard React app boots.
+ */
+const EMBED_AUTH_SCRIPT = `
+<script>
+(function() {
+  try {
+    sessionStorage.setItem('understand-anything-token', '${DASHBOARD_EMBED_TOKEN}');
+  } catch (e) { /* ignore */ }
+})();
+</script>
+`
 
 /**
  * Injected script that bridges Fieldguide shell ↔ UA Dashboard via postMessage.
  *
  * Protocol (both directions use `window.postMessage`):
- *   Shell → Dashboard: { source: 'fieldguide', type: 'selectNode'|'focusNode'|..., nodeId?: string, step?: number }
- *   Dashboard → Shell: { source: 'ua-dashboard', type: 'nodeSelected'|'tourStepChanged'|..., nodeId?: string, step?: number }
+ *   Shell → Dashboard: { source: 'fieldguide', type: 'selectNode'|..., nodeId?: string, step?: number }
+ *   Dashboard → Shell: { source: 'ua-dashboard', type: 'nodeSelected'|..., nodeId?: string, step?: number }
  */
 const POSTMESSAGE_BRIDGE_SCRIPT = `
 <script>
 (function() {
   'use strict';
 
-  // ── Receive commands from Fieldguide shell ──
   window.addEventListener('message', function(event) {
     var data = event.data;
     if (!data || data.source !== 'fieldguide') return;
 
-    // Defer until Zustand store is available (poll for it)
-    function withStore(fn) {
-      var maxTries = 100;
-      var tries = 0;
-      function tryGet() {
-        // Zustand stores expose getState/setState on the hook itself,
-        // but we need to find the store instance. The Dashboard's
-        // useDashboardStore is a Zustand hook — its getState() is on
-        // the hook function.
-        var el = document.getElementById('root');
-        if (!el) { tries++; if (tries < maxTries) setTimeout(tryGet, 50); return; }
-        // Access React fiber to find the store — or wait for a global
-        // that we'll expose below
-        fn();
-      }
-      tryGet();
-    }
-
-    // The Dashboard's main.tsx will expose __uaStore on window
-    // after the store is created. We'll poll for it.
     function getStore() {
       return window.__uaStore;
     }
@@ -106,7 +138,6 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
     function run() {
       var store = getStore();
       if (!store || !store.getState) { setTimeout(run, 50); return; }
-      // Zustand hook API: actions live on getState(), not on the hook itself
       var s = store.getState();
 
       switch (data.type) {
@@ -152,15 +183,40 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
         case 'setTheme':
           if (data.colors) {
             var root = document.documentElement;
-            Object.keys(data.colors).forEach(function(key) {
-              root.style.setProperty('--fg-' + key.replace(/([A-Z])/g, '-$1').toLowerCase(), data.colors[key]);
-            });
-            if (data.colors.mode && data.colors.mode !== 'system') {
-              root.dataset.theme = data.colors.mode;
+            var c = data.colors;
+            // Map Fieldguide tokens → UA Dashboard CSS variables (--color-*)
+            if (c.background) root.style.setProperty('--color-root', c.background);
+            if (c.card) {
+              root.style.setProperty('--color-surface', c.card);
+              root.style.setProperty('--color-elevated', c.card);
             }
-            if (data.colors.preset) {
-              root.dataset.themePreset = data.colors.preset;
+            if (c.text) root.style.setProperty('--color-text-primary', c.text);
+            if (c.muted) root.style.setProperty('--color-text-muted', c.muted);
+            if (c.accent) {
+              root.style.setProperty('--color-accent', c.accent);
+              root.style.setProperty('--color-accent-bright', c.accent);
             }
+            if (c.accentMuted) root.style.setProperty('--color-accent-dim', c.accentMuted);
+            if (c.border) {
+              root.style.setProperty('--color-border-subtle', c.border);
+              root.style.setProperty('--color-border-medium', c.border);
+            }
+            if (c.scrollbarThumb) root.style.setProperty('--scrollbar-thumb', c.scrollbarThumb);
+            // Only light|dark — never pass shell preset names as data-theme
+            var mode = 'light';
+            if (c.mode === 'dark') mode = 'dark';
+            else if (c.mode === 'system' && window.matchMedia) {
+              mode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            } else if (c.background) {
+              var hex = String(c.background).replace('#', '');
+              if (hex.length === 6) {
+                var r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+                var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                mode = lum < 0.45 ? 'dark' : 'light';
+              }
+            }
+            root.setAttribute('data-theme', mode);
+            if (c.background) document.body.style.backgroundColor = c.background;
           }
           break;
         case 'setChromeless':
@@ -173,7 +229,6 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
     run();
   });
 
-  // ── Poll store for node selection changes ──
   var lastSelectedNodeId = null;
   var lastTourStep = null;
   setInterval(function() {
@@ -188,7 +243,6 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
         window.parent.postMessage({ source: 'ua-dashboard', type: 'nodeSelected', nodeId: nodeId }, '*');
       }
     }
-    // ── Poll tour step changes ──
     var tourStep = state.tourStep ?? state.tourStepIndex ?? state.currentTourStep ?? null;
     if (tourStep !== lastTourStep) {
       lastTourStep = tourStep;
@@ -198,7 +252,8 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
     }
   }, 150);
 })();
-</script>`
+</script>
+`
 
 export function registerDashboardProtocol(): string {
   const distDir = findDashboardDist()
@@ -206,22 +261,31 @@ export function registerDashboardProtocol(): string {
   protocol.handle(DASHBOARD_SCHEME, (request) => {
     const url = new URL(request.url)
     let pathname = url.pathname
+    // ua-dashboard://dashboard/index.html → host=dashboard, path=/index.html
+    // Also accept ua-dashboard:///assets/... absolute-from-root asset URLs
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
-    if (!pathname) pathname = 'index.html'
+    if (pathname.startsWith('dashboard/')) pathname = pathname.slice('dashboard/'.length)
+    if (!pathname || pathname === 'dashboard') pathname = 'index.html'
 
-    // Intercept knowledge-graph.json — serve project graph if available
-    if (pathname === 'knowledge-graph.json' && projectGraphPath && existsSync(projectGraphPath)) {
-      try {
-        const data = readFileSync(projectGraphPath)
-        return new Response(data, {
-          status: 200,
-          headers: { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' },
-        })
-      } catch { /* fall through to sample */ }
+    // Intercept knowledge-graph.json — project graph, else sample fallback
+    if (pathname === 'knowledge-graph.json' || pathname.endsWith('/knowledge-graph.json')) {
+      const graphFile = (projectGraphPath && existsSync(projectGraphPath))
+        ? projectGraphPath
+        : findSampleGraph()
+      if (graphFile) {
+        try {
+          const data = readFileSync(graphFile)
+          return new Response(data, {
+            status: 200,
+            headers: { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' },
+          })
+        } catch { /* fall through */ }
+      }
     }
 
-    // Intercept diff-overlay.json — serve project diff overlay if available
-    if (pathname === 'diff-overlay.json' && diffOverlayPath && existsSync(diffOverlayPath)) {
+    // Intercept diff-overlay.json
+    if ((pathname === 'diff-overlay.json' || pathname.endsWith('/diff-overlay.json'))
+      && diffOverlayPath && existsSync(diffOverlayPath)) {
       try {
         const data = readFileSync(diffOverlayPath)
         return new Response(data, {
@@ -239,10 +303,12 @@ export function registerDashboardProtocol(): string {
     try {
       let content = readFileSync(filePath)
 
-      // Inject postMessage bridge into index.html
-      if (pathname === 'index.html') {
+      if (pathname === 'index.html' || pathname.endsWith('/index.html')) {
         const html = content.toString('utf-8')
-        const injected = html.replace('</head>', POSTMESSAGE_BRIDGE_SCRIPT + '\n</head>')
+        const injected = html.replace(
+          '</head>',
+          EMBED_AUTH_SCRIPT + POSTMESSAGE_BRIDGE_SCRIPT + '\n</head>',
+        )
         content = Buffer.from(injected, 'utf-8')
       }
 
@@ -255,5 +321,5 @@ export function registerDashboardProtocol(): string {
     }
   })
 
-  return `${DASHBOARD_SCHEME}://dashboard/index.html`
+  return `${DASHBOARD_SCHEME}://dashboard/index.html?token=${DASHBOARD_EMBED_TOKEN}`
 }

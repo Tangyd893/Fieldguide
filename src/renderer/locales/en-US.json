@@ -18,6 +18,12 @@
     "noProject": "No project",
     "openLibrary": "Open project library…"
   },
+  "window": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close"
+  },
   "panels": {
     "graph": "Graph",
     "code": "Code",
@@ -30,6 +36,8 @@
     "emptyDesc": "Fieldguide analyzes source code and generates an interactive knowledge graph",
     "addLocal": "Add local folder",
     "addGit": "Clone from Git URL",
+    "addDemo": "Install built-in Demo",
+    "addDemoHint": "~13 nodes with a prebuilt graph — best for verifying Code Map",
     "addLocalTitle": "Add local folder",
     "addGitTitle": "Clone from Git",
     "pathLabel": "Project path",
@@ -276,7 +284,11 @@
     "llm": "LLM Configuration",
     "llmHint": "Pick a provider to fill the API base URL, then choose a model",
     "provider": "Provider",
-    "chatModel": "Model",
+    "chatModel": "Chat model",
+    "embedModel": "Embedding model",
+    "embedModelNone": "None (paper vectors unavailable)",
+    "embedModelPlaceholder": "text-embedding-3-small",
+    "embedModelHint": "Used for paper RAG / vector search; optional. Shares Base URL and API Key with chat.",
     "customModel": "Custom model name…",
     "backToModelList": "Back to model list",
     "baseUrlLocked": "Locked to the provider preset; choose Custom for a free-form URL",

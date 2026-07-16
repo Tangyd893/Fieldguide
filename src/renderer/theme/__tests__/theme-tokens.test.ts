@@ -8,6 +8,8 @@ const REQUIRED_VARS = [
   '--fg-bg',
   '--fg-card',
   '--fg-border',
+  '--fg-chrome-bg',
+  '--fg-chrome-border',
   '--fg-text-primary',
   '--fg-text-secondary',
   '--fg-accent',

@@ -1,8 +1,9 @@
-import { useRef, useCallback, type CSSProperties, type ReactNode } from 'react'
+import { useRef, useCallback, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent } from 'react'
 import { useWorkspaceLayout, type PanelTab } from '../../hooks/useWorkspaceLayout'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { beginResizeDrag } from '@/lib/resize-drag'
 
 interface Props {
   renderGraph: () => ReactNode
@@ -35,25 +36,20 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, render
   const hasTwo = panels.length === 2
   const isVertical = splitDirection === 'vertical'
 
-  const onMouseDown = useCallback(() => {
-    document.body.style.cursor = isVertical ? 'row-resize' : 'col-resize'
-    document.body.style.userSelect = 'none'
-    const onMove = (e: MouseEvent) => {
-      if (!containerRef.current) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const pct = isVertical
-        ? ((e.clientY - rect.top) / rect.height) * 100
-        : ((e.clientX - rect.left) / rect.width) * 100
-      setPos(Math.max(20, Math.min(80, pct)))
-    }
-    const onUp = () => {
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
+  const onMouseDown = useCallback((e: ReactMouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    beginResizeDrag({
+      cursor: isVertical ? 'row-resize' : 'col-resize',
+      onMove: (ev) => {
+        if (!containerRef.current) return
+        const rect = containerRef.current.getBoundingClientRect()
+        const pct = isVertical
+          ? ((ev.clientY - rect.top) / rect.height) * 100
+          : ((ev.clientX - rect.left) / rect.width) * 100
+        setPos(Math.max(20, Math.min(80, pct)))
+      },
+    })
   }, [isVertical, setPos])
 
   const TAB_LABELS: Record<PanelTab, string> = {
@@ -88,10 +84,10 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, render
       onDoubleClick={restorePanels}
       title={t('split.resizeHint')}
       className={cn(
-        'group shrink-0 z-10 flex items-center justify-center transition-colors duration-150',
+        'group shrink-0 z-20 flex items-center justify-center transition-colors duration-150',
         isVertical
-          ? 'h-1.5 cursor-row-resize bg-[var(--fg-border)] hover:bg-[var(--fg-accent-muted)]'
-          : 'w-1.5 cursor-col-resize bg-[var(--fg-border)] hover:bg-[var(--fg-accent-muted)]',
+          ? 'h-1.5 cursor-row-resize bg-[var(--fg-chrome-border,var(--fg-border))] hover:bg-[var(--fg-accent-muted)]'
+          : 'w-1.5 cursor-col-resize bg-[var(--fg-chrome-border,var(--fg-border))] hover:bg-[var(--fg-accent-muted)]',
       )}
     >
       <div
@@ -176,12 +172,12 @@ function PanelChrome({
     <div
       className={cn(
         'flex flex-col overflow-hidden relative transition-[box-shadow,border-color] duration-150 shrink-0 bg-[var(--fg-bg)]',
-        isActive && 'border-l-2 border-[var(--fg-accent)]',
+        isActive && 'ring-1 ring-inset ring-[var(--fg-accent)]/40',
       )}
       style={style}
       onClick={onActivate}
     >
-      <div className="flex items-center h-8 border-b border-[var(--fg-border)] bg-[var(--fg-card)] px-1 shrink-0" data-fg-surface>
+      <div className="flex items-center h-8 border-b border-[var(--fg-border)] bg-[var(--fg-panel-chrome,var(--fg-card))] px-1 shrink-0" data-fg-surface>
         <Tabs value={panel.activeTab} onValueChange={(v) => onTabChange(v as PanelTab)} className="flex-1 min-w-0">
           <TabsList className="h-8 bg-transparent p-0 gap-0 w-full justify-start">
             {panel.tabs.map(tab => (
@@ -202,7 +198,7 @@ function PanelChrome({
       </div>
 
       {panel.activeTab === 'code' && panel.openFiles.length > 0 && (
-        <div className="flex items-center h-8 border-b border-[var(--fg-border)] bg-[var(--fg-card)] px-1 shrink-0 overflow-x-auto gap-0">
+        <div className="flex items-center h-8 border-b border-[var(--fg-border)] bg-[var(--fg-panel-chrome,var(--fg-card))] px-1 shrink-0 overflow-x-auto gap-0">
           {panel.openFiles.map((f) => {
             const name = f.path.split('/').pop() ?? f.path
             const isFileActive = f.id === panel.activeFileId

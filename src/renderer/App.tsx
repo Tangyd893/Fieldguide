@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Folder, ChevronDown } from 'lucide-react'
+import { Folder } from 'lucide-react'
 import ProjectLibrary from './views/ProjectLibrary/ProjectLibrary'
 import FileTree from './views/CodeMap/FileTree'
 import SplitPanel from './views/CodeMap/SplitPanel'
@@ -21,6 +21,8 @@ import AboutDialog from './views/AboutDialog'
 import TheoryView from './views/Theory/TheoryView'
 import BridgeView from './views/Bridge/BridgeView'
 import ActivityBar, { defaultActivityIcons, type ShellModule } from './components/ActivityBar'
+import AppTitleBar from './components/AppTitleBar'
+import { beginResizeDrag } from './lib/resize-drag'
 import { useToast, ToastContainer, showToast } from './views/Toast'
 import { useWorkspaceLayout } from './hooks/useWorkspaceLayout'
 import { useIndexProgress, progressPercent } from './hooks/useIndexProgress'
@@ -35,9 +37,13 @@ import {
   persistAppearancePatch,
   type AppearanceState,
 } from './lib/appearance'
-import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+type MenuId = 'file' | 'edit' | 'view' | 'help'
+const DEFAULT_MENU_LABELS: Record<MenuId, string> = {
+  file: 'File',
+  edit: 'Edit',
+  view: 'View',
+  help: 'Help',
+}
 
 export type Tab = ShellModule
 
@@ -85,7 +91,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('library')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
-  const workspaceLayout = useWorkspaceLayout()
+  const workspaceLayout = useWorkspaceLayout(selectedProject?.id)
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false)
   const [fileTreeWidth, setFileTreeWidth] = useState(260)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -93,6 +99,8 @@ export default function App() {
   const [showCostDialog, setShowCostDialog] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const [showProjectMenu, setShowProjectMenu] = useState(false)
+  const [customChrome, setCustomChrome] = useState(false)
+  const [menuLabels, setMenuLabels] = useState<Record<MenuId, string>>(DEFAULT_MENU_LABELS)
   const indexProgress = useIndexProgress(selectedProject?.id)
   const [pendingIndex, setPendingIndex] = useState<string | null>(null)
   const [dashboardTourStep, setDashboardTourStep] = useState<number | null>(null)
@@ -101,6 +109,18 @@ export default function App() {
   const { toasts, removeToast } = useToast()
 
   useDashboardThemeSync()
+
+  useEffect(() => {
+    window.fieldguide.windowPlatform?.().then((r) => {
+      if (r.ok && r.data) setCustomChrome(!!r.data.customTitleBar)
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    window.fieldguide.menuTopLevelLabels?.().then((r) => {
+      if (r.ok && r.data) setMenuLabels(r.data)
+    }).catch(() => {})
+  }, [i18n.language])
 
   const refreshProjects = () => {
     window.fieldguide.projectList().then((list) => {
@@ -349,12 +369,12 @@ export default function App() {
     doIndex(selectedProject.id, selectedProject.name, incremental)
   }
 
-  async function doIndex(projectId: string, _projectName: string, incremental = false) {
+  async function doIndex(projectId: string, _projectName: string, incremental = false, skipLlm = false) {
     setShowCostDialog(false)
     setPendingIndex(null)
 
     try {
-      const result = await window.fieldguide.projectIndex(projectId, incremental)
+      const result = await window.fieldguide.projectIndex(projectId, incremental, skipLlm)
       if (!result.ok) {
         showToast('error', result.error?.message ?? '索引失败')
         return
@@ -441,39 +461,34 @@ export default function App() {
     { id: 'settings' as const, icon: null as unknown as React.ReactNode, label: t('tabs.settings') },
   ]
 
-  const moduleTitle =
-    activeTab === 'library' ? t('tabs.library')
-      : activeTab === 'codemap' ? t('tabs.codemap')
-        : activeTab === 'theory' ? t('tabs.theory')
-          : activeTab === 'bridge' ? t('tabs.bridge')
-            : t('tabs.settings')
-
   return (
-    <div className="flex h-screen bg-[var(--fg-bg)] text-[var(--fg-text-primary)]" data-fg-surface>
-      <ActivityBar
-        active={activeTab}
-        onChange={changeModule}
-        items={activityItems}
-        settingsLabel={t('tabs.settings')}
+    <div className="flex flex-col h-screen bg-[var(--fg-bg)] text-[var(--fg-text-primary)]" data-fg-surface>
+      <AppTitleBar
+        selectedProject={selectedProject}
+        projects={projects}
+        showProjectMenu={showProjectMenu}
+        setShowProjectMenu={setShowProjectMenu}
+        onSelectProject={(p) => {
+          const full = p ? projects.find((x) => x.id === p.id) ?? null : null
+          setSelectedProject(full)
+          setShowProjectMenu(false)
+          if (full) setActiveTab('codemap')
+        }}
+        onOpenLibrary={() => setActiveTab('library')}
+        onSearch={() => setShowPalette(true)}
+        showLayout={activeTab === 'codemap'}
+        workspaceLayout={workspaceLayout}
+        t={t}
+        customChrome={customChrome}
+        menuLabels={menuLabels}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TitleBar
-          moduleTitle={moduleTitle}
-          selectedProject={selectedProject}
-          projects={projects}
-          showProjectMenu={showProjectMenu}
-          setShowProjectMenu={setShowProjectMenu}
-          onSelectProject={(p) => {
-            setSelectedProject(p)
-            setShowProjectMenu(false)
-            if (p) setActiveTab('codemap')
-          }}
-          onOpenLibrary={() => setActiveTab('library')}
-          onSearch={() => setShowPalette(true)}
-          showLayout={activeTab === 'codemap'}
-          workspaceLayout={workspaceLayout}
-          t={t}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <ActivityBar
+          active={activeTab}
+          onChange={changeModule}
+          items={activityItems}
+          settingsLabel={t('tabs.settings')}
         />
 
         <div className="flex-1 flex overflow-hidden min-h-0">
@@ -481,7 +496,7 @@ export default function App() {
             <>
               <div
                 style={{ width: fileTreeWidth }}
-                className="flex-shrink-0 border-r border-[var(--fg-border)] bg-[var(--fg-sidebar-bg,var(--fg-bg))] transition-[width] duration-200 ease-out"
+                className="flex-shrink-0 border-r border-[var(--fg-chrome-border,var(--fg-border))] bg-[var(--fg-chrome-bg,var(--fg-sidebar-bg,var(--fg-card)))] transition-[width] duration-200 ease-out"
               >
                 <FileTree
                   projectId={selectedProject?.id ?? ''}
@@ -491,31 +506,29 @@ export default function App() {
                 />
               </div>
               <div
-                className="group w-1.5 bg-[var(--fg-border)] hover:bg-[var(--fg-accent-muted)] cursor-col-resize shrink-0 transition-colors duration-150 flex items-center justify-center"
+                className="group w-1.5 bg-[var(--fg-chrome-border,var(--fg-border))] hover:bg-[var(--fg-accent-muted)] cursor-col-resize shrink-0 transition-colors duration-150 flex items-center justify-center z-20"
                 title={t('tooltip.collapseFileTree')}
                 onMouseDown={(e) => {
+                  e.preventDefault()
                   const startX = e.clientX
                   const startW = fileTreeWidth
-                  const onMove = (ev: MouseEvent) => {
-                    const w = Math.max(160, Math.min(400, startW + ev.clientX - startX))
-                    setFileTreeWidth(w)
-                    fileTreeWidthRef.current = w
-                  }
-                  const onUp = () => {
-                    document.removeEventListener('mousemove', onMove)
-                    document.removeEventListener('mouseup', onUp)
-                    document.body.style.cursor = ''
-                    window.fieldguide.configGet().then((r) => {
-                      if (r.ok && r.data) {
-                        const cfg = r.data as Record<string, unknown>
-                        const app = (cfg.appearance as Record<string, unknown>) || {}
-                        window.fieldguide.configSet({ appearance: { ...app, sidebarWidth: fileTreeWidthRef.current } }).catch(() => {})
-                      }
-                    }).catch(() => {})
-                  }
-                  document.body.style.cursor = 'col-resize'
-                  document.addEventListener('mousemove', onMove)
-                  document.addEventListener('mouseup', onUp)
+                  beginResizeDrag({
+                    cursor: 'col-resize',
+                    onMove: (ev) => {
+                      const w = Math.max(160, Math.min(400, startW + ev.clientX - startX))
+                      setFileTreeWidth(w)
+                      fileTreeWidthRef.current = w
+                    },
+                    onEnd: () => {
+                      window.fieldguide.configGet().then((r) => {
+                        if (r.ok && r.data) {
+                          const cfg = r.data as Record<string, unknown>
+                          const app = (cfg.appearance as Record<string, unknown>) || {}
+                          window.fieldguide.configSet({ appearance: { ...app, sidebarWidth: fileTreeWidthRef.current } }).catch(() => {})
+                        }
+                      }).catch(() => {})
+                    },
+                  })
                 }}
               >
                 <div className="w-0.5 h-8 rounded-full bg-[var(--fg-text-tertiary)] opacity-0 group-hover:opacity-60 transition-opacity" />
@@ -584,16 +597,16 @@ export default function App() {
             )}
           </main>
         </div>
-
-        <StatusBar
-          project={selectedProject}
-          t={t}
-          indexProgress={indexProgress}
-          shellZoom={appearance.shellZoom}
-          dashboardZoom={appearance.dashboardZoom}
-          onCancelIndex={selectedProject ? () => window.fieldguide.projectIndexCancel(selectedProject.id) : undefined}
-        />
       </div>
+
+      <StatusBar
+        project={selectedProject}
+        t={t}
+        indexProgress={indexProgress}
+        shellZoom={appearance.shellZoom}
+        dashboardZoom={appearance.dashboardZoom}
+        onCancelIndex={selectedProject ? () => window.fieldguide.projectIndexCancel(selectedProject.id) : undefined}
+      />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
@@ -666,119 +679,17 @@ export default function App() {
         onContinue={() => {
           if (pendingIndex) {
             const p = selectedProject
-            if (p) doIndex(p.id, p.name)
+            if (p) doIndex(p.id, p.name, false, false)
           }
         }}
         onSkipLLM={() => {
           if (pendingIndex) {
             const p = selectedProject
-            if (p) doIndex(p.id, p.name)
+            if (p) doIndex(p.id, p.name, false, true)
           }
         }}
       />
     </div>
-  )
-}
-
-function TitleBar({
-  moduleTitle,
-  selectedProject,
-  projects,
-  showProjectMenu,
-  setShowProjectMenu,
-  onSelectProject,
-  onOpenLibrary,
-  onSearch,
-  showLayout,
-  workspaceLayout,
-  t,
-}: {
-  moduleTitle: string
-  selectedProject: Project | null
-  projects: Project[]
-  showProjectMenu: boolean
-  setShowProjectMenu: (v: boolean) => void
-  onSelectProject: (p: Project | null) => void
-  onOpenLibrary: () => void
-  onSearch: () => void
-  showLayout: boolean
-  workspaceLayout: ReturnType<typeof useWorkspaceLayout>
-  t: (k: string) => string
-}) {
-  const { setNumPanels, setSplitDirection, swapPanels, layout } = workspaceLayout
-  const hasTwo = layout.panels.length === 2
-
-  return (
-    <header className="h-10 flex items-center px-2 border-b border-[var(--fg-border)] bg-[var(--fg-card)] shrink-0 select-none gap-1" data-fg-surface>
-      <span className="text-[11px] font-semibold tracking-wide text-[var(--fg-text-tertiary)] px-1.5 shrink-0" title={t('app.name')}>
-        FG
-      </span>
-      <span className="text-sm font-medium text-[var(--fg-text-secondary)] shrink-0 mr-1">{moduleTitle}</span>
-      <span className="text-[var(--fg-border)] mx-0.5">·</span>
-
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setShowProjectMenu(!showProjectMenu)}
-          className="flex items-center gap-1 max-w-[220px] px-2 py-1 rounded-md text-sm hover:bg-[var(--fg-tree-hover)] text-[var(--fg-text-primary)]"
-        >
-          <span className="truncate">{selectedProject?.name || t('titleBar.noProject')}</span>
-          <ChevronDown size={14} className="shrink-0 text-[var(--fg-text-tertiary)]" />
-        </button>
-        {showProjectMenu && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowProjectMenu(false)} />
-            <div className="absolute top-full left-0 mt-1 z-50 min-w-[220px] max-h-64 overflow-auto rounded-lg border border-[var(--fg-border)] bg-[var(--fg-card)] shadow-[var(--fg-dialog-shadow)] py-1">
-              {projects.length === 0 ? (
-                <button
-                  type="button"
-                  className="w-full text-left px-3 py-2 text-sm text-[var(--fg-text-secondary)] hover:bg-[var(--fg-tree-hover)]"
-                  onClick={() => { setShowProjectMenu(false); onOpenLibrary() }}
-                >
-                  {t('titleBar.openLibrary')}
-                </button>
-              ) : (
-                projects.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={cn(
-                      'w-full text-left px-3 py-1.5 text-sm truncate hover:bg-[var(--fg-tree-hover)]',
-                      selectedProject?.id === p.id && 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)]',
-                    )}
-                    onClick={() => onSelectProject(p)}
-                  >
-                    {p.name}
-                  </button>
-                ))
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="flex-1" />
-
-      {showLayout && (
-        <div className="flex items-center gap-0.5 mr-1">
-          <Button variant="ghost" size="icon-sm" onClick={() => setNumPanels(1)} title={t('split.singlePanel')} className="text-[10px]">▣</Button>
-          <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('horizontal') }} title={t('split.horizontal')} className="text-[10px]">◫</Button>
-          <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('vertical') }} title={t('split.vertical')} className="text-[10px]">◰</Button>
-          {hasTwo && (
-            <Button variant="ghost" size="icon-sm" onClick={swapPanels} title={t('split.swap')} className="text-[10px]">⇄</Button>
-          )}
-        </div>
-      )}
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="icon" size="icon-sm" onClick={onSearch} aria-label={t('tooltip.search')}>
-            <Search size={16} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Ctrl+K</TooltipContent>
-      </Tooltip>
-    </header>
   )
 }
 
@@ -834,7 +745,7 @@ function StatusBar({
   const error = p?.type === 'error' ? p.error : null
 
   return (
-    <footer className="shrink-0 select-none border-t border-[var(--fg-border)] bg-[var(--fg-card)]">
+    <footer className="shrink-0 select-none border-t border-[var(--fg-chrome-border,var(--fg-border))] bg-[var(--fg-chrome-bg,var(--fg-card))]" data-fg-chrome>
       {indexProgress.isIndexing && pct >= 0 && (
         <div className="h-[3px] bg-[var(--fg-input-border)]">
           <div

@@ -39,6 +39,22 @@ footer {
   -webkit-user-select: none;
 }
 
+/* Split / sidebar resize — keep drag alive over iframes; no blue text selection */
+body.fg-is-resizing,
+body.fg-is-resizing * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: inherit;
+}
+
+body.fg-is-resizing iframe {
+  pointer-events: none !important;
+}
+
+body.fg-is-resizing {
+  cursor: col-resize !important;
+}
+
 /* Toast animation */
 @keyframes slide-up {
   from {

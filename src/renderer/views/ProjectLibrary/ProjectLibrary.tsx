@@ -58,6 +58,21 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, onFullRein
     finally { setAdding(false) }
   }
 
+  async function handleInstallDemo() {
+    setError(null); setAdding(true)
+    try {
+      const r = await window.fieldguide.projectInstallDemo()
+      if (r.ok && r.data) {
+        const row = r.data as ProjectRow
+        setProjects(p => (p.some(x => x.id === row.id) ? p : [row, ...p]))
+        onSelect(row)
+      } else {
+        setError(r.error?.message ?? t('project.addFailed'))
+      }
+    } catch (err) { setError(String(err)) }
+    finally { setAdding(false) }
+  }
+
   async function handleDiffAnalyze(projectId: string) {
     setAnalyzingDiff(projectId)
     setDiffResult(null)
@@ -104,9 +119,14 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, onFullRein
           <h2 className="text-xl font-semibold text-[var(--fg-text-primary)] mb-2">{t('project.emptyTitle')}</h2>
           <p className="text-sm text-[var(--fg-text-secondary)] mb-8">{t('project.emptyDesc')}</p>
           <div className="flex flex-col gap-3">
-            <Button onClick={()=>{setAddMode('local');setShowAdd(true)}} className="px-6 py-2.5">{t('project.addLocal')}</Button>
+            <Button onClick={() => { void handleInstallDemo() }} disabled={adding} className="px-6 py-2.5">
+              {adding ? t('project.processing') : t('project.addDemo')}
+            </Button>
+            <p className="text-xs text-[var(--fg-text-tertiary)] -mt-1">{t('project.addDemoHint')}</p>
+            <Button variant="outline" onClick={()=>{setAddMode('local');setShowAdd(true)}} className="px-6 py-2.5">{t('project.addLocal')}</Button>
             <Button variant="outline" onClick={()=>{setAddMode('git');setShowAdd(true)}} className="px-6 py-2.5">{t('project.addGit')}</Button>
           </div>
+          {error && <div className="mt-4 p-2 bg-[var(--fg-status-error-bg)] border border-[var(--fg-status-error)] rounded text-sm text-[var(--fg-status-error)]">{error}</div>}
           <AddDialog open={showAdd} mode={addMode} localPath={localPath} gitUrl={gitUrl} gitBranch={gitBranch} error={error} adding={adding}
             onLocalPathChange={setLocalPath} onGitUrlChange={setGitUrl} onGitBranchChange={setGitBranch}
             onClose={()=>{setShowAdd(false);setError(null)}} onAdd={handleAdd} t={t} />
@@ -120,10 +140,16 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, onFullRein
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold">{t('tabs.library')}</h2>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => { void handleInstallDemo() }} disabled={adding}>
+            {adding ? t('project.processing') : `+ ${t('project.addDemo')}`}
+          </Button>
           <Button variant="outline" size="sm" onClick={()=>{setAddMode('local');setShowAdd(true)}}>+ {t('project.addLocal')}</Button>
           <Button variant="outline" size="sm" onClick={()=>{setAddMode('git');setShowAdd(true)}}>+ {t('project.addGit')}</Button>
         </div>
       </div>
+      {error && !showAdd && (
+        <div className="mb-4 p-2 bg-[var(--fg-status-error-bg)] border border-[var(--fg-status-error)] rounded text-sm text-[var(--fg-status-error)]">{error}</div>
+      )}
       <div className="space-y-3">
         {projects.map(p=>(
           <button key={p.id} onClick={()=>onSelect(p)}

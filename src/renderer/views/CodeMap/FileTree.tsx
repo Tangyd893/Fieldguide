@@ -62,7 +62,7 @@ export default function FileTree({ projectId, onFileClick, activeFilePath, t }: 
   const filtered = filterTree(tree, filter)
 
   return (
-    <div className="h-full flex flex-col bg-[var(--fg-card)]" data-fg-surface>
+    <div className="h-full flex flex-col bg-[var(--fg-chrome-bg,var(--fg-card))]" data-fg-surface data-fg-chrome>
       <div className="px-2 py-1.5 border-b border-[var(--fg-border)]">
         <Input
           type="text"

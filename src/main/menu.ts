@@ -201,3 +201,28 @@ export function buildApplicationMenu(locale: MenuLocale): Menu {
 export function setApplicationMenu(locale: MenuLocale): void {
   Menu.setApplicationMenu(buildApplicationMenu(locale))
 }
+
+/** Top-level menus shown in the custom title bar (Windows). */
+export type TopLevelMenuId = 'file' | 'edit' | 'view' | 'help'
+
+/**
+ * Popup a top-level application submenu at screen/window coordinates.
+ * Keeps Menu.setApplicationMenu for accelerators while the native bar stays hidden.
+ */
+export function popupTopLevelMenu(id: TopLevelMenuId, x: number, y: number): void {
+  const win = focusedWindow()
+  const menu = Menu.getApplicationMenu()
+  if (!win || !menu) return
+
+  const isMac = process.platform === 'darwin'
+  const order: TopLevelMenuId[] = ['file', 'edit', 'view', 'help']
+  const idx = order.indexOf(id)
+  if (idx < 0) return
+  const item = menu.items[isMac ? idx + 1 : idx]
+  item?.submenu?.popup({ window: win, x: Math.round(x), y: Math.round(y) })
+}
+
+export function getTopLevelMenuLabels(locale: MenuLocale): Record<TopLevelMenuId, string> {
+  const s = MENU_STRINGS[locale] ?? MENU_STRINGS['en-US']
+  return { file: s.file, edit: s.edit, view: s.view, help: s.help }
+}

@@ -14,6 +14,11 @@
   --fg-bg: #fafafa;
   --fg-card: #ffffff;
   --fg-border: #e5e7eb;
+  /* Shell chrome (title / activity / status / sidebars) — distinct from content */
+  --fg-chrome-bg: #eef0f4;
+  --fg-chrome-border: #d5d9e0;
+  --fg-panel-chrome: #f3f4f6;
+  --fg-sidebar-bg: #eef0f4;
 
   /* Text */
   --fg-text-primary: #111827;
@@ -72,6 +77,10 @@
   --fg-bg: #0f172a;
   --fg-card: #1e293b;
   --fg-border: #334155;
+  --fg-chrome-bg: #0b1220;
+  --fg-chrome-border: #1e293b;
+  --fg-panel-chrome: #152033;
+  --fg-sidebar-bg: #0b1220;
 
   --fg-text-primary: #f8fafc;
   --fg-text-secondary: #94a3b8;
@@ -113,6 +122,10 @@
     --fg-bg: #0f172a;
     --fg-card: #1e293b;
     --fg-border: #334155;
+    --fg-chrome-bg: #0b1220;
+    --fg-chrome-border: #1e293b;
+    --fg-panel-chrome: #152033;
+    --fg-sidebar-bg: #0b1220;
 
     --fg-text-primary: #f8fafc;
     --fg-text-secondary: #94a3b8;
@@ -157,6 +170,10 @@
   --fg-bg: #FDFCF8;
   --fg-card: #FFFFFF;
   --fg-border: #E5E5E5;
+  --fg-chrome-bg: #EDE9E0;
+  --fg-chrome-border: #D9D3C7;
+  --fg-panel-chrome: #F5F2EB;
+  --fg-sidebar-bg: #EDE9E0;
   --fg-text-primary: #222222;
   --fg-text-secondary: #757575;
   --fg-text-tertiary: #9E9E9E;
@@ -178,7 +195,6 @@
   --fg-overlay: rgba(0, 0, 0, 0.25);
   --fg-modal-scrim: rgba(0, 0, 0, 0.45);
   --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
-  --fg-sidebar-bg: #F8F7F4;
   --fg-status-info: #4A90E2;
   --fg-status-info-bg: #EBF3FC;
   --fg-status-warning: #F5A623;
@@ -190,6 +206,10 @@
   --fg-bg: #1B2E1E;
   --fg-card: #263C2A;
   --fg-border: #3A523E;
+  --fg-chrome-bg: #142218;
+  --fg-chrome-border: #2A3C2E;
+  --fg-panel-chrome: #1F3323;
+  --fg-sidebar-bg: #142218;
   --fg-text-primary: #E8EDE6;
   --fg-text-secondary: #A3B8A5;
   --fg-text-tertiary: #6B806E;
@@ -218,6 +238,10 @@
   --fg-bg: #F0F2F5;
   --fg-card: #FFFFFF;
   --fg-border: #D1D5DB;
+  --fg-chrome-bg: #E2E6EC;
+  --fg-chrome-border: #C5CBD4;
+  --fg-panel-chrome: #E8ECF1;
+  --fg-sidebar-bg: #E2E6EC;
   --fg-text-primary: #1F2937;
   --fg-text-secondary: #6B7280;
   --fg-text-tertiary: #9CA3AF;
@@ -246,6 +270,10 @@
   --fg-bg: #0D1117;
   --fg-card: #161B22;
   --fg-border: #30363D;
+  --fg-chrome-bg: #010409;
+  --fg-chrome-border: #21262D;
+  --fg-panel-chrome: #12171E;
+  --fg-sidebar-bg: #010409;
   --fg-text-primary: #E6EDF3;
   --fg-text-secondary: #8B949E;
   --fg-text-tertiary: #6E7681;
@@ -274,6 +302,10 @@
   --fg-bg: #2D2420;
   --fg-card: #39322E;
   --fg-border: #534B45;
+  --fg-chrome-bg: #221B18;
+  --fg-chrome-border: #3F3732;
+  --fg-panel-chrome: #322B27;
+  --fg-sidebar-bg: #221B18;
   --fg-text-primary: #EAE0D5;
   --fg-text-secondary: #A99C8E;
   --fg-text-tertiary: #7A6E63;

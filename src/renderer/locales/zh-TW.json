@@ -18,6 +18,12 @@
     "noProject": "未選擇專案",
     "openLibrary": "開啟專案庫…"
   },
+  "window": {
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "還原",
+    "close": "關閉"
+  },
   "panels": {
     "graph": "圖譜",
     "code": "程式碼",
@@ -30,6 +36,8 @@
     "emptyDesc": "Fieldguide 會分析專案原始碼並產出互動式知識圖譜",
     "addLocal": "選擇本機資料夾",
     "addGit": "從 Git URL 複製",
+    "addDemo": "安裝內建 Demo",
+    "addDemoHint": "約 13 個節點、自帶圖譜，適合先驗證程式碼地圖",
     "addLocalTitle": "選擇本機資料夾",
     "addGitTitle": "從 Git 複製",
     "pathLabel": "專案路徑",
@@ -276,7 +284,11 @@
     "llm": "LLM 配置",
     "llmHint": "選擇供應商後自動填入 API 位址，並可選模型名稱",
     "provider": "模型供應商",
-    "chatModel": "模型名稱",
+    "chatModel": "對話模型",
+    "embedModel": "嵌入模型",
+    "embedModelNone": "不使用（論文向量不可用）",
+    "embedModelPlaceholder": "text-embedding-3-small",
+    "embedModelHint": "用於論文 RAG / 向量檢索；可留空。與對話模型共用 Base URL 與 API Key。",
     "customModel": "自訂模型名稱…",
     "backToModelList": "返回模型列表",
     "baseUrlLocked": "由供應商預設；如需完全自訂請選「自訂 / OpenAI 相容」",

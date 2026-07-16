@@ -13,6 +13,8 @@ const api = {
     ipcRenderer.invoke('config:set', patch),
   configTestLlm: (): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('config:testLlm'),
+  configLlmStatus: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('config:llmStatus'),
 
   // Projects
   projectList: (): Promise<IpcResult<unknown[]>> =>
@@ -43,8 +45,8 @@ const api = {
     ipcRenderer.invoke('graph:meta', { projectId }),
 
   // Index
-  projectIndex: (projectId: string, incremental?: boolean): Promise<IpcResult<unknown>> =>
-    ipcRenderer.invoke('project:index', { projectId, incremental }),
+  projectIndex: (projectId: string, incremental?: boolean, skipLlm?: boolean): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('project:index', { projectId, incremental, skipLlm }),
   projectIndexCancel: (projectId: string): Promise<IpcResult<null>> =>
     ipcRenderer.invoke('project:indexCancel', { projectId }),
   projectExportGraph: (projectId: string): Promise<IpcResult<unknown>> =>
@@ -157,6 +159,27 @@ const api = {
     const handler = () => cb()
     ipcRenderer.on('menu:zoomReset', handler)
     return () => ipcRenderer.removeListener('menu:zoomReset', handler)
+  },
+
+  menuPopupTopLevel: (id: 'file' | 'edit' | 'view' | 'help', x: number, y: number): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('menu:popupTopLevel', { id, x, y }),
+  menuTopLevelLabels: (): Promise<IpcResult<Record<'file' | 'edit' | 'view' | 'help', string>>> =>
+    ipcRenderer.invoke('menu:topLevelLabels'),
+
+  windowMinimize: (): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('window:minimize'),
+  windowMaximize: (): Promise<IpcResult<{ maximized: boolean }>> =>
+    ipcRenderer.invoke('window:maximize'),
+  windowClose: (): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('window:close'),
+  windowIsMaximized: (): Promise<IpcResult<{ maximized: boolean }>> =>
+    ipcRenderer.invoke('window:isMaximized'),
+  windowPlatform: (): Promise<IpcResult<{ platform: string; customTitleBar: boolean }>> =>
+    ipcRenderer.invoke('window:platform'),
+  onWindowMaximizeChange: (cb: (maximized: boolean) => void) => {
+    const handler = (_event: unknown, maximized: boolean) => cb(maximized)
+    ipcRenderer.on('window:maximize-changed', handler)
+    return () => ipcRenderer.removeListener('window:maximize-changed', handler)
   },
 
   // Bridge Tour

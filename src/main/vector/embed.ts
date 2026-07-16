@@ -5,6 +5,7 @@
  * Uses the `embedModel` field from LLMConfig (e.g., "text-embedding-3-small").
  */
 import { loadConfig } from '../config'
+import { joinLlmUrl } from '../../shared/llm-url'
 
 export interface EmbedResult {
   /** The embedding vector (float32 array) */
@@ -27,8 +28,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 
   const embedModel = config.llm.embedModel || 'text-embedding-3-small'
-  const baseUrl = config.llm.baseUrl.replace(/\/+$/, '')
-  const url = `${baseUrl}/v1/embeddings`
+  const url = joinLlmUrl(config.llm.baseUrl, '/v1/embeddings')
 
   const resp = await fetch(url, {
     method: 'POST',
@@ -75,8 +75,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 
     const config = loadConfig()
     const embedModel = config.llm.embedModel || 'text-embedding-3-small'
-    const baseUrl = config.llm.baseUrl.replace(/\/+$/, '')
-    const url = `${baseUrl}/v1/embeddings`
+    const url = joinLlmUrl(config.llm.baseUrl, '/v1/embeddings')
 
     const resp = await fetch(url, {
       method: 'POST',

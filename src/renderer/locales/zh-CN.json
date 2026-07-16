@@ -18,6 +18,12 @@
     "noProject": "未选择项目",
     "openLibrary": "打开项目库…"
   },
+  "window": {
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "还原",
+    "close": "关闭"
+  },
   "panels": {
     "graph": "图谱",
     "code": "代码",
@@ -30,6 +36,8 @@
     "emptyDesc": "Fieldguide 会分析项目源码并生成交互式知识图谱",
     "addLocal": "选择本地文件夹",
     "addGit": "从 Git URL 克隆",
+    "addDemo": "安装内置 Demo",
+    "addDemoHint": "约 13 个节点，自带图谱，适合先验证代码地图",
     "addLocalTitle": "选择本地文件夹",
     "addGitTitle": "从 Git 克隆",
     "pathLabel": "项目路径",
@@ -276,7 +284,11 @@
     "llm": "LLM 配置",
     "llmHint": "选择供应商后自动填入 API 地址，并可选模型名称",
     "provider": "模型供应商",
-    "chatModel": "模型名称",
+    "chatModel": "对话模型",
+    "embedModel": "嵌入模型",
+    "embedModelNone": "不使用（论文向量不可用）",
+    "embedModelPlaceholder": "text-embedding-3-small",
+    "embedModelHint": "用于论文 RAG / 向量检索；可留空。与对话模型共用 Base URL 与 API Key。",
     "customModel": "自定义模型名称…",
     "backToModelList": "返回模型列表",
     "baseUrlLocked": "由供应商预设；如需完全自定义请选「自定义 / OpenAI 兼容」",

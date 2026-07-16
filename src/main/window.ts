@@ -2,6 +2,8 @@ import { BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
+const useCustomTitleBar = process.platform === 'win32'
+
 export function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1440,
@@ -9,6 +11,9 @@ export function createWindow(): BrowserWindow {
     minWidth: 1280,
     minHeight: 800,
     show: false,
+    title: 'Fieldguide',
+    frame: !useCustomTitleBar,
+    autoHideMenuBar: useCustomTitleBar,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -16,6 +21,15 @@ export function createWindow(): BrowserWindow {
       sandbox: false,
     },
   })
+
+  if (useCustomTitleBar) {
+    win.setMenuBarVisibility(false)
+    const emitMax = () => {
+      win.webContents.send('window:maximize-changed', win.isMaximized())
+    }
+    win.on('maximize', emitMax)
+    win.on('unmaximize', emitMax)
+  }
 
   win.on('ready-to-show', () => {
     win.show()

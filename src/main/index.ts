@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog } from 'electron'
-import { registerDashboardProtocol } from './ua/dashboard'
+import { registerDashboardProtocol, registerDashboardScheme } from './ua/dashboard'
 import { createWindow } from './window'
 import { logError } from './logger'
 import { loadConfig } from './config'
@@ -8,6 +8,9 @@ import { setApplicationMenu } from './menu'
 // Side-effect import: registers all IPC handlers
 import './ipc/index'
 import { setDashboardUrl } from './ipc/index'
+
+// Required before app.ready — enables ES modules + fetch in ua-dashboard:// iframe
+registerDashboardScheme()
 
 let mainWindow: BrowserWindow | null = null
 
@@ -35,7 +38,7 @@ app.whenReady().then(() => {
     logError('dashboard:register-failed', { message })
     dialog.showErrorBox(
       'Fieldguide 启动警告',
-      `代码地图 Dashboard 加载失败，图谱功能不可用。\n\n${message}`,
+      `代码地图 Dashboard 加载失败，图谱功能不可用。\n\n${message}\n\n请在 Fieldguide 根目录执行：pnpm bootstrap:ua`,
     )
   }
 

@@ -1,13 +1,13 @@
 /**
  * useWorkspaceLayout — manages panel state for the CodeMap split view.
- * 
+ *
  * Policy (ux-split-policy):
  * - Single panel default: activeTab = 'graph'
  * - Dual panel default: panel[0] = code, panel[1] = graph
  * - File opens route to active panel (no forced split)
- * - Layout persisted to config.workspaceLayout
+ * - Layout persisted per projectId under config.workspaceLayouts
  */
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 
 export type PanelTab = 'graph' | 'code' | 'chat' | 'tour'
 
@@ -39,7 +39,7 @@ export interface WorkspaceLayout {
   splitDirection: SplitDirection
 }
 
-const DEFAULT_LAYOUT: WorkspaceLayout = {
+export const DEFAULT_LAYOUT: WorkspaceLayout = {
   panels: [
     { id: 0, tabs: ['graph', 'code', 'chat', 'tour'], activeTab: 'graph', filePath: undefined, openFiles: [], activeFileId: undefined },
   ],
@@ -57,40 +57,142 @@ function createPanel(activeTab: PanelTab = 'code'): PanelState {
   return { id: nextPanelId(), tabs: ['graph', 'code', 'chat', 'tour'], activeTab, filePath: undefined, openFiles: [], activeFileId: undefined }
 }
 
-export function useWorkspaceLayout(persistKey?: string) {
-  const [layout, setLayout] = useState<WorkspaceLayout>(DEFAULT_LAYOUT)
-  const [loaded, setLoaded] = useState(false)
+function cloneDefaultLayout(): WorkspaceLayout {
+  return {
+    panels: [
+      { id: 0, tabs: ['graph', 'code', 'chat', 'tour'], activeTab: 'graph', filePath: undefined, openFiles: [], activeFileId: undefined },
+    ],
+    activePanelIndex: 0,
+    splitPos: 50,
+    splitDirection: 'horizontal',
+  }
+}
 
-  // Load persisted layout on mount
+function isValidLayout(saved: unknown): saved is WorkspaceLayout {
+  return !!saved
+    && typeof saved === 'object'
+    && Array.isArray((saved as WorkspaceLayout).panels)
+    && (saved as WorkspaceLayout).panels.length > 0
+}
+
+function hydrateCounters(layout: WorkspaceLayout): void {
+  panelIdCounter = Math.max(...layout.panels.map(p => p.id), 0)
+  let maxFileId = 0
+  for (const panel of layout.panels) {
+    for (const f of panel.openFiles ?? []) {
+      const m = /^f(\d+)$/.exec(f.id)
+      if (m) maxFileId = Math.max(maxFileId, Number(m[1]))
+    }
+  }
+  fileIdCounter = Math.max(fileIdCounter, maxFileId)
+}
+
+/**
+ * @param projectId — when set, openFiles / panel layout are scoped per project
+ */
+export function useWorkspaceLayout(projectId?: string | null) {
+  const [layout, setLayout] = useState<WorkspaceLayout>(cloneDefaultLayout)
+  const [loaded, setLoaded] = useState(false)
+  const layoutsRef = useRef<Record<string, WorkspaceLayout>>({})
+  const projectIdRef = useRef<string | null | undefined>(projectId)
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
+  projectIdRef.current = projectId
+
+  // Initial load + migrate legacy global workspaceLayout → workspaceLayouts[lastProjectId]
   useEffect(() => {
-    window.fieldguide.configGet().then((r) => {
+    let cancelled = false
+    window.fieldguide.configGet().then(async (r) => {
+      if (cancelled) return
       if (r.ok && r.data) {
         const cfg = r.data as Record<string, unknown>
-        const saved = cfg.workspaceLayout as WorkspaceLayout | undefined
-        if (saved && Array.isArray(saved.panels) && saved.panels.length > 0) {
-          // Re-hydrate panel id counters
-          panelIdCounter = Math.max(...saved.panels.map(p => p.id), 0)
+        let layouts = (cfg.workspaceLayouts as Record<string, WorkspaceLayout> | undefined) ?? {}
+        const legacy = cfg.workspaceLayout as WorkspaceLayout | undefined
+        const lastProjectId = typeof cfg.lastProjectId === 'string' ? cfg.lastProjectId : undefined
+
+        if (isValidLayout(legacy) && Object.keys(layouts).length === 0 && lastProjectId) {
+          layouts = { [lastProjectId]: legacy }
+          await window.fieldguide.configSet({
+            workspaceLayouts: layouts as unknown as Record<string, unknown>,
+            workspaceLayout: undefined,
+          } as never).catch(() => {})
+        } else if (isValidLayout(legacy) && Object.keys(layouts).length === 0) {
+          // Keep legacy in memory until a project is selected; still clear global on first save
+          layouts = { __legacy__: legacy }
+        }
+
+        layoutsRef.current = layouts
+
+        const key = projectIdRef.current
+        const saved = (key && layouts[key]) || (!key && layouts.__legacy__) || undefined
+        if (isValidLayout(saved)) {
+          hydrateCounters(saved)
           setLayout(saved)
         } else {
-          // Apply default: single panel with graph
           panelIdCounter = 0
-          setLayout(DEFAULT_LAYOUT)
+          setLayout(cloneDefaultLayout())
         }
       }
       setLoaded(true)
     }).catch(() => setLoaded(true))
+    return () => { cancelled = true }
   }, [])
 
-  // Persist layout on change (debounced)
+  // Switch layout when projectId changes
+  const prevProjectIdRef = useRef<string | null | undefined>(undefined)
+
+  useEffect(() => {
+    if (!loaded) return
+
+    const prevId = prevProjectIdRef.current
+    const nextId = projectId
+
+    // Persist layout for the project we are leaving
+    if (prevId && prevId !== nextId) {
+      layoutsRef.current = {
+        ...layoutsRef.current,
+        [prevId]: layoutRef.current,
+      }
+    }
+
+    // Load layout for the project we are entering (skip first sync after initial hydrate)
+    if (prevId === undefined) {
+      prevProjectIdRef.current = nextId
+      return
+    }
+
+    if (nextId !== prevId) {
+      if (nextId && isValidLayout(layoutsRef.current[nextId])) {
+        const saved = layoutsRef.current[nextId]
+        hydrateCounters(saved)
+        setLayout(saved)
+      } else {
+        panelIdCounter = 0
+        setLayout(cloneDefaultLayout())
+      }
+    }
+
+    prevProjectIdRef.current = nextId
+  }, [projectId, loaded])
+
+  // Persist layouts map on change (debounced)
   useEffect(() => {
     if (!loaded) return
     const t = setTimeout(() => {
+      const key = projectIdRef.current
+      const nextMap = { ...layoutsRef.current }
+      if (key) {
+        nextMap[key] = layout
+        delete nextMap.__legacy__
+      }
+      layoutsRef.current = nextMap
       window.fieldguide.configSet({
-        workspaceLayout: layout as unknown as Record<string, unknown>,
+        workspaceLayouts: nextMap as unknown as Record<string, unknown>,
+        workspaceLayout: undefined,
       } as never).catch(() => {})
     }, 500)
     return () => clearTimeout(t)
-  }, [layout, loaded])
+  }, [layout, loaded, projectId])
 
   const setActivePanel = useCallback((index: number) => {
     setLayout(prev => ({ ...prev, activePanelIndex: index }))
@@ -176,11 +278,9 @@ export function useWorkspaceLayout(persistKey?: string) {
     setLayout(prev => {
       if (prev.panels.length === count) return prev
       if (count === 1) {
-        // Keep current active panel
         const keep = prev.panels[prev.activePanelIndex] ?? prev.panels[0]
         return { ...prev, panels: [keep], activePanelIndex: 0, splitPos: 50 }
       }
-      // count === 2: add a second panel
       const existing = prev.panels[0]
       const newPanel = createPanel('graph')
       return {
@@ -214,7 +314,6 @@ export function useWorkspaceLayout(persistKey?: string) {
   const maximizePanel = useCallback((panelIndex: number) => {
     setLayout(prev => {
       if (prev.panels.length < 2) return prev
-      // Hide the other panel by pushing split to 100/0
       const newPos = panelIndex === 0 ? 100 : 0
       return { ...prev, splitPos: newPos, _maximized: true, _preMaxPos: prev.splitPos }
     })

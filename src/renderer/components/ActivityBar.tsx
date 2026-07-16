@@ -34,7 +34,8 @@ export default function ActivityBar({ active, onChange, items, settingsLabel }: 
 
   return (
     <nav
-      className="w-12 shrink-0 flex flex-col items-center py-2 gap-1 border-r border-[var(--fg-border)] bg-[var(--fg-card)] select-none"
+      className="w-12 shrink-0 flex flex-col items-center py-2 gap-1 border-r border-[var(--fg-chrome-border,var(--fg-border))] bg-[var(--fg-chrome-bg,var(--fg-card))] select-none"
+      data-fg-chrome
       aria-label="Activity bar"
       data-fg-surface
     >

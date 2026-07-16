@@ -46,6 +46,7 @@ interface FieldguideAPI {
   configGet(): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: { message: string } }>
   configSet(patch: Record<string, unknown>): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   configTestLlm(): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  configLlmStatus(): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
 
   // Projects
   projectList(): Promise<{ ok: boolean; data?: ProjectRow[]; error?: { message: string } }>
@@ -64,7 +65,7 @@ interface FieldguideAPI {
   graphMeta(projectId: string): Promise<{ ok: boolean; data?: GraphMeta; error?: { message: string } }>
 
   // Index
-  projectIndex(projectId: string, incremental?: boolean): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  projectIndex(projectId: string, incremental?: boolean, skipLlm?: boolean): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   projectIndexCancel(projectId: string): Promise<{ ok: boolean; error?: { message: string } }>
   projectExportGraph(projectId: string): Promise<{ ok: boolean; data?: { exportPath?: string }; error?: { message: string } }>
   onIndexProgress(cb: (data: unknown) => void): () => void
@@ -108,6 +109,14 @@ interface FieldguideAPI {
   onMenuZoomIn(cb: () => void): () => void
   onMenuZoomOut(cb: () => void): () => void
   onMenuZoomReset(cb: () => void): () => void
+  menuPopupTopLevel(id: 'file' | 'edit' | 'view' | 'help', x: number, y: number): Promise<{ ok: boolean; error?: { message: string } }>
+  menuTopLevelLabels(): Promise<{ ok: boolean; data?: Record<'file' | 'edit' | 'view' | 'help', string>; error?: { message: string } }>
+  windowMinimize(): Promise<{ ok: boolean; error?: { message: string } }>
+  windowMaximize(): Promise<{ ok: boolean; data?: { maximized: boolean }; error?: { message: string } }>
+  windowClose(): Promise<{ ok: boolean; error?: { message: string } }>
+  windowIsMaximized(): Promise<{ ok: boolean; data?: { maximized: boolean }; error?: { message: string } }>
+  windowPlatform(): Promise<{ ok: boolean; data?: { platform: string; customTitleBar: boolean }; error?: { message: string } }>
+  onWindowMaximizeChange(cb: (maximized: boolean) => void): () => void
 
   // Bridge Tour
   bridgeGenerateTour(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>

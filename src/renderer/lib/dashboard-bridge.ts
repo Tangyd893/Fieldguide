@@ -15,8 +15,22 @@ export function setDashboardIframeRef(ref: HTMLIFrameElement | null): void {
 
 /** Post a command to the Dashboard iframe. Safe to call before iframe loads. */
 export function postToDashboard(msg: Record<string, unknown>): void {
-  if (_iframeRef) {
-    _iframeRef.contentWindow?.postMessage({ source: 'fieldguide', ...msg }, '*')
+  const win = _iframeRef?.contentWindow
+  if (win) {
+    win.postMessage({ source: 'fieldguide', ...msg }, '*')
+  }
+}
+
+/**
+ * Post directly to an iframe's contentWindow (use from onLoad so we don't
+ * race the React effect that registers `_iframeRef`).
+ */
+export function postToDashboardWindow(
+  win: Window | null | undefined,
+  msg: Record<string, unknown>,
+): void {
+  if (win) {
+    win.postMessage({ source: 'fieldguide', ...msg }, '*')
   }
 }
 

@@ -3,12 +3,11 @@ import { useIndexProgress } from '../../hooks/useIndexProgress'
 import {
   type DashboardMessage,
   setDashboardIframeRef,
-  postToDashboard,
   dashboardDrillIntoLayer,
   dashboardNavigateToOverview,
   dashboardSetViewMode,
 } from '@/lib/dashboard-bridge'
-import { syncDashboardTheme } from '@/lib/dashboard-theme'
+import { syncDashboardThemeAfterLoad } from '@/lib/dashboard-theme'
 
 export type { DashboardMessage }
 export {
@@ -226,8 +225,9 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
         title="UA Dashboard"
         onLoad={() => {
           setIframeLoading(false)
-          syncDashboardTheme()
-          postToDashboard({ type: 'setChromeless', chromeless: true })
+          // Register ref before postMessage — effect may not have run yet.
+          setDashboardIframeRef(iframeRef.current)
+          syncDashboardThemeAfterLoad(iframeRef.current?.contentWindow)
         }}
         style={{
           visibility: iframeLoading ? 'hidden' : undefined,

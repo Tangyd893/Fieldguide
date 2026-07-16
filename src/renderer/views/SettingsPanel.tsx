@@ -39,6 +39,7 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [chatModel, setChatModel] = useState('')
+  const [embedModel, setEmbedModel] = useState('')
   const [providerId, setProviderId] = useState('deepseek')
   const [customModel, setCustomModel] = useState(false)
   const [projectsRoot, setProjectsRoot] = useState('')
@@ -62,6 +63,7 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
         setBaseUrl(llm.baseUrl || '')
         setApiKey(llm.apiKey || '')
         setChatModel(llm.chatModel || '')
+        setEmbedModel(llm.embedModel || '')
         const pid = matchProviderId(llm.baseUrl || '')
         setProviderId(pid)
         const preset = getProvider(pid)
@@ -97,7 +99,7 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
   async function save() {
     setSaving(true)
     await window.fieldguide.configSet({
-      llm: { baseUrl, apiKey, chatModel, embedModel: '' },
+      llm: { baseUrl, apiKey, chatModel, embedModel },
       projectsRoot,
       locale,
       theme,
@@ -118,7 +120,7 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
       return
     }
     await window.fieldguide.configSet({
-      llm: { baseUrl, apiKey, chatModel, embedModel: '' },
+      llm: { baseUrl, apiKey, chatModel, embedModel },
       projectsRoot,
       locale,
       theme,
@@ -376,6 +378,11 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                       } else {
                         setCustomModel(true)
                       }
+                      if (p.embedModels && p.embedModels.length > 0) {
+                        setEmbedModel(p.embedModels[0])
+                      } else {
+                        setEmbedModel('')
+                      }
                     }}
                     className="w-full px-2 py-1.5 text-sm border border-[var(--fg-input-border)] rounded bg-[var(--fg-input-bg)] text-[var(--fg-input-text)]"
                   >
@@ -451,6 +458,36 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                       </div>
                     )
                   })()}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">{t('settings.embedModel')}</label>
+                  {(() => {
+                    const p = getProvider(providerId)
+                    const embeds = p.embedModels ?? []
+                    if (embeds.length > 0) {
+                      return (
+                        <select
+                          value={embeds.includes(embedModel) || embedModel === '' ? embedModel : embeds[0]}
+                          onChange={(e) => setEmbedModel(e.target.value)}
+                          className="w-full px-2 py-1.5 text-sm border border-[var(--fg-input-border)] rounded bg-[var(--fg-input-bg)] text-[var(--fg-input-text)]"
+                        >
+                          <option value="">{t('settings.embedModelNone')}</option>
+                          {embeds.map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      )
+                    }
+                    return (
+                      <Input
+                        type="text"
+                        value={embedModel}
+                        onChange={(e) => setEmbedModel(e.target.value)}
+                        placeholder={t('settings.embedModelPlaceholder')}
+                      />
+                    )
+                  })()}
+                  <p className="text-[11px] text-[var(--fg-text-tertiary)] mt-1">{t('settings.embedModelHint')}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <Button variant="outline" size="sm" onClick={testConnection} disabled={testing}>
