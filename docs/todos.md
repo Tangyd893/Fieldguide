@@ -1,8 +1,8 @@
 # Fieldguide 待办清单
 
-> 最后更新：2026-07-16（图谱路径自动验收 + 真跑 indexProject 集成测）  
+> 最后更新：2026-07-16（修点击开文件桥接：`__uaStore` + `getState()`）  
 > 来源：UA 图谱能力排查 + 壳层 UX + P0/P1 管线补齐 + `qa:graph` / live index 测试  
-> **壳层 / UX ~98%**；**UA 图谱能力 ~75%**（结构索引 + Dashboard + 增量合并 + 自动 smoke；**GUI 点击仍需人工**）；Phase 4 可发布约 **60%**  
+> **壳层 / UX ~98%**；**UA 图谱能力 ~80%**（结构索引 + Dashboard + 增量合并 + 桥接根因已修；**GUI 点一次仍待人工确认**）；Phase 4 可发布约 **65%**  
 > 产品分阶段任务见 [roadmap.md](./roadmap.md)；UA 集成见 [understand-anything-integration.md](./understand-anything-integration.md)；本文跟踪**下一步工程待办**。
 
 ---
@@ -12,10 +12,10 @@
 | Phase | 完成度 | 备注 |
 |-------|--------|------|
 | 0 设计 + Spike | 100% | Spike 通过；已明确完整 Agent 管线依赖运行时（见 [spike-ua.md](./spike-ua.md)） |
-| 1 桌面壳 + UA | **~80%** | 壳层齐；精简索引管线已有 **live** 集成测；图谱 iframe GUI 点击未人工勾 |
-| 2 智能层 | **~75%** | 增量 merge ✅；locale/Tour schema/bridge ✅；domain 为隐藏策略；无完整 UA Agent |
+| 1 桌面壳 + UA | **~85%** | 壳层齐；live index ✅；**点击桥接根因已修**（待 GUI 点一次确认） |
+| 2 智能层 | **~80%** | 增量 merge ✅；locale/Tour schema/bridge ✅；domain 为隐藏策略；无完整 UA Agent |
 | 3 理论 + 桥接 | ~90% | 桥接 + RAG + 对照 Tour + PDF 均已接线 |
-| 4 发布 | **~60%** | 安装包+Dashboard 本机齐；`qa:graph`/`qa:his-go` ✅；**p4-manual-qa GUI 未勾** |
+| 4 发布 | **~65%** | 安装包+Dashboard 本机齐；`qa:graph`/`qa:his-go` ✅；**p4-manual-qa GUI 未勾** |
 | **UX 质感** | **~98%** | Activity Bar + 全页设置 + 双缩放/字号（`46f55c5`） |
 
 **基线验证**（2026-07-16）：`pnpm typecheck` ✅ · `pnpm test:unit` ✅（83 passed / 2 skipped，含 live `indexProject`）· `pnpm qa:graph` ✅ · `pnpm qa:his-go` ✅ · `pnpm dist` ✅
@@ -39,7 +39,7 @@
 | Dashboard iframe 嵌入 | ✅ sibling / 打包 dist 均可（`qa:graph`） |
 | 完整 UA Agent（domain / reviewer 等） | ❌ 未接；domain Tab 无数据则隐藏 |
 | 增量索引 | ✅ `mergeIncrementalGraph`；零变更保 nodeCount |
-| 点节点打开文件 / Tour 步进 | ⚠️ 源码已接；**GUI 人工未勾** |
+| 点节点打开文件 / Tour 步进 | ✅ 根因已修（UA 暴露 `__uaStore` + 壳层 `getState()`）；**GUI 点一次确认** |
 | HIS-Go 头less smoke | ✅ 3656 nodes（`pnpm qa:his-go`） |
 
 ---
@@ -136,7 +136,11 @@ flowchart TD
 
 ### 下一步（图谱闭环 → Phase 4）
 
-- [ ] **GUI 最小验收**（`scenario-abc-test-record.md`）：Demo 可见图 + 点击节点打开文件  
+- [x] **ua-bridge-ua-store** · 修复点击无跳转根因 (2026-07-16)  
+  - UA Dashboard [`main.tsx`](../../Understand-Anything/understand-anything-plugin/packages/dashboard/src/main.tsx)：`window.__uaStore = useDashboardStore`  
+  - Fieldguide [`dashboard.ts`](../src/main/ua/dashboard.ts)：动作经 `store.getState()` 调用（Zustand hook API）  
+  - 单测：[`dashboard-bridge-script.test.ts`](../src/main/ua/__tests__/dashboard-bridge-script.test.ts)；`qa:graph` 增加 `__uaStore` 检查  
+- [ ] **GUI 最小验收**（`scenario-abc-test-record.md`）：用新包 / `pnpm dev` **点一次**确认开文件  
 - [ ] **p4-his-go-smoke-gui** · 应用内 HIS-Go 点节点 + diff 高亮  
 - [ ] **p4-manual-qa** / **eng-user-test**  
 - [ ] **ux-dashboard-theme-deep** · Dashboard 与壳层 CSS 变量深度统一（延后） 
@@ -602,6 +606,7 @@ Fieldguide/
 |------|-----|------|
 | 1–3 | 壳层 UX + 增量 merge + P1 bridge | ✅ |
 | 4 | live `indexProject` + `pnpm qa:graph` / `qa:his-go` | ✅ |
-| 5 | **GUI 最小验收**（Demo 可见 + 点击开文件） | ⬜ **当前** |
-| 6 | p4-his-go-smoke-gui → p4-manual-qa → eng-user-test | ⬜ |
+| 5 | **ua-bridge-ua-store**（`__uaStore` + getState） | ✅ |
+| 6 | **GUI 最小验收**（点一次确认开文件） | ⬜ **当前** |
+| 7 | p4-his-go-smoke-gui → p4-manual-qa → eng-user-test | ⬜ |
 | — | ux-dashboard-theme-deep / 全 UA Agent | 延后 |

@@ -21,7 +21,7 @@
 | HIS-Go 图谱 | ✅ 3656 nodes / 3298 edges |
 | `indexProject` 写出 `knowledge-graph.json` | ✅ vitest live pipeline |
 | 增量零变更不归零 nodeCount | ✅ vitest |
-| **iframe 内点击节点 → 打开文件（GUI）** | ⬜ 需人工在 `pnpm dev` 或安装包点一次 |
+| **iframe 内点击节点 → 打开文件（GUI）** | ⬜ 需人工点一次确认；**根因已修**：UA `window.__uaStore` + 桥接 `getState()`（见 2026-07-16 修复） |
 
 ## 场景 A：读懂新项目（30 分钟）
 

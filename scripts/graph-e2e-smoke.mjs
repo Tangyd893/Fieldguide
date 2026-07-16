@@ -55,6 +55,16 @@ pass = check('Shell handles tourStepChanged', appSrc.includes("case 'tourStepCha
 pass = check('Shell handles nodeSelected → openFile', appSrc.includes("case 'nodeSelected'") && appSrc.includes('openFile')) && pass
 const dashSrc = readFileSync(join(root, 'src/main/ua/dashboard.ts'), 'utf-8')
 pass = check('Dashboard protocol / graph override', dashSrc.includes('setDashboardGraph') || dashSrc.includes('knowledge-graph')) && pass
+pass = check('Bridge polls __uaStore.getState', dashSrc.includes('__uaStore') && dashSrc.includes('store.getState')) && pass
+pass = check('Bridge invokes actions via getState()', dashSrc.includes('s.selectNode') || dashSrc.includes('getState().selectNode')) && pass
+
+const uaMain = join(root, '..', 'Understand-Anything', 'understand-anything-plugin', 'packages', 'dashboard', 'src', 'main.tsx')
+if (existsSync(uaMain)) {
+  const mainSrc = readFileSync(uaMain, 'utf-8')
+  pass = check('UA Dashboard exposes window.__uaStore', mainSrc.includes('__uaStore')) && pass
+} else {
+  console.log('⚠️  UA dashboard main.tsx not found — skip __uaStore source check')
+}
 
 // ── 4. HIS-Go (optional but preferred) ──
 let hisGoRoot = join(root, '..', 'his-go')

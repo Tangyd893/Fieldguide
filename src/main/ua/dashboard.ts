@@ -105,47 +105,49 @@ const POSTMESSAGE_BRIDGE_SCRIPT = `
 
     function run() {
       var store = getStore();
-      if (!store) { setTimeout(run, 50); return; }
+      if (!store || !store.getState) { setTimeout(run, 50); return; }
+      // Zustand hook API: actions live on getState(), not on the hook itself
+      var s = store.getState();
 
       switch (data.type) {
         case 'selectNode':
-          store.selectNode(data.nodeId || null);
+          if (s.selectNode) s.selectNode(data.nodeId || null);
           break;
         case 'focusNode':
-          store.setFocusNode(data.nodeId || null);
+          if (s.setFocusNode) s.setFocusNode(data.nodeId || null);
           break;
         case 'navigateToNode':
-          store.navigateToNode(data.nodeId);
+          if (s.navigateToNode) s.navigateToNode(data.nodeId);
           break;
         case 'startTour':
-          store.startTour();
+          if (s.startTour) s.startTour();
           break;
         case 'stopTour':
-          store.stopTour();
+          if (s.stopTour) s.stopTour();
           break;
         case 'setTourStep':
-          store.setTourStep(data.step || 0);
+          if (s.setTourStep) s.setTourStep(data.step || 0);
           break;
         case 'nextTourStep':
-          store.nextTourStep();
+          if (s.nextTourStep) s.nextTourStep();
           break;
         case 'prevTourStep':
-          store.prevTourStep();
+          if (s.prevTourStep) s.prevTourStep();
           break;
         case 'navigateToOverview':
-          store.navigateToOverview();
+          if (s.navigateToOverview) s.navigateToOverview();
           break;
         case 'setViewMode':
-          store.setViewMode(data.mode);
+          if (s.setViewMode) s.setViewMode(data.mode);
           break;
         case 'setDiffOverlay':
-          store.setDiffOverlay(data.changed || [], data.affected || []);
+          if (s.setDiffOverlay) s.setDiffOverlay(data.changed || [], data.affected || []);
           break;
         case 'clearDiffOverlay':
-          store.clearDiffOverlay();
+          if (s.clearDiffOverlay) s.clearDiffOverlay();
           break;
         case 'drillIntoLayer':
-          store.drillIntoLayer(data.layerId);
+          if (s.drillIntoLayer) s.drillIntoLayer(data.layerId);
           break;
         case 'setTheme':
           if (data.colors) {
