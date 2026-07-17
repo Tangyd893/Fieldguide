@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { app } from 'electron'
 
-type Layer = { id: string; name: string; description?: string; nodeIds: string[] }
+type Layer = { id: string; name: string; description?: string; nodeIds?: string[] }
 type GraphLike = {
   nodes?: Array<{ id: string; type?: string; filePath?: string }>
   layers?: Layer[]

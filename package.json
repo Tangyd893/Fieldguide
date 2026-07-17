@@ -1,7 +1,7 @@
 {
   "name": "fieldguide",
   "version": "0.2.0",
-  "description": "Fieldguide — 把代码库变成可探索、可导览、可提问的知识地图",
+  "description": "Fieldguide — 知识图谱 + 问答 Agent 的本地项目学习工作台",
   "private": true,
   "main": "out/main/index.js",
   "scripts": {
