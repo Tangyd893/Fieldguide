@@ -3,8 +3,15 @@ export interface DashboardMessage {
   source: string
   type: string
   nodeId?: string
+  filePath?: string
   step?: number
   total?: number
+  /** layoutStatus */
+  busy?: boolean
+  nodeCount?: number
+  renderedNodes?: number
+  reason?: 'layout' | 'no-layers' | 'ready'
+  layerCount?: number
 }
 
 let _iframeRef: HTMLIFrameElement | null = null
@@ -76,4 +83,16 @@ export function dashboardSetViewMode(mode: 'structural' | 'domain' | 'knowledge'
 
 export function dashboardNavigateToOverview(): void {
   postToDashboard({ type: 'navigateToOverview' })
+}
+
+export function dashboardViewportZoomIn(): void {
+  postToDashboard({ type: 'viewportZoomIn' })
+}
+
+export function dashboardViewportZoomOut(): void {
+  postToDashboard({ type: 'viewportZoomOut' })
+}
+
+export function dashboardViewportZoomReset(): void {
+  postToDashboard({ type: 'viewportZoomReset' })
 }

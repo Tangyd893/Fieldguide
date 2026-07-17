@@ -28,7 +28,7 @@ import { useWorkspaceLayout } from './hooks/useWorkspaceLayout'
 import { useIndexProgress, progressPercent } from './hooks/useIndexProgress'
 import { useDashboardThemeSync } from './hooks/useDashboardThemeSync'
 import { syncDashboardTheme } from './lib/dashboard-theme'
-import { postToDashboard } from './lib/dashboard-bridge'
+import { postToDashboard, dashboardViewportZoomIn, dashboardViewportZoomOut, dashboardViewportZoomReset } from './lib/dashboard-bridge'
 import {
   applyAppearance,
   applyShellZoom,
@@ -89,6 +89,8 @@ interface Project {
 export default function App() {
   const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('library')
+  const activeTabRef = useRef<Tab>(activeTab)
+  activeTabRef.current = activeTab
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const workspaceLayout = useWorkspaceLayout(selectedProject?.id)
@@ -104,6 +106,7 @@ export default function App() {
   const indexProgress = useIndexProgress(selectedProject?.id)
   const [pendingIndex, setPendingIndex] = useState<string | null>(null)
   const [dashboardTourStep, setDashboardTourStep] = useState<number | null>(null)
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [appearance, setAppearance] = useState<AppearanceState>(() => normalizeAppearance())
   const fileTreeWidthRef = useRef(260)
   const { toasts, removeToast } = useToast()
@@ -151,9 +154,30 @@ export default function App() {
     })
     const unsubOpenProject = window.fieldguide.onMenuOpenProject?.(() => { void openLocalProject() })
     const unsubAbout = window.fieldguide.onMenuAbout?.(() => setShowAbout(true))
-    const unsubZoomIn = window.fieldguide.onMenuZoomIn?.(() => bumpShellZoom(10))
-    const unsubZoomOut = window.fieldguide.onMenuZoomOut?.(() => bumpShellZoom(-10))
-    const unsubZoomReset = window.fieldguide.onMenuZoomReset?.(() => setShellZoom(100))
+    const unsubZoomIn = window.fieldguide.onMenuZoomIn?.(() => {
+      if (activeTabRef.current === 'codemap') {
+        dashboardViewportZoomIn()
+        showToast('info', t('status.graphZoomIn'))
+      } else {
+        bumpShellZoom(10)
+      }
+    })
+    const unsubZoomOut = window.fieldguide.onMenuZoomOut?.(() => {
+      if (activeTabRef.current === 'codemap') {
+        dashboardViewportZoomOut()
+        showToast('info', t('status.graphZoomOut'))
+      } else {
+        bumpShellZoom(-10)
+      }
+    })
+    const unsubZoomReset = window.fieldguide.onMenuZoomReset?.(() => {
+      if (activeTabRef.current === 'codemap') {
+        dashboardViewportZoomReset()
+        showToast('info', t('status.graphZoomReset'))
+      } else {
+        setShellZoom(100)
+      }
+    })
     return () => {
       unsubFolder?.()
       unsubOpenProject?.()
@@ -399,9 +423,18 @@ export default function App() {
       { id: 'openFolder', label: t('commandPalette.openFolder'), action: () => window.fieldguide.openInExplorer(selectedProject.id, '.') },
     ] : []),
     { id: 'settings', label: t('commandPalette.settings'), action: () => setActiveTab('settings') },
-    { id: 'zoomIn', label: t('commandPalette.zoomIn'), action: () => bumpShellZoom(10) },
-    { id: 'zoomOut', label: t('commandPalette.zoomOut'), action: () => bumpShellZoom(-10) },
-    { id: 'zoomReset', label: t('commandPalette.zoomReset'), action: () => setShellZoom(100) },
+    { id: 'zoomIn', label: t('commandPalette.zoomIn'), action: () => {
+      if (activeTabRef.current === 'codemap') dashboardViewportZoomIn()
+      else bumpShellZoom(10)
+    }},
+    { id: 'zoomOut', label: t('commandPalette.zoomOut'), action: () => {
+      if (activeTabRef.current === 'codemap') dashboardViewportZoomOut()
+      else bumpShellZoom(-10)
+    }},
+    { id: 'zoomReset', label: t('commandPalette.zoomReset'), action: () => {
+      if (activeTabRef.current === 'codemap') dashboardViewportZoomReset()
+      else setShellZoom(100)
+    }},
     { id: 'toggleTheme', label: t('commandPalette.toggleTheme'), action: () => {
       const current = document.documentElement.dataset.theme
       const next = current === 'dark' ? 'light' : 'dark'
@@ -427,7 +460,11 @@ export default function App() {
   function handleDashboardMessage(msg: DashboardMessage) {
     switch (msg.type) {
       case 'nodeSelected': {
-        if (msg.nodeId && selectedProject) {
+        if (msg.nodeId) setFocusedNodeId(msg.nodeId)
+        const pathFromMsg = msg.filePath
+        if (pathFromMsg) {
+          workspaceLayout.openFile(pathFromMsg)
+        } else if (msg.nodeId && selectedProject) {
           window.fieldguide.graphGet(selectedProject.id).then((r) => {
             if (r.ok && r.data) {
               const g = r.data as { nodes?: Array<{ id: string; filePath?: string }> }
@@ -471,6 +508,8 @@ export default function App() {
         onSelectProject={(p) => {
           const full = p ? projects.find((x) => x.id === p.id) ?? null : null
           setSelectedProject(full)
+          setFocusedNodeId(null)
+          setDashboardTourStep(null)
           setShowProjectMenu(false)
           if (full) setActiveTab('codemap')
         }}
@@ -581,6 +620,7 @@ export default function App() {
                     onDashboardMessage={handleDashboardMessage}
                     onNodeRefClick={handleNodeRef}
                     dashboardTourStep={dashboardTourStep}
+                    focusedNodeId={focusedNodeId}
                   />
                 </div>
               </div>
@@ -700,6 +740,7 @@ function CodeMapLayout({
   onDashboardMessage,
   onNodeRefClick,
   dashboardTourStep,
+  focusedNodeId,
 }: {
   project: Project | null
   workspaceLayout: ReturnType<typeof useWorkspaceLayout>
@@ -707,6 +748,7 @@ function CodeMapLayout({
   onDashboardMessage?: (msg: DashboardMessage) => void
   onNodeRefClick?: (nodeId: string) => void
   dashboardTourStep?: number | null
+  focusedNodeId?: string | null
 }) {
   if (!project) {
     return (
@@ -719,7 +761,16 @@ function CodeMapLayout({
     <SplitPanel
       renderGraph={() => <GraphPanel t={t} projectRoot={project.root_path} projectId={project.id} onDashboardMessage={onDashboardMessage} />}
       renderCode={(path) => <CodeViewer projectId={project.id} filePath={path} t={t} />}
-      renderChat={() => <ChatPanel projectId={project.id} projectName={project.name} t={t} onNodeRefClick={onNodeRefClick} />}
+      renderChat={() => (
+        <ChatPanel
+          projectId={project.id}
+          projectName={project.name}
+          t={t}
+          onNodeRefClick={onNodeRefClick}
+          focusedNodeId={focusedNodeId}
+          tourStepIndex={dashboardTourStep}
+        />
+      )}
       renderTour={() => <TourPanel projectId={project.id} t={t} externalStepIndex={dashboardTourStep} />}
       layout={workspaceLayout}
       t={t}

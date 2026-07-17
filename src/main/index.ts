@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import { registerDashboardProtocol, registerDashboardScheme } from './ua/dashboard'
+import { warmLlmProviderCatalog } from './llm/catalog'
 import { createWindow } from './window'
 import { logError } from './logger'
 import { loadConfig } from './config'
@@ -28,6 +29,11 @@ if (!gotSingleInstanceLock) {
 
 app.whenReady().then(() => {
   setApplicationMenu(loadConfig().locale)
+
+  // Builtin provider catalog + optional local Ollama model discovery
+  void warmLlmProviderCatalog().catch((err) => {
+    logError('llm:catalog-warm-failed', { message: err instanceof Error ? err.message : String(err) })
+  })
 
   let dashboardUrl = ''
   try {

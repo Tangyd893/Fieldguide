@@ -1,4 +1,4 @@
-export type AgentStepType = 'thought' | 'action' | 'observation' | 'answer'
+export type AgentStepType = 'thought' | 'action' | 'observation' | 'answer' | 'context'
 
 export interface AgentStep {
   type: AgentStepType
@@ -22,4 +22,8 @@ export interface AgentContext {
   projectName: string
   projectRoot: string
   locale: string
+  /** Currently selected graph node in the Dashboard (optional). */
+  focusedNodeId?: string | null
+  /** Current guided-tour step index from Dashboard / TourPanel (optional). */
+  tourStepIndex?: number | null
 }

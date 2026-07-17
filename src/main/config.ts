@@ -5,6 +5,7 @@
 import { app } from 'electron'
 import { join, dirname } from 'node:path'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { migrateLegacyChatModel } from '../shared/llm-catalog'
 
 export interface LLMConfig {
   baseUrl: string
@@ -49,7 +50,7 @@ const DEFAULT_CONFIG: AppConfig = {
   llm: {
     baseUrl: 'https://api.deepseek.com/v1',
     apiKey: '',
-    chatModel: 'deepseek-chat',
+    chatModel: 'deepseek-v4-flash',
     embedModel: '',
   },
   locale: 'zh-CN',
@@ -102,10 +103,12 @@ function normalizeAppearance(raw: Partial<AppearanceConfig> | undefined): Appear
 }
 
 function mergeConfig(raw: Partial<AppConfig>): AppConfig {
+  const llm = { ...DEFAULT_CONFIG.llm, ...(raw.llm || {}) }
+  llm.chatModel = migrateLegacyChatModel(llm.chatModel || DEFAULT_CONFIG.llm.chatModel)
   return {
     ...DEFAULT_CONFIG,
     ...raw,
-    llm: { ...DEFAULT_CONFIG.llm, ...(raw.llm || {}) },
+    llm,
     appearance: normalizeAppearance(raw.appearance),
     ua: { ...DEFAULT_CONFIG.ua, ...(raw.ua || {}) },
   }
@@ -118,8 +121,13 @@ export function loadConfig(): AppConfig {
     return { ...DEFAULT_CONFIG, llm: { ...DEFAULT_CONFIG.llm }, appearance: { ...DEFAULT_CONFIG.appearance }, ua: { ...DEFAULT_CONFIG.ua } }
   }
   try {
-    const raw = readFileSync(p, 'utf-8')
-    return mergeConfig(JSON.parse(raw) as Partial<AppConfig>)
+    const parsed = JSON.parse(readFileSync(p, 'utf-8')) as Partial<AppConfig>
+    const merged = mergeConfig(parsed)
+    // Persist legacy DeepSeek model id migration once
+    if (parsed.llm?.chatModel && parsed.llm.chatModel !== merged.llm.chatModel) {
+      saveConfig(merged)
+    }
+    return merged
   } catch {
     return { ...DEFAULT_CONFIG, llm: { ...DEFAULT_CONFIG.llm }, appearance: { ...DEFAULT_CONFIG.appearance }, ua: { ...DEFAULT_CONFIG.ua } }
   }

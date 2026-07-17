@@ -1,14 +1,15 @@
 /**
- * ReAct Agent — tool-calling loop for cross-source Q&A.
- * Max 4 iterations; returns thought/action/observation/answer steps.
+ * Fieldguide Coach Agent — context-first ReAct loop.
+ * Injects packed project context, forces a final answer on the last round,
+ * and deduplicates identical tool calls.
  */
 import { loadConfig } from '../config'
-import { listPapers } from '../db'
-import { AGENT_TOOLS, executeTool, extractNodeRefsFromObservation, buildGraphOverview } from './tools'
+import { AGENT_TOOLS, executeTool, extractNodeRefsFromObservation, toolCallKey } from './tools'
+import { packCoachContext, coachPolicyHints } from './context-packer'
 import type { AgentContext, AgentResult, AgentStep } from './types'
 import { joinLlmUrl } from '../../shared/llm-url'
 
-const MAX_ITERATIONS = 4
+const MAX_ITERATIONS = 6
 
 interface LLMMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
@@ -31,6 +32,16 @@ function localeHint(locale: string): string {
   return 'Reply in Simplified Chinese.'
 }
 
+function fallbackMessage(locale: string): string {
+  if (locale === 'en-US') {
+    return 'I reached the tool-call limit. Based on the injected project context above, please ask a follow-up if you need more detail on a specific module.'
+  }
+  if (locale === 'zh-TW') {
+    return '已達工具呼叫上限。請根據已注入的專案上下文追問具體模組，我會繼續說明。'
+  }
+  return '已达到工具调用上限。请基于已注入的项目上下文追问具体模块，我会继续说明。'
+}
+
 export async function runAgent(
   ctx: AgentContext,
   userMessages: Array<{ role: string; content: string }>,
@@ -38,26 +49,33 @@ export async function runAgent(
   const config = loadConfig()
   const steps: AgentStep[] = []
   const nodeRefs = new Set<string>()
+  const seenToolCalls = new Set<string>()
 
-  const overview = buildGraphOverview(ctx.projectRoot)
-  const papers = listPapers().slice(0, 8).map(p =>
-    `${p.title} (arxiv:${p.arxiv_id})`
-  ).join('\n')
+  const lastUser = [...userMessages].reverse().find((m) => m.role === 'user')
+  const userQuery = lastUser?.content?.trim() || ''
+
+  const packed = await packCoachContext(ctx, userQuery)
+  steps.push({
+    type: 'context',
+    content: `intent=${packed.intent}; seeded ${packed.seedNodeIds.length} nodes`,
+  })
+  for (const id of packed.seedNodeIds) nodeRefs.add(id)
 
   const systemPrompt = [
-    'You are Fieldguide AI — a learning coach connecting code maps and research papers.',
+    coachPolicyHints(packed.intent),
     `Project: "${ctx.projectName}".`,
-    overview ? `\n## Graph overview\n${overview}` : '',
-    papers ? `\n## Saved papers\n${papers}` : '',
-    '\nUse tools when you need specific nodes, paper excerpts, source code, or concept bridges.',
-    'For pure structural code navigation, you may suggest using the UA Dashboard graph view.',
-    'When referencing code nodes, include their node id in brackets like [node:fn:handleRequest].',
+    '\n# Injected project context (use this first)',
+    packed.markdown,
+    '\n# Tool policy',
+    'Use tools only when the injected context is insufficient.',
+    'Never call the same tool with the same arguments twice.',
+    'When referencing code nodes, include their node id like [node:fn:handleRequest].',
     localeHint(ctx.locale),
   ].filter(Boolean).join('\n')
 
   const messages: LLMMessage[] = [
     { role: 'system', content: systemPrompt },
-    ...userMessages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({
+    ...userMessages.filter((m) => m.role === 'user' || m.role === 'assistant').map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     })),
@@ -66,17 +84,26 @@ export async function runAgent(
   const url = chatCompletionsUrl(config.llm.baseUrl)
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
+    const isLast = i === MAX_ITERATIONS - 1
+    if (isLast) {
+      messages.push({
+        role: 'user',
+        content:
+          'SYSTEM: This is your final turn. Do not call tools. Synthesize a complete, helpful answer from the injected context and prior tool observations.',
+      })
+    }
+
     const resp = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.llm.apiKey}`,
+        Authorization: `Bearer ${config.llm.apiKey}`,
       },
       body: JSON.stringify({
         model: config.llm.chatModel,
         messages,
-        tools: AGENT_TOOLS,
-        tool_choice: 'auto',
+        tools: isLast ? undefined : AGENT_TOOLS,
+        tool_choice: isLast ? undefined : 'auto',
         temperature: 0.3,
         max_tokens: 2048,
       }),
@@ -108,7 +135,7 @@ export async function runAgent(
       steps.push({ type: 'thought', content: choice.content.trim() })
     }
 
-    const toolCalls = choice.tool_calls
+    const toolCalls = isLast ? undefined : choice.tool_calls
     if (!toolCalls?.length) {
       const answer = choice.content?.trim() || 'No response.'
       steps.push({ type: 'answer', content: answer })
@@ -121,6 +148,7 @@ export async function runAgent(
       tool_calls: toolCalls,
     })
 
+    let anyNewTool = false
     for (const tc of toolCalls) {
       const toolName = tc.function.name
       let args: Record<string, unknown> = {}
@@ -128,13 +156,25 @@ export async function runAgent(
         args = JSON.parse(tc.function.arguments || '{}')
       } catch { /* empty args */ }
 
+      const key = toolCallKey(toolName, args)
       steps.push({
         type: 'action',
         content: JSON.stringify(args),
         tool: toolName,
       })
 
-      const observation = await executeTool(toolName, args, ctx)
+      let observation: string
+      if (seenToolCalls.has(key)) {
+        observation = JSON.stringify({
+          skipped: true,
+          reason: 'Duplicate tool call — reuse prior observation; answer now if possible.',
+        })
+      } else {
+        seenToolCalls.add(key)
+        anyNewTool = true
+        observation = await executeTool(toolName, args, ctx)
+      }
+
       steps.push({ type: 'observation', content: observation, tool: toolName })
 
       for (const ref of extractNodeRefsFromObservation(observation)) {
@@ -147,9 +187,18 @@ export async function runAgent(
         content: observation,
       })
     }
+
+    // If every tool call was a duplicate, nudge the model to answer next round
+    if (!anyNewTool) {
+      messages.push({
+        role: 'user',
+        content:
+          'SYSTEM: All tool calls were duplicates. Stop calling tools and give your final answer now.',
+      })
+    }
   }
 
-  const fallback = 'Reached maximum reasoning steps. Please try a more specific question.'
+  const fallback = fallbackMessage(ctx.locale)
   steps.push({ type: 'answer', content: fallback })
   return { content: fallback, steps, nodeRefs: [...nodeRefs] }
 }

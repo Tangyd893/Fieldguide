@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Cpu, FolderOpen, Globe, Palette, Wrench, ZoomIn, Type, Plug, Check, X, Database, Info,
+  Cpu, FolderOpen, Globe, Palette, Wrench, ZoomIn, Type, Plug, Check, X, Database, Info, RefreshCw,
 } from 'lucide-react'
 import { applyTheme } from '../App'
 import {
@@ -18,7 +18,12 @@ import {
 } from '../lib/appearance'
 import FolderPathField from '../components/FolderPathField'
 import SteppedSlider from '../components/SteppedSlider'
-import { getProvider, LLM_PROVIDERS, matchProviderId } from '../lib/llm-providers'
+import {
+  LLM_PROVIDERS,
+  matchProviderId,
+  migrateLegacyChatModel,
+  type LlmProviderPreset,
+} from '../lib/llm-providers'
 import { syncDashboardTheme } from '@/lib/dashboard-theme'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +46,10 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
   const [chatModel, setChatModel] = useState('')
   const [embedModel, setEmbedModel] = useState('')
   const [providerId, setProviderId] = useState('deepseek')
+  const [providers, setProviders] = useState<LlmProviderPreset[]>(() => [...LLM_PROVIDERS])
+  const [modelsSource, setModelsSource] = useState<'builtin' | 'live'>('builtin')
+  const [modelsHint, setModelsHint] = useState<string | null>(null)
+  const [refreshingModels, setRefreshingModels] = useState(false)
   const [customModel, setCustomModel] = useState(false)
   const [projectsRoot, setProjectsRoot] = useState('')
   const [locale, setLocale] = useState('zh-CN')
@@ -55,30 +64,107 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
   const [logLoading, setLogLoading] = useState(false)
   const [dataMsg, setDataMsg] = useState<string | null>(null)
 
+  const getProvider = useCallback(
+    (id: string) => providers.find((p) => p.id === id) ?? providers[providers.length - 1] ?? LLM_PROVIDERS[LLM_PROVIDERS.length - 1],
+    [providers],
+  )
+
+  const applyFetchedModels = useCallback(
+    (pid: string, models: string[], embedModels: string[], source: 'builtin' | 'live') => {
+      setProviders((prev) =>
+        prev.map((p) => (p.id === pid ? { ...p, models: [...models], embedModels: [...embedModels], source } : p)),
+      )
+      setModelsSource(source)
+      if (models.length > 0) {
+        setChatModel((cur) => (models.includes(cur) ? cur : models[0]))
+        setCustomModel(false)
+      }
+      if (embedModels.length > 0) {
+        setEmbedModel((cur) => (cur === '' || embedModels.includes(cur) ? cur : embedModels[0]))
+      }
+    },
+    [],
+  )
+
+  const refreshModels = useCallback(
+    async (opts?: { providerId?: string; baseUrl?: string; apiKey?: string; silent?: boolean }) => {
+      const pid = opts?.providerId ?? providerId
+      const url = opts?.baseUrl ?? baseUrl
+      const key = opts?.apiKey ?? apiKey
+      if (!url) return
+      if (!opts?.silent) setRefreshingModels(true)
+      setModelsHint(null)
+      try {
+        const result = await window.fieldguide.llmFetchModels({
+          providerId: pid,
+          baseUrl: url,
+          apiKey: key,
+        })
+        if (result.ok && result.data) {
+          const data = result.data
+          applyFetchedModels(pid, data.models, data.embedModels, data.source)
+          if (!data.ok && data.error) {
+            setModelsHint(t('settings.modelsFetchFailed'))
+          } else if (data.source === 'live') {
+            setModelsHint(null)
+          }
+        }
+      } catch {
+        setModelsHint(t('settings.modelsFetchFailed'))
+      } finally {
+        if (!opts?.silent) setRefreshingModels(false)
+      }
+    },
+    [providerId, baseUrl, apiKey, applyFetchedModels, t],
+  )
+
   useEffect(() => {
-    window.fieldguide.configGet().then((r) => {
-      if (r.ok && r.data) {
-        const c = r.data as Record<string, unknown>
+    void Promise.all([
+      window.fieldguide.configGet(),
+      window.fieldguide.llmListProviders(),
+    ]).then(([configResult, catalogResult]) => {
+      if (catalogResult.ok && Array.isArray(catalogResult.data) && catalogResult.data.length > 0) {
+        setProviders(catalogResult.data as LlmProviderPreset[])
+      }
+      if (configResult.ok && configResult.data) {
+        const c = configResult.data as Record<string, unknown>
         const llm = (c.llm as Record<string, string>) || {}
-        setBaseUrl(llm.baseUrl || '')
-        setApiKey(llm.apiKey || '')
-        setChatModel(llm.chatModel || '')
+        const url = llm.baseUrl || ''
+        const key = llm.apiKey || ''
+        const model = migrateLegacyChatModel(llm.chatModel || '')
+        setBaseUrl(url)
+        setApiKey(key)
+        setChatModel(model)
         setEmbedModel(llm.embedModel || '')
-        const pid = matchProviderId(llm.baseUrl || '')
+        const pid = matchProviderId(url)
         setProviderId(pid)
-        const preset = getProvider(pid)
+        const catalog = (catalogResult.ok && Array.isArray(catalogResult.data)
+          ? catalogResult.data
+          : LLM_PROVIDERS) as LlmProviderPreset[]
+        const preset = catalog.find((p) => p.id === pid) ?? catalog[catalog.length - 1]
+        setModelsSource(preset?.source === 'live' ? 'live' : 'builtin')
         setCustomModel(
           pid === 'custom'
-          || (!!llm.chatModel && preset.models.length > 0 && !preset.models.includes(llm.chatModel))
-          || !!preset.customModel && !!llm.chatModel && !preset.models.includes(llm.chatModel),
+          || (!!model && (preset?.models?.length ?? 0) > 0 && !preset!.models.includes(model))
+          || (!!preset?.customModel && !!model && !(preset.models ?? []).includes(model)),
         )
         setProjectsRoot((c.projectsRoot as string) || '')
         setLocale((c.locale as string) || 'zh-CN')
         setTheme((c.theme as string) || 'system')
         setAppearance(normalizeAppearance(c.appearance as Record<string, unknown> | undefined))
+
+        // Live models when key present (or Ollama without key)
+        if (url && (key || pid === 'ollama')) {
+          void window.fieldguide.llmFetchModels({ providerId: pid, baseUrl: url, apiKey: key }).then((r) => {
+            if (r.ok && r.data && r.data.models.length > 0) {
+              applyFetchedModels(pid, r.data.models, r.data.embedModels, r.data.source)
+              if (!r.data.ok && r.data.error) setModelsHint(t('settings.modelsFetchFailed'))
+            }
+          })
+        }
       }
     })
-  }, [])
+  }, [applyFetchedModels, t])
 
   const patchAppearance = useCallback((patch: Partial<AppearanceState>) => {
     setAppearance((prev) => {
@@ -370,7 +456,9 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                       const id = e.target.value
                       const p = getProvider(id)
                       setProviderId(id)
+                      setModelsHint(null)
                       setCustomModel(!!p.customModel && p.models.length === 0)
+                      const nextUrl = p.baseUrl || baseUrl
                       if (p.baseUrl) setBaseUrl(p.baseUrl)
                       if (p.models.length > 0) {
                         setChatModel(p.models[0])
@@ -383,10 +471,15 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                       } else {
                         setEmbedModel('')
                       }
+                      setModelsSource(p.source === 'live' ? 'live' : 'builtin')
+                      // Pull live list when possible (Ollama needs no key)
+                      if (nextUrl && (apiKey || id === 'ollama')) {
+                        void refreshModels({ providerId: id, baseUrl: nextUrl, apiKey, silent: true })
+                      }
                     }}
                     className="w-full px-2 py-1.5 text-sm border border-[var(--fg-input-border)] rounded bg-[var(--fg-input-bg)] text-[var(--fg-input-text)]"
                   >
-                    {LLM_PROVIDERS.map((p) => (
+                    {providers.map((p) => (
                       <option key={p.id} value={p.id}>{t(`settings.providers.${p.labelKey}`)}</option>
                     ))}
                   </select>
@@ -412,7 +505,18 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                   <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">{t('settings.chatModel')}</label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="block text-xs font-medium text-[var(--fg-text-tertiary)]">{t('settings.chatModel')}</label>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-[11px] text-[var(--fg-accent-text)] disabled:opacity-50"
+                      disabled={refreshingModels || !baseUrl || (!apiKey && providerId !== 'ollama')}
+                      onClick={() => void refreshModels()}
+                    >
+                      <RefreshCw size={11} className={refreshingModels ? 'animate-spin' : undefined} />
+                      {refreshingModels ? t('settings.refreshingModels') : t('settings.refreshModels')}
+                    </button>
+                  </div>
                   {(() => {
                     const p = getProvider(providerId)
                     const showSelect = p.models.length > 0 && !customModel
@@ -455,6 +559,12 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                             {t('settings.backToModelList')}
                           </button>
                         )}
+                        <p className="text-[11px] text-[var(--fg-text-tertiary)]">
+                          {modelsHint
+                            ?? (modelsSource === 'live'
+                              ? t('settings.modelsSourceLive')
+                              : t('settings.modelsSourceBuiltin'))}
+                        </p>
                       </div>
                     )
                   })()}

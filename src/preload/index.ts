@@ -15,6 +15,10 @@ const api = {
     ipcRenderer.invoke('config:testLlm'),
   configLlmStatus: (): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('config:llmStatus'),
+  llmListProviders: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('llm:listProviders'),
+  llmFetchModels: (opts?: { providerId?: string; baseUrl?: string; apiKey?: string }): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('llm:fetchModels', opts ?? {}),
 
   // Projects
   projectList: (): Promise<IpcResult<unknown[]>> =>
@@ -74,8 +78,17 @@ const api = {
     ipcRenderer.invoke('dialog:openFolder'),
 
   // Chat
-  chatSend: (projectId: string, messages: Array<{ role: string; content: string }>): Promise<IpcResult<unknown>> =>
-    ipcRenderer.invoke('chat:send', { projectId, messages }),
+  chatSend: (
+    projectId: string,
+    messages: Array<{ role: string; content: string }>,
+    opts?: { focusedNodeId?: string | null; tourStepIndex?: number | null },
+  ): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('chat:send', {
+      projectId,
+      messages,
+      focusedNodeId: opts?.focusedNodeId ?? null,
+      tourStepIndex: opts?.tourStepIndex ?? null,
+    }),
   chatHistory: (projectId: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('chat:history', { projectId }),
   chatClear: (projectId: string): Promise<IpcResult<null>> =>

@@ -56,6 +56,21 @@ describe('dashboard postMessage bridge script', () => {
     expect(indexSrc).toContain('registerDashboardScheme()')
   })
 
+  it('serves config.json language and reports layoutStatus', () => {
+    expect(src).toContain('outputLanguage')
+    expect(src).toContain('buildUARuntimeConfig')
+    expect(src).toContain("type: 'layoutStatus'")
+    expect(src).toContain('ua-onboarding-dismissed-v1')
+  })
+
+  it('injects light-mode contrast pack and viewport zoom bridge', () => {
+    expect(src).toContain('fg-embed-contrast')
+    expect(src).toContain('viewportZoomIn')
+    expect(src).toContain('viewportZoomOut')
+    expect(src).toContain('reactFlowInstance')
+    expect(src).toContain('text-amber-200')
+  })
+
   describe('runtime: click → nodeSelected', () => {
     let messages: unknown[]
     let selectedNodeId: string | null
@@ -86,21 +101,26 @@ describe('dashboard postMessage bridge script', () => {
         }),
       }
 
+      const documentMock = {
+        documentElement: {
+          style: { setProperty: vi.fn() },
+          classList: { toggle: vi.fn() },
+          setAttribute: vi.fn(),
+        },
+        body: { style: {} as Record<string, string> },
+        head: { appendChild: vi.fn() },
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        getElementById: () => null,
+        createElement: () => ({ id: '', textContent: '' }),
+      }
       const windowMock = {
         __uaStore: store,
         parent: parentWin,
-        addEventListener: (_type: string, handler: (event: { data: unknown }) => void) => {
-          messageHandler = handler
+        addEventListener: (type: string, handler: (event: { data: unknown }) => void) => {
+          if (type === 'message') messageHandler = handler
         },
-        document: {
-          documentElement: {
-            style: { setProperty: vi.fn() },
-            classList: { toggle: vi.fn() },
-            setAttribute: vi.fn(),
-          },
-          body: { style: {} as Record<string, string> },
-          querySelector: () => null,
-        },
+        document: documentMock,
         matchMedia: undefined,
       }
 
@@ -120,6 +140,7 @@ describe('dashboard postMessage bridge script', () => {
         source: 'ua-dashboard',
         type: 'nodeSelected',
         nodeId: 'file:src/main.go',
+        filePath: null,
       })
     })
 

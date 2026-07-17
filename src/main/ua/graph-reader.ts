@@ -6,6 +6,7 @@
  */
 import { join } from 'node:path'
 import { existsSync, readFileSync, statSync, readdirSync } from 'node:fs'
+import { ensureGraphLayersSync } from './ensure-layers'
 
 // ─── Types ───
 
@@ -86,7 +87,10 @@ export function loadGraph(projectRoot: string): KnowledgeGraph | null {
   const p = graphPath(projectRoot)
   if (!existsSync(p)) return null
   try {
-    return JSON.parse(readFileSync(p, 'utf-8'))
+    const graph = JSON.parse(readFileSync(p, 'utf-8')) as KnowledgeGraph
+    // Structure-only indexes may lack layers — UA Dashboard needs them
+    ensureGraphLayersSync(graph)
+    return graph
   } catch {
     return null
   }

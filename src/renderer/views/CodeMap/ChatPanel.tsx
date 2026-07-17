@@ -1,10 +1,10 @@
 /**
- * ChatPanel — ReAct Agent 问答面板 (ui-spec §3.2.5)
+ * ChatPanel — Fieldguide Coach Agent 问答面板 (ui-spec §3.2.5)
  */
 import { useState, useRef, useEffect } from 'react'
 
 interface AgentStep {
-  type: 'thought' | 'action' | 'observation' | 'answer'
+  type: 'thought' | 'action' | 'observation' | 'answer' | 'context'
   content: string
   tool?: string
 }
@@ -22,10 +22,19 @@ interface Props {
   t: (key: string, opts?: Record<string, unknown>) => string
   projectId?: string
   projectName?: string
+  focusedNodeId?: string | null
+  tourStepIndex?: number | null
   onNodeRefClick?: (nodeId: string) => void
 }
 
-export default function ChatPanel({ t, projectId, projectName, onNodeRefClick }: Props) {
+export default function ChatPanel({
+  t,
+  projectId,
+  projectName,
+  focusedNodeId,
+  tourStepIndex,
+  onNodeRefClick,
+}: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -103,7 +112,11 @@ export default function ChatPanel({ t, projectId, projectName, onNodeRefClick }:
     try {
       const result = await window.fieldguide.chatSend(
         projectId,
-        [...history, userMsg].map(m => ({ role: m.role, content: m.content }))
+        [...history, userMsg].map(m => ({ role: m.role, content: m.content })),
+        {
+          focusedNodeId: focusedNodeId ?? null,
+          tourStepIndex: tourStepIndex ?? null,
+        },
       )
 
       if (result.ok && result.data) {
@@ -140,6 +153,7 @@ export default function ChatPanel({ t, projectId, projectName, onNodeRefClick }:
 
   function stepLabel(step: AgentStep): string {
     switch (step.type) {
+      case 'context': return t('chat.stepContext')
       case 'thought': return t('chat.stepThought')
       case 'action': return step.tool ? `${t('chat.stepAction')}: ${step.tool}` : t('chat.stepAction')
       case 'observation': return t('chat.stepObservation')

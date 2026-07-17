@@ -197,8 +197,12 @@
   --fg-dialog-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
   --fg-status-info: #4A90E2;
   --fg-status-info-bg: #EBF3FC;
-  --fg-status-warning: #F5A623;
-  --fg-status-warning-bg: #FEF6E8;
+  --fg-status-warning: #B45309;
+  --fg-status-warning-bg: #FDE68A;
+  --fg-syntax-string: #047857;
+  --fg-syntax-comment: #78716C;
+  --fg-syntax-number: #C2410C;
+  --fg-syntax-keyword: #6D28D9;
 }
 
 /* Forest — deep greens, earthy */

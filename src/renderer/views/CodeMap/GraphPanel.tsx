@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useIndexProgress } from '../../hooks/useIndexProgress'
 import {
   type DashboardMessage,
@@ -33,13 +34,17 @@ interface LayerInfo {
 }
 
 interface Props {
-  t: (key: string) => string
+  t: (key: string, opts?: Record<string, unknown>) => string
   projectRoot?: string
   projectId?: string
   onDashboardMessage?: (msg: DashboardMessage) => void
 }
 
+/** Above this, show an explicit “computing layout” wait state for large graphs. */
+const LARGE_GRAPH_NODES = 200
+
 export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessage }: Props) {
+  const { i18n } = useTranslation()
   const [dashboardUrl, setDashboardUrl] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -52,6 +57,10 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
   const [graphEmpty, setGraphEmpty] = useState(false)
   const [hasDomain, setHasDomain] = useState(false)
   const [hasKnowledge, setHasKnowledge] = useState(false)
+  const [graphNodeCount, setGraphNodeCount] = useState(0)
+  const [layoutBusy, setLayoutBusy] = useState(false)
+  const [layoutNodeCount, setLayoutNodeCount] = useState(0)
+  const [layoutReason, setLayoutReason] = useState<'layout' | 'no-layers' | 'ready'>('ready')
 
   const idxProgress = useIndexProgress(projectId)
   const prevComplete = useRef(false)
@@ -61,6 +70,7 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
         prevComplete.current = true
         setIframeKey(k => k + 1)
         setIframeLoading(true)
+        setLayoutBusy(true)
       }
     } else {
       prevComplete.current = false
@@ -76,12 +86,35 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
     return () => { setDashboardIframeRef(null) }
   }, [iframeKey])
 
+  // Reload Dashboard when shell locale changes (UA reads language from config.json once)
+  useEffect(() => {
+    const onLang = () => {
+      setIframeKey(k => k + 1)
+      setIframeLoading(true)
+      setLayoutBusy(true)
+    }
+    i18n.on('languageChanged', onLang)
+    return () => { i18n.off('languageChanged', onLang) }
+  }, [i18n])
+
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
-      const data = event.data as DashboardMessage | undefined
-      if (data && data.source === 'ua-dashboard') {
-        onDashboardMessage?.(data)
+      const data = event.data as (DashboardMessage & {
+        busy?: boolean
+        nodeCount?: number
+        renderedNodes?: number
+        reason?: 'layout' | 'no-layers' | 'ready'
+      }) | undefined
+      if (!data || data.source !== 'ua-dashboard') return
+      if (data.type === 'layoutStatus') {
+        setLayoutBusy(!!data.busy)
+        if (typeof data.nodeCount === 'number') setLayoutNodeCount(data.nodeCount)
+        if (data.reason === 'no-layers' || data.reason === 'layout' || data.reason === 'ready') {
+          setLayoutReason(data.reason)
+        }
+        return
       }
+      onDashboardMessage?.(data)
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
@@ -93,6 +126,7 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
       prevRoot.current = projectRoot
       setIframeKey(k => k + 1)
       setIframeLoading(true)
+      setLayoutBusy(true)
       setActiveLayer(null)
     }
   }, [projectRoot])
@@ -118,14 +152,19 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
       setGraphEmpty(false)
       setHasDomain(false)
       setHasKnowledge(false)
+      setGraphNodeCount(0)
       return
     }
     window.fieldguide.graphGet?.(projectId).then((result) => {
       if (result.ok && result.data) {
         const graph = result.data as { nodes?: unknown[] }
-        setGraphEmpty(!graph.nodes?.length)
+        const n = graph.nodes?.length ?? 0
+        setGraphNodeCount(n)
+        setGraphEmpty(n === 0)
+        if (n > LARGE_GRAPH_NODES) setLayoutBusy(true)
       } else {
         setGraphEmpty(true)
+        setGraphNodeCount(0)
       }
     }).catch(() => setGraphEmpty(true))
 
@@ -136,6 +175,9 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
       }
     }).catch(() => { /* meta is optional */ })
   }, [projectId, iframeKey])
+
+  const showLayoutWait = !iframeLoading && layoutBusy && (layoutNodeCount > 0 || graphNodeCount > 0)
+  const waitCount = layoutNodeCount || graphNodeCount
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.dashboardLoading')}</div>
   if (!dashboardUrl) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.dashboardUnavailable')}</div>
@@ -217,6 +259,28 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
         </div>
       )}
 
+      {showLayoutWait && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[var(--fg-bg)]/85 z-10 pointer-events-none">
+          <div className="flex flex-col items-center gap-3 px-6 text-center max-w-sm">
+            <div className="w-8 h-8 border-2 border-[var(--fg-accent)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-[var(--fg-text-primary)] font-medium">
+              {layoutReason === 'no-layers'
+                ? t('codeMap.layoutNoLayers')
+                : t('codeMap.layoutComputing', { count: waitCount })}
+            </span>
+            {layoutReason === 'no-layers' ? (
+              <span className="text-xs text-[var(--fg-text-secondary)] leading-relaxed">
+                {t('codeMap.layoutNoLayersHint')}
+              </span>
+            ) : waitCount >= LARGE_GRAPH_NODES ? (
+              <span className="text-xs text-[var(--fg-text-secondary)] leading-relaxed">
+                {t('codeMap.layoutComputingHint')}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       <iframe
         ref={iframeRef}
         key={iframeKey}
@@ -228,6 +292,8 @@ export default function GraphPanel({ t, projectRoot, projectId, onDashboardMessa
           // Register ref before postMessage — effect may not have run yet.
           setDashboardIframeRef(iframeRef.current)
           syncDashboardThemeAfterLoad(iframeRef.current?.contentWindow)
+          // Assume layout may still be busy until bridge reports rendered nodes
+          if (graphNodeCount > 0) setLayoutBusy(true)
         }}
         style={{
           visibility: iframeLoading ? 'hidden' : undefined,

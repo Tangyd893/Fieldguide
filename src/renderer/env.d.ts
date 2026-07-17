@@ -47,6 +47,20 @@ interface FieldguideAPI {
   configSet(patch: Record<string, unknown>): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   configTestLlm(): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   configLlmStatus(): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  llmListProviders(): Promise<{ ok: boolean; data?: Array<{
+    id: string
+    labelKey: string
+    baseUrl: string
+    models: string[]
+    embedModels: string[]
+    customModel?: boolean
+    source?: 'builtin' | 'live'
+  }>; error?: { message: string } }>
+  llmFetchModels(opts?: { providerId?: string; baseUrl?: string; apiKey?: string }): Promise<{
+    ok: boolean
+    data?: { ok: boolean; models: string[]; embedModels: string[]; error?: string; source: 'live' | 'builtin' }
+    error?: { message: string }
+  }>
 
   // Projects
   projectList(): Promise<{ ok: boolean; data?: ProjectRow[]; error?: { message: string } }>
@@ -80,7 +94,11 @@ interface FieldguideAPI {
   openFolderDialog(): Promise<{ ok: boolean; data?: string | null; error?: { message: string } }>
 
   // Chat
-  chatSend(projectId: string, messages: Array<{ role: string; content: string }>): Promise<{ ok: boolean; data?: { content: string; steps?: unknown[]; nodeRefs?: string[] }; error?: { message: string } }>
+  chatSend(
+    projectId: string,
+    messages: Array<{ role: string; content: string }>,
+    opts?: { focusedNodeId?: string | null; tourStepIndex?: number | null },
+  ): Promise<{ ok: boolean; data?: { content: string; steps?: unknown[]; nodeRefs?: string[] }; error?: { message: string } }>
   chatHistory(projectId: string): Promise<{ ok: boolean; data?: unknown[]; error?: { message: string } }>
   chatClear(projectId: string): Promise<{ ok: boolean; error?: { message: string } }>
 

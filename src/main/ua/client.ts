@@ -53,6 +53,7 @@ let applyLLMLayers: any
 let buildTourGenerationPrompt: any
 let parseTourGenerationResponse: any
 let generateHeuristicTour: any
+let detectLayers: any
 
 async function loadCore(): Promise<void> {
   if (TreeSitterPlugin) return // already loaded
@@ -100,6 +101,11 @@ async function loadCore(): Promise<void> {
   buildTourGenerationPrompt = core.buildTourGenerationPrompt
   parseTourGenerationResponse = core.parseTourGenerationResponse
   generateHeuristicTour = core.generateHeuristicTour
+  detectLayers = core.detectLayers
+
+  // Share with ensure-layers (sync path for graph-reader / dashboard)
+  const { setDetectLayersImpl } = await import('./ensure-layers')
+  setDetectLayersImpl(detectLayers)
 }
 
 // ─── Language detection (subset of UA's scan-project table) ───
@@ -730,6 +736,15 @@ export async function indexProject(
       } catch (err) {
         // LLM enrichment failure is non-fatal — graph still has structure
         console.error(`[ua/client] LLM enrichment failed: ${String(err)}`)
+      }
+    }
+
+    // Structure-only (or LLM without layers): UA Dashboard overview requires layers
+    if (!graph.layers?.length && detectLayers) {
+      try {
+        graph.layers = detectLayers(graph)
+      } catch (err) {
+        console.warn(`[ua/client] detectLayers failed: ${String(err)}`)
       }
     }
 

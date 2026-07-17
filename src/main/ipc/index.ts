@@ -40,6 +40,7 @@ import { installDemoProject } from '../sample-project'
 import { indexProject, beginIndex, cancelIndex } from '../ua/client'
 import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
 import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
+import { getLlmProviderCatalog, fetchProviderModels } from '../llm/catalog'
 import {
   loadGraph,
   getNode,
@@ -123,6 +124,35 @@ ipcMain.handle('config:testLlm', async (): Promise<IpcResult<unknown>> => {
     return ipcErr('LLM_API_ERROR', `连接失败: ${err instanceof Error ? err.message : String(err)}`, true)
   }
 })
+
+ipcMain.handle('llm:listProviders', (): IpcResult<unknown> => {
+  try {
+    return ipcOk(getLlmProviderCatalog())
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle(
+  'llm:fetchModels',
+  async (
+    _e,
+    opts: { providerId?: string; baseUrl?: string; apiKey?: string } = {},
+  ): Promise<IpcResult<unknown>> => {
+    try {
+      const config = loadConfig()
+      const result = await fetchProviderModels({
+        providerId: opts.providerId,
+        baseUrl: opts.baseUrl || config.llm.baseUrl,
+        apiKey: opts.apiKey !== undefined ? opts.apiKey : config.llm.apiKey,
+      })
+      // Always return models (live or builtin fallback) so the UI stays usable
+      return ipcOk(result)
+    } catch (err) {
+      return ipcErr('LLM_API_ERROR', String(err), true)
+    }
+  },
+)
 
 /* ──────────── App ──────────── */
 
@@ -503,9 +533,13 @@ interface ChatMessage {
 ipcMain.handle('chat:send', async (_e, {
   projectId,
   messages,
+  focusedNodeId,
+  tourStepIndex,
 }: {
   projectId: string
   messages: ChatMessage[]
+  focusedNodeId?: string | null
+  tourStepIndex?: number | null
 }): Promise<IpcResult<unknown>> => {
   const config = loadConfig()
 
@@ -533,6 +567,8 @@ ipcMain.handle('chat:send', async (_e, {
         projectName: project.name,
         projectRoot: project.root_path,
         locale: config.locale,
+        focusedNodeId: focusedNodeId ?? null,
+        tourStepIndex: tourStepIndex ?? null,
       },
       messages,
     )
