@@ -60,8 +60,8 @@
 ### 2.3 外部依赖（动工第一周）
 
 - [ ] **UA 集成 Spike 通过**（硬门禁）→ 填写 [spike-ua.md](./spike-ua.md)
-- [ ] 按 [fieldguide-demo-spec.md](./fieldguide-demo-spec.md) 创建 demo 仓库
-- [ ] 按 [fixtures-tiny-go-spec.md](./fixtures-tiny-go-spec.md) 创建 `tests/fixtures/tiny-go/`
+- [x] **内置 Demo**：`resources/sample-project/`（应用内「安装内置 Demo」）
+- [ ] 按 [fixtures-tiny-go-spec.md](./fixtures-tiny-go-spec.md) 维护 `tests/fixtures/tiny-go/`
 - [ ] 锁定 UA 版本：记录 commit hash 或 npm 版本至 `package.json`（见 spike-ua.md）
 - [ ] 准备 **LLM API Key**（Phase 2 起；Phase 1 结构图可无 Key）
 
@@ -347,7 +347,6 @@ Fieldguide **不替代** IDE。定位是：
 | [spike-ua.md](./spike-ua.md) | UA Spike 记录（动工前必填） |
 | [README.md](../README.md) | 项目概览 |
 | [understand-anything-integration.md](./understand-anything-integration.md) | UA 集成 |
-| [fieldguide-demo-spec.md](./fieldguide-demo-spec.md) | Demo 仓库 |
 | [fixtures-tiny-go-spec.md](./fixtures-tiny-go-spec.md) | 测试 fixture |
 | [product-spec.md](./product-spec.md) | 功能边界、用户场景 |
 | [architecture.md](./architecture.md) | 技术架构、IPC、数据模型 |

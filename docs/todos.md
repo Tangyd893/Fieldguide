@@ -555,7 +555,7 @@ Fieldguide/
 ├── docs/                    设计文档（入口：doc-index.md）
 ├── sampleTheme.png          主题 v2 视觉参考（米白网格 + 鼠尾草绿强调）
 ├── resources/               应用图标、内置 sample-project（demo）
-├── scripts/                 Spike 脚本（spike-electron.mjs 等）
+├── scripts/                 QA / bootstrap 脚本（bootstrap-ua、qa:*、prepare-pack）
 ├── src/
 │   ├── main/                Electron 主进程
 │   │   ├── ua/              UA 集成层（client / dashboard / config-bridge / graph-reader / diff / cross-tour）

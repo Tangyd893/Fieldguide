@@ -231,7 +231,7 @@ flowchart TD
 | Dashboard iframe 与 Fieldguide 面板视觉割裂 | ui-spec §3.2.3 | Phase 2 主题统一 |
 | 文件树需实时反映项目文件变更 | ui-spec §3.2.1 stale badge | Phase 2 |
 | 面板联动（图谱↔代码↔问答）| ui-spec §3.2.2 | Phase 2 |
-| Demo / fixture | fieldguide-demo-spec、fixtures-tiny-go-spec | ✅ 已完成 |
+| Demo / fixture | 内置 sample-project、fixtures-tiny-go-spec | ✅ 已完成 |
 
 ---
 
@@ -252,7 +252,6 @@ flowchart TD
 | understand-anything-integration | v0.1 |
 | doc-index | v0.1 |
 | spike-ua | 模板（Spike 后填写） |
-| fieldguide-demo-spec | v0.1 |
 | fixtures-tiny-go-spec | v0.1 |
 | NOTICE.md | v0.1 |
 

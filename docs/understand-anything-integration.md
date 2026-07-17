@@ -286,5 +286,4 @@ Spike 失败则回退方案：submodule fork + 薄 CLI 包装（`node ua-cli und
 | [getting-started.md](./getting-started.md) | 动工清单增加 UA spike |
 | [roadmap.md](./roadmap.md) | Phase 1/2 任务重排，周期缩短 |
 | [spike-ua.md](./spike-ua.md) | Spike 记录 |
-| [fieldguide-demo-spec.md](./fieldguide-demo-spec.md) | Demo 仓库 |
 | [fixtures-tiny-go-spec.md](./fixtures-tiny-go-spec.md) | 测试 fixture |

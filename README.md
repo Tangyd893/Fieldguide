@@ -265,8 +265,7 @@ Fieldguide/
 | [design-review.md](docs/design-review.md) | 设计审视 |
 | [onboarding-spec.md](docs/onboarding-spec.md) | 首次启动引导 |
 | [testing-strategy.md](docs/testing-strategy.md) | 测试策略 |
-| [spike-ua.md](docs/spike-ua.md) | UA 集成 Spike |
-| [fieldguide-demo-spec.md](docs/fieldguide-demo-spec.md) | Demo 仓库规格 |
+| [spike-ua.md](docs/spike-ua.md) | UA 集成 Spike（历史记录） |
 | [fixtures-tiny-go-spec.md](docs/fixtures-tiny-go-spec.md) | 测试 fixture 规格 |
 
 建议阅读顺序：doc-index -> understand-anything-integration -> getting-started -> product-spec -> architecture -> ui-spec -> roadmap。

@@ -35,7 +35,7 @@
 - [x] [testing-strategy.md](./testing-strategy.md)
 - [x] [doc-index.md](./doc-index.md)
 - [x] [spike-ua.md](./spike-ua.md)（模板）
-- [x] [fieldguide-demo-spec.md](./fieldguide-demo-spec.md)
+- [x] 内置 `resources/sample-project/` Demo（取代独立 fieldguide-demo 仓库规格）
 - [x] [fixtures-tiny-go-spec.md](./fixtures-tiny-go-spec.md)
 - [x] [../NOTICE.md](../NOTICE.md)
 

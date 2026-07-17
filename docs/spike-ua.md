@@ -72,7 +72,8 @@ node skills/understand/extract-structure.mjs \
 ### 5. Programmatic GraphBuilder → knowledge-graph.json
 
 ```bash
-node scripts/spike-generate-graph.mjs
+# （历史）曾用独立 generate 脚本验证 GraphBuilder；现以 `pnpm qa:graph` / 应用内索引为准
+# node scripts/spike-generate-graph.mjs
 ```
 
 **结果**：✅ 12 nodes, 14 edges，schema validate 通过

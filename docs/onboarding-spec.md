@@ -93,7 +93,7 @@ flowchart TD
 
 | 项 | 值 |
 |----|-----|
-| 仓库 | `https://github.com/fieldguide-app/fieldguide-demo`（Phase 1 创建，见 [fieldguide-demo-spec.md](./fieldguide-demo-spec.md)） |
+| Demo | `resources/sample-project/`（应用内安装） | 见 Project Library「安装内置 Demo」 |
 | slug | `demo` |
 | 落盘路径 | `{projectsRoot}/demo/` |
 | 体量 | Go + TypeScript 混合，~500 行，含 HTTP 入口 → service → 数据层 |
