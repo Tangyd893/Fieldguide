@@ -6,10 +6,19 @@
  * - Dual panel default: panel[0] = code, panel[1] = graph
  * - File opens route to active panel (no forced split)
  * - Layout persisted per projectId under config.workspaceLayouts
+ * - V1 panel catalog: overview | graph | code | chat | tour | knowledge | interview
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
+import {
+  ALL_PANEL_TABS,
+  LAYOUT_PRESETS,
+  migratePanelTabs,
+  isPanelTab,
+  type PanelTab,
+  type LayoutPresetId,
+} from '../../shared/understand'
 
-export type PanelTab = 'graph' | 'code' | 'chat' | 'tour'
+export type { PanelTab }
 
 export interface OpenFile {
   id: string
@@ -35,13 +44,13 @@ export type SplitDirection = 'horizontal' | 'vertical'
 export interface WorkspaceLayout {
   panels: PanelState[]
   activePanelIndex: number
-  splitPos: number        // percentage, 20-80
+  splitPos: number
   splitDirection: SplitDirection
 }
 
 export const DEFAULT_LAYOUT: WorkspaceLayout = {
   panels: [
-    { id: 0, tabs: ['graph', 'code', 'chat', 'tour'], activeTab: 'graph', filePath: undefined, openFiles: [], activeFileId: undefined },
+    { id: 0, tabs: [...ALL_PANEL_TABS], activeTab: 'graph', filePath: undefined, openFiles: [], activeFileId: undefined },
   ],
   activePanelIndex: 0,
   splitPos: 50,
@@ -54,17 +63,41 @@ function nextPanelId(): number {
 }
 
 function createPanel(activeTab: PanelTab = 'code'): PanelState {
-  return { id: nextPanelId(), tabs: ['graph', 'code', 'chat', 'tour'], activeTab, filePath: undefined, openFiles: [], activeFileId: undefined }
+  return {
+    id: nextPanelId(),
+    tabs: [...ALL_PANEL_TABS],
+    activeTab,
+    filePath: undefined,
+    openFiles: [],
+    activeFileId: undefined,
+  }
 }
 
 function cloneDefaultLayout(): WorkspaceLayout {
   return {
     panels: [
-      { id: 0, tabs: ['graph', 'code', 'chat', 'tour'], activeTab: 'graph', filePath: undefined, openFiles: [], activeFileId: undefined },
+      { id: 0, tabs: [...ALL_PANEL_TABS], activeTab: 'graph', filePath: undefined, openFiles: [], activeFileId: undefined },
     ],
     activePanelIndex: 0,
     splitPos: 50,
     splitDirection: 'horizontal',
+  }
+}
+
+/** Migrate legacy layouts so new panel tabs appear after upgrade */
+export function migrateWorkspaceLayout(saved: WorkspaceLayout): WorkspaceLayout {
+  return {
+    ...saved,
+    panels: saved.panels.map((p) => {
+      const tabs = migratePanelTabs(p.tabs)
+      const activeTab = isPanelTab(p.activeTab) ? p.activeTab : 'graph'
+      return {
+        ...p,
+        tabs,
+        activeTab: tabs.includes(activeTab) ? activeTab : tabs[0] || 'graph',
+        openFiles: Array.isArray(p.openFiles) ? p.openFiles : [],
+      }
+    }),
   }
 }
 
@@ -99,7 +132,6 @@ export function useWorkspaceLayout(projectId?: string | null) {
   layoutRef.current = layout
   projectIdRef.current = projectId
 
-  // Initial load + migrate legacy global workspaceLayout → workspaceLayouts[lastProjectId]
   useEffect(() => {
     let cancelled = false
     window.fieldguide.configGet().then(async (r) => {
@@ -111,14 +143,19 @@ export function useWorkspaceLayout(projectId?: string | null) {
         const lastProjectId = typeof cfg.lastProjectId === 'string' ? cfg.lastProjectId : undefined
 
         if (isValidLayout(legacy) && Object.keys(layouts).length === 0 && lastProjectId) {
-          layouts = { [lastProjectId]: legacy }
+          layouts = { [lastProjectId]: migrateWorkspaceLayout(legacy) }
           await window.fieldguide.configSet({
             workspaceLayouts: layouts as unknown as Record<string, unknown>,
             workspaceLayout: undefined,
           } as never).catch(() => {})
         } else if (isValidLayout(legacy) && Object.keys(layouts).length === 0) {
-          // Keep legacy in memory until a project is selected; still clear global on first save
-          layouts = { __legacy__: legacy }
+          layouts = { __legacy__: migrateWorkspaceLayout(legacy) }
+        } else {
+          const migrated: Record<string, WorkspaceLayout> = {}
+          for (const [k, v] of Object.entries(layouts)) {
+            if (isValidLayout(v)) migrated[k] = migrateWorkspaceLayout(v)
+          }
+          layouts = migrated
         }
 
         layoutsRef.current = layouts
@@ -126,8 +163,9 @@ export function useWorkspaceLayout(projectId?: string | null) {
         const key = projectIdRef.current
         const saved = (key && layouts[key]) || (!key && layouts.__legacy__) || undefined
         if (isValidLayout(saved)) {
-          hydrateCounters(saved)
-          setLayout(saved)
+          const migrated = migrateWorkspaceLayout(saved)
+          hydrateCounters(migrated)
+          setLayout(migrated)
         } else {
           panelIdCounter = 0
           setLayout(cloneDefaultLayout())
@@ -138,7 +176,6 @@ export function useWorkspaceLayout(projectId?: string | null) {
     return () => { cancelled = true }
   }, [])
 
-  // Switch layout when projectId changes
   const prevProjectIdRef = useRef<string | null | undefined>(undefined)
 
   useEffect(() => {
@@ -147,7 +184,6 @@ export function useWorkspaceLayout(projectId?: string | null) {
     const prevId = prevProjectIdRef.current
     const nextId = projectId
 
-    // Persist layout for the project we are leaving
     if (prevId && prevId !== nextId) {
       layoutsRef.current = {
         ...layoutsRef.current,
@@ -155,7 +191,6 @@ export function useWorkspaceLayout(projectId?: string | null) {
       }
     }
 
-    // Load layout for the project we are entering (skip first sync after initial hydrate)
     if (prevId === undefined) {
       prevProjectIdRef.current = nextId
       return
@@ -163,7 +198,7 @@ export function useWorkspaceLayout(projectId?: string | null) {
 
     if (nextId !== prevId) {
       if (nextId && isValidLayout(layoutsRef.current[nextId])) {
-        const saved = layoutsRef.current[nextId]
+        const saved = migrateWorkspaceLayout(layoutsRef.current[nextId])
         hydrateCounters(saved)
         setLayout(saved)
       } else {
@@ -175,7 +210,6 @@ export function useWorkspaceLayout(projectId?: string | null) {
     prevProjectIdRef.current = nextId
   }, [projectId, loaded])
 
-  // Persist layouts map on change (debounced)
   useEffect(() => {
     if (!loaded) return
     const t = setTimeout(() => {
@@ -198,7 +232,6 @@ export function useWorkspaceLayout(projectId?: string | null) {
     setLayout(prev => ({ ...prev, activePanelIndex: index }))
   }, [])
 
-  /** Route a file open to the active panel. Manages open files tab list. */
   const openFile = useCallback((filePath: string) => {
     setLayout(prev => {
       const panels = [...prev.panels]
@@ -211,7 +244,7 @@ export function useWorkspaceLayout(projectId?: string | null) {
           ...panel,
           filePath,
           activeFileId: existing.id,
-          activeTab: panel.activeTab === 'graph' ? 'code' : panel.activeTab,
+          activeTab: panel.activeTab === 'graph' || panel.activeTab === 'overview' ? 'code' : panel.activeTab,
         }
       } else {
         const newFile: OpenFile = { id: nextFileId(), path: filePath }
@@ -220,7 +253,7 @@ export function useWorkspaceLayout(projectId?: string | null) {
           filePath,
           activeFileId: newFile.id,
           openFiles: [...panel.openFiles, newFile].slice(-10),
-          activeTab: panel.activeTab === 'graph' ? 'code' : panel.activeTab,
+          activeTab: panel.activeTab === 'graph' || panel.activeTab === 'overview' ? 'code' : panel.activeTab,
         }
       }
       return { ...prev, panels }
@@ -259,7 +292,7 @@ export function useWorkspaceLayout(projectId?: string | null) {
         ...panel,
         filePath: file.path,
         activeFileId: fileId,
-        activeTab: panel.activeTab === 'graph' ? 'code' : panel.activeTab,
+        activeTab: panel.activeTab === 'graph' || panel.activeTab === 'overview' ? 'code' : panel.activeTab,
       }
       return { ...prev, panels }
     })
@@ -328,6 +361,30 @@ export function useWorkspaceLayout(projectId?: string | null) {
     })
   }, [])
 
+  const applyPreset = useCallback((presetId: LayoutPresetId) => {
+    const preset = LAYOUT_PRESETS.find(p => p.id === presetId)
+    if (!preset) return
+    setLayout(() => {
+      if (!preset.right) {
+        return {
+          panels: [{ ...createPanel(preset.left), id: 0 }],
+          activePanelIndex: 0,
+          splitPos: 50,
+          splitDirection: preset.direction || 'horizontal',
+        }
+      }
+      return {
+        panels: [
+          { ...createPanel(preset.left), id: 0 },
+          { ...createPanel(preset.right), id: 1 },
+        ],
+        activePanelIndex: 0,
+        splitPos: 50,
+        splitDirection: preset.direction || 'horizontal',
+      }
+    })
+  }, [])
+
   return {
     layout,
     loaded,
@@ -342,5 +399,6 @@ export function useWorkspaceLayout(projectId?: string | null) {
     restorePanels,
     closeFile,
     switchToFile,
+    applyPreset,
   }
 }

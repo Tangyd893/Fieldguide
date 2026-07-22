@@ -29,7 +29,13 @@
     "code": "Code",
     "chat": "Chat",
     "tour": "Tour",
-    "tourUnavailable": "Tour is not available"
+    "overview": "Overview",
+    "knowledge": "Knowledge",
+    "interview": "Interview",
+    "tourUnavailable": "Tour is not available",
+    "overviewUnavailable": "Architecture overview is not available",
+    "knowledgeUnavailable": "Knowledge panel is not available",
+    "interviewUnavailable": "Interview panel is not available"
   },
   "project": {
     "emptyTitle": "Add your first project",
@@ -102,8 +108,59 @@
       "parse": "Parsing code…",
       "build": "Building graph…",
       "save": "Saving graph…",
-      "llm": "AI analysis…"
+      "llm": "AI analysis…",
+      "analyze": "Summarizing files…",
+      "review-layers": "Detecting layers…",
+      "review-tour": "Generating tour…",
+      "structure": "Structure indexed",
+      "architecture": "Architecture mapping…",
+      "knowledge": "Extracting knowledge…",
+      "interview": "Building interview questions…"
     }
+  },
+  "overview": {
+    "title": "Architecture overview",
+    "empty": "No architecture summary yet",
+    "emptyHint": "Index the project, or generate a heuristic overview from the graph.",
+    "generate": "Generate overview",
+    "generating": "Generating…",
+    "refresh": "Refresh",
+    "source": "Source: {{source}}",
+    "stack": "Stack",
+    "entryPoints": "Entry points",
+    "layers": "Layers",
+    "modules": "Modules",
+    "flows": "Key flows",
+    "tech": "Tech choices",
+    "jumpGraph": "Focus in graph"
+  },
+  "knowledge": {
+    "title": "Knowledge nodes",
+    "empty": "No knowledge cards yet",
+    "emptyHint": "Run knowledge extraction after indexing (stays inside Fieldguide).",
+    "generate": "Extract knowledge",
+    "generating": "Extracting…",
+    "refresh": "Refresh",
+    "principle": "Principle",
+    "tradeoffs": "Tradeoffs",
+    "examples": "Examples",
+    "jumpGraph": "Focus related code"
+  },
+  "interview": {
+    "title": "Interview drill",
+    "empty": "No interview questions yet",
+    "emptyHint": "Generate project-specific questions from architecture and knowledge cards.",
+    "generate": "Generate questions",
+    "generating": "Generating…",
+    "refresh": "Refresh",
+    "problem": "Question",
+    "context": "Context",
+    "answer": "Reference answer",
+    "showAnswer": "Show answer",
+    "hideAnswer": "Hide answer",
+    "jumpGraph": "Focus related code",
+    "prev": "Previous",
+    "next": "Next"
   },
   "chat": {
     "title": "AI Chat",
@@ -143,7 +200,16 @@
     "singlePanel": "Single panel",
     "horizontal": "Split left/right",
     "vertical": "Split top/bottom",
-    "swap": "Swap panels"
+    "swap": "Swap panels",
+    "presets": "Layout presets",
+    "presetsShort": "Presets",
+    "preset": {
+      "default": "Graph only",
+      "overviewGraph": "Overview | Graph",
+      "knowledgeCode": "Knowledge | Code",
+      "interviewChat": "Interview | Chat",
+      "tourCode": "Tour | Code"
+    }
   },
   "theory": {
     "title": "Theory",

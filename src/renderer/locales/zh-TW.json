@@ -29,7 +29,13 @@
     "code": "程式碼",
     "chat": "問答",
     "tour": "導覽",
-    "tourUnavailable": "導覽不可用"
+    "overview": "總覽",
+    "knowledge": "知識",
+    "interview": "面試",
+    "tourUnavailable": "導覽不可用",
+    "overviewUnavailable": "架構總覽不可用",
+    "knowledgeUnavailable": "知識面板不可用",
+    "interviewUnavailable": "面試面板不可用"
   },
   "project": {
     "emptyTitle": "加入你的第一個專案",
@@ -102,8 +108,59 @@
       "parse": "正在解析程式碼…",
       "build": "正在建立圖譜…",
       "save": "正在儲存圖譜…",
-      "llm": "正在 AI 分析…"
+      "llm": "正在 AI 分析…",
+      "analyze": "正在摘要檔案…",
+      "review-layers": "正在辨識分層…",
+      "review-tour": "正在產生導覽…",
+      "structure": "結構索引完成",
+      "architecture": "正在對應架構…",
+      "knowledge": "正在抽取知識…",
+      "interview": "正在產生面試題…"
     }
+  },
+  "overview": {
+    "title": "架構總覽",
+    "empty": "尚無架構摘要",
+    "emptyHint": "先索引專案，或基於圖譜產生啟發式總覽。",
+    "generate": "產生總覽",
+    "generating": "產生中…",
+    "refresh": "重新整理",
+    "source": "來源：{{source}}",
+    "stack": "技術棧",
+    "entryPoints": "入口",
+    "layers": "分層",
+    "modules": "模組",
+    "flows": "主資料流",
+    "tech": "技術選型",
+    "jumpGraph": "在圖譜中定位"
+  },
+  "knowledge": {
+    "title": "知識節點",
+    "empty": "尚無知識卡片",
+    "emptyHint": "索引後抽取技術知識（保存在 Fieldguide 內，不依賴外部工具）。",
+    "generate": "抽取知識",
+    "generating": "抽取中…",
+    "refresh": "重新整理",
+    "principle": "原理",
+    "tradeoffs": "取捨",
+    "examples": "範例",
+    "jumpGraph": "定位相關程式碼"
+  },
+  "interview": {
+    "title": "面試演練",
+    "empty": "尚無面試題",
+    "emptyHint": "基於架構與知識卡片產生專案相關面試題。",
+    "generate": "產生題目",
+    "generating": "產生中…",
+    "refresh": "重新整理",
+    "problem": "問題",
+    "context": "上下文",
+    "answer": "參考答案",
+    "showAnswer": "顯示答案",
+    "hideAnswer": "隱藏答案",
+    "jumpGraph": "定位相關程式碼",
+    "prev": "上一題",
+    "next": "下一題"
   },
   "chat": {
     "title": "AI 問答",
@@ -143,7 +200,16 @@
     "singlePanel": "單面板",
     "horizontal": "左右分割",
     "vertical": "上下分割",
-    "swap": "交換面板"
+    "swap": "交換面板",
+    "presets": "版面預設",
+    "presetsShort": "預設",
+    "preset": {
+      "default": "僅圖譜",
+      "overviewGraph": "總覽 | 圖譜",
+      "knowledgeCode": "知識 | 程式碼",
+      "interviewChat": "面試 | 問答",
+      "tourCode": "導覽 | 程式碼"
+    }
   },
   "theory": {
     "title": "理論學習",

@@ -1,6 +1,6 @@
 # Fieldguide 路线图
 
-> 版本：v0.5 | 状态：Phase 1–3 完成，Phase 4 发布验收中，Obsidian UX + 主题 v2 已落地
+> 版本：v0.6 | 状态：Phase 1–3 完成，Phase 4 发布验收中；Phase 5+ 理解工作台（分屏面板 + 架构/知识/面试）进行中
 
 ---
 
@@ -12,11 +12,36 @@
 | 1 | 桌面壳 + UA 集成 | Electron 脚手架、项目库、嵌入 UA 图谱 | 3–4 周 | ✅ 完成 |
 | 2 | 智能层打通 | LLM 配置桥接、Tour/聊天/diff 桌面化 | 3–4 周 | 🔵 近完成 |
 | 3 | 理论 + 桥接 | 论文/PDF 与代码对照 | 4–5 周 | 🔵 核心已通 |
-| 4 | 发布 | 安装包、体验 polish、上游同步 | 持续 | 🔵 进行中（≈55%） |
+| 4 | 发布 | 安装包、体验 polish、上游同步 | 持续 | 🔵 进行中（与 Phase 5 错峰） |
+| 5 | 理解工作台 | 架构总览 / 知识 / 面试面板 + 布局预设 + 渐进分析 | 6–8 周 | 🔵 进行中 |
 
-**原则**：体验打磨优先；**复用 UA 已有能力，不重复造轮子**；每 Phase 结束有可演示的完整用户路径。
+**原则**：体验打磨优先；**复用 UA 已有能力，不重复造轮子**；Fieldguide **保持产品独立**（不耦合 Obsidian / 外部 PKB）；每 Phase 结束有可演示的完整用户路径。
 
 **相对 v0.2 的变化**：Phase 1/2 周期缩短——索引、图谱 UI、多 Agent 由 [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) 提供。
+
+---
+
+## Phase 5 — 理解工作台（Architecture / Knowledge / Interview）
+
+### 目标
+
+把 Refactor Guide 三大能力落地为**应用内面板 + 分析产物**，用户通过有限分屏搭配理解项目。
+
+### 任务
+
+| ID | 任务 | 验收标准 |
+|----|------|---------|
+| 5.0 | 面板契约 + 布局预设 + 文档 | `PanelTab` 含 overview/knowledge/interview；旧布局可迁移；明确无 Obsidian 同步 |
+| 5.1 | ArchitectureSummary + overview 面板 | Demo/tiny-go 可说入口、分层、主数据流 |
+| 5.2 | knowledge_nodes + knowledge 面板 | 索引后可见知识卡；可跳转代码节点 |
+| 5.3 | interview_questions + interview 面板 | 抽题 → 对照答案 → 跳转知识/代码 |
+| 5.4 | 渐进四阶段进度 + 推荐搭配 | 无 Key 启发式；有 Key 可跑满；预设一键恢复 |
+
+### 刻意不做
+
+- Obsidian vault / 双向同步
+- 无限面板插件生态
+- 完整 UA domain / graph-reviewer（除非直接服务 overview）
 
 ---
 

@@ -7,6 +7,9 @@ import { Folder } from 'lucide-react'
 import ProjectLibrary from './views/ProjectLibrary/ProjectLibrary'
 import FileTree from './views/CodeMap/FileTree'
 import SplitPanel from './views/CodeMap/SplitPanel'
+import OverviewPanel from './views/CodeMap/OverviewPanel'
+import KnowledgePanel from './views/CodeMap/KnowledgePanel'
+import InterviewPanel from './views/CodeMap/InterviewPanel'
 import GraphPanel from './views/CodeMap/GraphPanel'
 import { type DashboardMessage, dashboardSelectNode } from './views/CodeMap/GraphPanel'
 import CodeViewer from './views/CodeMap/CodeViewer'
@@ -772,6 +775,9 @@ function CodeMapLayout({
         />
       )}
       renderTour={() => <TourPanel projectId={project.id} t={t} externalStepIndex={dashboardTourStep} />}
+      renderOverview={() => <OverviewPanel projectId={project.id} t={t} />}
+      renderKnowledge={() => <KnowledgePanel projectId={project.id} t={t} />}
+      renderInterview={() => <InterviewPanel projectId={project.id} t={t} />}
       layout={workspaceLayout}
       t={t}
       hideChromeControls

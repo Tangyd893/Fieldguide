@@ -1,6 +1,7 @@
 # Phase 4 发布验收清单（p4-release）
 
-> 版本：v1.0 | 目标：干净机器可安装、场景 A/B 用户路径可完成
+> 版本：v1.1 | 目标：干净机器可安装、场景 A/B 用户路径可完成  
+> **与 Phase 5 错峰**：理解工作台（overview / knowledge / interview）不阻塞本清单；发布质量与新能力可并行验收。
 
 ## 构建
 
@@ -15,7 +16,8 @@ pnpm dist
 产出：`dist/Fieldguide Setup x.y.z.exe`
 
 > **自动化基线**（2026-07-17）：`pnpm qa:graph`（含 pack `__uaStore`）· bridge vitest runtime · `prepare-pack` · `qa:his-go`。  
-> **图谱 GUI 最小闭环**（Demo 可见 + 点击开文件）已于开发机签收，见 [scenario-abc-test-record.md](./scenario-abc-test-record.md)。干净机器安装仍需人工勾选。
+> **图谱 GUI 最小闭环**（Demo 可见 + 点击开文件）已于开发机签收，见 [scenario-abc-test-record.md](./scenario-abc-test-record.md)。干净机器安装仍需人工勾选。  
+> **Phase 5 相关单测**：`src/shared/__tests__/understand.test.ts`、`src/main/understand/__tests__/*`（面板契约 / 启发式架构·知识·面试）。
 
 ## 干净机器安装（Win10/11）
 
@@ -33,8 +35,13 @@ pnpm dist
 - [ ] 跟随 Tour 完成至少一条路径
 - [ ] Ctrl+K 搜索文件/节点可跳转
 - [ ] 能说出入口、核心模块、主数据流（人工记录）
+- [ ] （Phase 5）打开「总览」面板或「总览 | 图谱」预设，对照架构摘要
 
-## 场景 B：论文 ↔ 实现对照
+## 场景 D（Phase 5）：面试演练（可选抽检）
+
+- [ ] 索引后「知识」「面试」面板有内容（无 Key 时为启发式）
+- [ ] 面试题可显示/隐藏参考答案
+- [ ] 可用「面试 | 问答」预设分屏
 
 - [ ] 理论 Tab 搜索 arXiv 并下载 PDF
 - [ ] PDF 阅读器可选中段落

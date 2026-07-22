@@ -140,6 +140,16 @@ interface FieldguideAPI {
   bridgeGenerateTour(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   onBridgeTourGenerated(cb: (data: unknown) => void): () => void
 
+  // Understanding workbench
+  understandGetArchitecture(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  understandListKnowledge(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  understandListQuestions(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  understandRun(
+    projectId: string,
+    stages?: Array<'structure' | 'architecture' | 'knowledge' | 'interview'>,
+    skipLlm?: boolean,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+
   // App
   appVersion(): Promise<string>
   dashboardUrl(): Promise<string>

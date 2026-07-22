@@ -206,6 +206,16 @@ const api = {
     }
   },
 
+  // Understanding workbench (architecture / knowledge / interview)
+  understandGetArchitecture: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('understand:getArchitecture', { projectId }),
+  understandListKnowledge: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('understand:listKnowledge', { projectId }),
+  understandListQuestions: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('understand:listQuestions', { projectId }),
+  understandRun: (projectId: string, stages?: Array<'structure' | 'architecture' | 'knowledge' | 'interview'>, skipLlm?: boolean): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('understand:run', { projectId, stages, skipLlm }),
+
   // App
   appVersion: (): Promise<string> =>
     ipcRenderer.invoke('app:version'),

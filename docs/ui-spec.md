@@ -1,15 +1,16 @@
 # Fieldguide 界面与交互规格
 
-> 版本：v0.4 | 状态：设计修订（Phase 1，VSCode/Obsidian 风格布局）  
+> 版本：v0.5 | 状态：设计修订（理解工作台分屏；VS Code 风格布局，**不依赖 Obsidian 产品耦合**）  
+> v0.5 变更：面板目录扩展为 overview / graph / code / chat / tour / knowledge / interview；布局预设  
 > v0.4 变更：三栏布局 → 左文件树 + 右可分隔面板（2026-07-01）
 
 ---
 
 ## 一、设计目标
 
-参考 **VSCode / Obsidian** 的开发者工作台体验：左侧项目文件树导航，右侧可自由分隔为 1~2 个面板，每个面板可在「图谱 / 代码阅读 / LLM 问答」间切换。
+参考 **VS Code** 的开发者工作台体验：左侧项目文件树导航，右侧可自由分隔为 1~2 个面板，每个面板可在**有限面板类型**间切换。
 
-**代码地图核心能力**：由 **[Understand-Anything Dashboard](https://github.com/Egonex-AI/Understand-Anything)**（Phase 1 通过 iframe 嵌入）提供图谱交互、Tour、节点详情。Fieldguide 负责文件树、代码阅读器、LLM 问答面板、以及面板间联动。
+**代码地图核心能力**：由 **[Understand-Anything Dashboard](https://github.com/Egonex-AI/Understand-Anything)**（iframe 嵌入）提供图谱交互；Fieldguide 负责文件树、代码阅读器、问答、Tour、架构总览、知识、面试，以及面板间联动。
 
 详见 [understand-anything-integration.md](./understand-anything-integration.md) §4.3。
 
@@ -54,15 +55,18 @@
 **布局规则**：
 - **左侧文件树**：宽度 260px（默认），可拖拽调整 160px–400px，可一键折叠
 - **右侧面板区**：flex-1，内部可拖拽分隔为 1 或 2 个面板（左右或上下排列）
-- **面板 Tab**：每个面板顶部有 Tab 栏，可在「图谱」「代码」「问答」间切换
+- **面板 Tab（V1 固定目录）**：`overview` | `graph` | `code` | `chat` | `tour` | `knowledge` | `interview`（Tab 栏可横向滚动）
 - **默认布局**：单面板显示图谱；用户可拖拽分出第二个面板
+- **布局预设**：总览|图谱、知识|代码、面试|问答、导览|代码
 - **面板最小宽度**：280px
+- **旧布局迁移**：升级后自动补全新 Tab，保留用户 activeTab / 分屏比例
+- **刻意不做**：与 Obsidian 等外部笔记应用耦合
 
 ### 2.3 顶栏
 
 - **Logo + 产品名**：点击回到项目库
 - **主导航 Tab**：项目库 | 代码地图 | 理论 | 桥接（当前 Tab 下划线高亮）
-- **面板布局控制**（代码地图 Tab 内）：`[ ⬜ ]` 单面板 / `[ ⬜｜⬜ ]` 左右双面板 / `[ ⬜ / ⬜ ]` 上下双面板 / `[ ⇄ ]` 交换左右面板
+- **面板布局控制**（代码地图 Tab 内）：单面板 / 左右双面板 / 上下双面板 / 交换 / **预设菜单**
 - **全局搜索（Ctrl+K）**：命令面板（重新索引、切换项目、打开设置）；代码语义搜索由 LLM 问答面板负责
 - **设置**：API Key、语言、主题、关于
 

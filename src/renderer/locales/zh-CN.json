@@ -29,7 +29,13 @@
     "code": "代码",
     "chat": "问答",
     "tour": "导览",
-    "tourUnavailable": "导览不可用"
+    "overview": "总览",
+    "knowledge": "知识",
+    "interview": "面试",
+    "tourUnavailable": "导览不可用",
+    "overviewUnavailable": "架构总览不可用",
+    "knowledgeUnavailable": "知识面板不可用",
+    "interviewUnavailable": "面试面板不可用"
   },
   "project": {
     "emptyTitle": "添加你的第一个项目",
@@ -102,8 +108,59 @@
       "parse": "正在解析代码…",
       "build": "正在构建图谱…",
       "save": "正在保存图谱…",
-      "llm": "正在 AI 分析…"
+      "llm": "正在 AI 分析…",
+      "analyze": "正在摘要文件…",
+      "review-layers": "正在识别分层…",
+      "review-tour": "正在生成导览…",
+      "structure": "结构索引完成",
+      "architecture": "正在映射架构…",
+      "knowledge": "正在抽取知识…",
+      "interview": "正在生成面试题…"
     }
+  },
+  "overview": {
+    "title": "架构总览",
+    "empty": "尚无架构摘要",
+    "emptyHint": "先索引项目，或基于图谱生成启发式总览。",
+    "generate": "生成总览",
+    "generating": "生成中…",
+    "refresh": "刷新",
+    "source": "来源：{{source}}",
+    "stack": "技术栈",
+    "entryPoints": "入口",
+    "layers": "分层",
+    "modules": "模块",
+    "flows": "主数据流",
+    "tech": "技术选型",
+    "jumpGraph": "在图谱中定位"
+  },
+  "knowledge": {
+    "title": "知识节点",
+    "empty": "尚无知识卡片",
+    "emptyHint": "索引后抽取技术知识（保存在 Fieldguide 内，不依赖外部工具）。",
+    "generate": "抽取知识",
+    "generating": "抽取中…",
+    "refresh": "刷新",
+    "principle": "原理",
+    "tradeoffs": "取舍",
+    "examples": "示例",
+    "jumpGraph": "定位相关代码"
+  },
+  "interview": {
+    "title": "面试演练",
+    "empty": "尚无面试题",
+    "emptyHint": "基于架构与知识卡片生成项目相关面试题。",
+    "generate": "生成题目",
+    "generating": "生成中…",
+    "refresh": "刷新",
+    "problem": "问题",
+    "context": "上下文",
+    "answer": "参考答案",
+    "showAnswer": "显示答案",
+    "hideAnswer": "隐藏答案",
+    "jumpGraph": "定位相关代码",
+    "prev": "上一题",
+    "next": "下一题"
   },
   "chat": {
     "title": "AI 问答",
@@ -143,7 +200,16 @@
     "singlePanel": "单面板",
     "horizontal": "左右分屏",
     "vertical": "上下分屏",
-    "swap": "交换面板"
+    "swap": "交换面板",
+    "presets": "布局预设",
+    "presetsShort": "预设",
+    "preset": {
+      "default": "仅图谱",
+      "overviewGraph": "总览 | 图谱",
+      "knowledgeCode": "知识 | 代码",
+      "interviewChat": "面试 | 问答",
+      "tourCode": "导览 | 代码"
+    }
   },
   "theory": {
     "title": "理论学习",

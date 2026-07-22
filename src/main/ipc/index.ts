@@ -30,6 +30,9 @@ import {
   listChatMessages,
   insertChatMessage,
   clearChatMessages,
+  getArchitectureSummary,
+  listKnowledgeNodes,
+  listQuestions,
 } from '../db'
 import type { PaperRow } from '../db'
 import { readProjectTree } from '../file-tree'
@@ -38,6 +41,8 @@ import { setApplicationMenu, popupTopLevelMenu, getTopLevelMenuLabels, type TopL
 import { cloneRepo } from '../git'
 import { installDemoProject } from '../sample-project'
 import { indexProject, beginIndex, cancelIndex } from '../ua/client'
+import { runUnderstandPipeline } from '../understand/pipeline'
+import type { AnalysisStage } from '../../shared/understand'
 import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
 import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
 import { getLlmProviderCatalog, fetchProviderModels } from '../llm/catalog'
@@ -672,13 +677,37 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: 
     if (result.success) {
       updateProjectStatus(projectId, 'ready', result.nodeCount)
       logIndexComplete(project.name, result.nodeCount, result.edgeCount, Date.now() - startTime)
+
+      // Progressive understanding stages (architecture → knowledge → interview)
+      let understand: { architecture: boolean; knowledgeCount: number; questionCount: number } | undefined
+      try {
+        win?.webContents.send('index:progress', { type: 'phase', phase: 'structure', projectId })
+        const llm = useLlm ? {
+          baseUrl: config.llm.baseUrl,
+          apiKey: config.llm.apiKey,
+          chatModel: config.llm.chatModel,
+        } : undefined
+        understand = await runUnderstandPipeline({
+          projectId,
+          rootPath: project.root_path,
+          llm,
+          language: config.ua?.language,
+          onStage: (stage) => {
+            win?.webContents.send('index:progress', { type: 'phase', phase: stage, projectId })
+          },
+        })
+      } catch (err) {
+        console.warn(`[ipc] understand pipeline failed: ${String(err)}`)
+      }
+
       win?.webContents.send('index:progress', {
         type: 'complete',
         projectId,
         nodeCount: result.nodeCount,
         edgeCount: result.edgeCount,
+        understand,
       })
-      return ipcOk({ nodeCount: result.nodeCount, edgeCount: result.edgeCount })
+      return ipcOk({ nodeCount: result.nodeCount, edgeCount: result.edgeCount, understand })
     } else {
       updateProjectStatus(projectId, 'failed')
       logIndexError(project.name, result.error ?? '未知错误')
@@ -703,6 +732,72 @@ ipcMain.handle('project:indexCancel', (_e, { projectId }: { projectId: string })
   const cancelled = cancelIndex()
   if (!cancelled) return ipcErr('UNKNOWN', '无法取消索引', false)
   return ipcOk(null)
+})
+
+ipcMain.handle('understand:getArchitecture', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk(getArchitectureSummary(projectId))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('understand:listKnowledge', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk(listKnowledgeNodes(projectId))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('understand:listQuestions', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk(listQuestions(projectId))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('understand:run', async (_e, {
+  projectId,
+  stages,
+  skipLlm,
+}: {
+  projectId: string
+  stages?: AnalysisStage[]
+  skipLlm?: boolean
+}): Promise<IpcResult<unknown>> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  const win = BrowserWindow.getAllWindows()[0]
+  try {
+    const config = loadConfig()
+    const useLlm = !skipLlm && isLLMConfigured()
+    const result = await runUnderstandPipeline({
+      projectId,
+      rootPath: project.root_path,
+      stages,
+      llm: useLlm ? {
+        baseUrl: config.llm.baseUrl,
+        apiKey: config.llm.apiKey,
+        chatModel: config.llm.chatModel,
+      } : undefined,
+      language: config.ua?.language,
+      onStage: (stage) => {
+        win?.webContents.send('index:progress', { type: 'phase', phase: stage, projectId })
+      },
+    })
+    win?.webContents.send('index:progress', { type: 'complete', projectId, understand: result })
+    return ipcOk(result)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
 })
 
 ipcMain.handle('project:exportGraph', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {

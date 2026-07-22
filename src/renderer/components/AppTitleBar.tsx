@@ -42,9 +42,10 @@ export default function AppTitleBar({
   customChrome,
   menuLabels,
 }: Props) {
-  const { setNumPanels, setSplitDirection, swapPanels, layout } = workspaceLayout
+  const { setNumPanels, setSplitDirection, swapPanels, applyPreset, layout } = workspaceLayout
   const hasTwo = layout.panels.length === 2
   const [maximized, setMaximized] = useState(false)
+  const [showPresets, setShowPresets] = useState(false)
   const menuRefs = useRef<Partial<Record<MenuId, HTMLButtonElement | null>>>({})
 
   useEffect(() => {
@@ -140,12 +141,49 @@ export default function AppTitleBar({
 
       <div className="flex items-center gap-0.5 shrink-0" style={noDragStyle}>
         {showLayout && (
-          <div className="flex items-center gap-0.5 mr-1">
+          <div className="flex items-center gap-0.5 mr-1 relative">
             <Button variant="ghost" size="icon-sm" onClick={() => setNumPanels(1)} title={t('split.singlePanel')} className="text-[10px]">▣</Button>
             <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('horizontal') }} title={t('split.horizontal')} className="text-[10px]">◫</Button>
             <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('vertical') }} title={t('split.vertical')} className="text-[10px]">◰</Button>
             {hasTwo && (
               <Button variant="ghost" size="icon-sm" onClick={swapPanels} title={t('split.swap')} className="text-[10px]">⇄</Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-[10px] h-7 px-1.5"
+              title={t('split.presets')}
+              onClick={() => setShowPresets(v => !v)}
+            >
+              {t('split.presetsShort')}
+            </Button>
+            {showPresets && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowPresets(false)} />
+                <div className="absolute top-full right-0 mt-1 z-50 min-w-[180px] rounded-lg border border-[var(--fg-border)] bg-[var(--fg-card)] shadow-[var(--fg-dialog-shadow)] py-1">
+                  {(
+                    [
+                      'default',
+                      'overview-graph',
+                      'knowledge-code',
+                      'interview-chat',
+                      'tour-code',
+                    ] as const
+                  ).map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--fg-tree-hover)] text-[var(--fg-text-primary)]"
+                      onClick={() => {
+                        applyPreset(id)
+                        setShowPresets(false)
+                      }}
+                    >
+                      {t(`split.preset.${id === 'overview-graph' ? 'overviewGraph' : id === 'knowledge-code' ? 'knowledgeCode' : id === 'interview-chat' ? 'interviewChat' : id === 'tour-code' ? 'tourCode' : 'default'}`)}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}

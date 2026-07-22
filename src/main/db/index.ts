@@ -8,6 +8,7 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'node:path'
 import { existsSync, mkdirSync } from 'node:fs'
+import type { ArchitectureSummary, KnowledgeNode, InterviewQuestion } from '../../shared/understand'
 
 let db: Database.Database | null = null
 
@@ -101,6 +102,38 @@ function migrate(db: Database.Database): void {
       created_at TEXT NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id)
     );
+
+    CREATE TABLE IF NOT EXISTS architecture_summaries (
+      project_id TEXT PRIMARY KEY,
+      summary_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS knowledge_nodes (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      concept TEXT NOT NULL,
+      principle TEXT NOT NULL DEFAULT '',
+      tradeoffs TEXT NOT NULL DEFAULT '',
+      examples TEXT NOT NULL DEFAULT '',
+      related_node_ids TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS interview_questions (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      problem TEXT NOT NULL,
+      context TEXT NOT NULL DEFAULT '',
+      answer TEXT NOT NULL DEFAULT '',
+      related_concepts TEXT NOT NULL DEFAULT '[]',
+      knowledge_ids TEXT NOT NULL DEFAULT '[]',
+      related_node_ids TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
   `)
 }
 
@@ -152,6 +185,10 @@ export function removeProject(id: string): void {
   const db = getDb()
   db.prepare('DELETE FROM index_jobs WHERE project_id = ?').run(id)
   db.prepare('DELETE FROM concept_links WHERE project_id = ?').run(id)
+  db.prepare('DELETE FROM architecture_summaries WHERE project_id = ?').run(id)
+  db.prepare('DELETE FROM knowledge_nodes WHERE project_id = ?').run(id)
+  db.prepare('DELETE FROM interview_questions WHERE project_id = ?').run(id)
+  db.prepare('DELETE FROM chat_messages WHERE project_id = ?').run(id)
   db.prepare('DELETE FROM projects WHERE id = ?').run(id)
 }
 
@@ -310,6 +347,152 @@ export function insertChatMessage(m: Omit<ChatMessageRow, 'id' | 'created_at'>):
 
 export function clearChatMessages(projectId: string): void {
   getDb().prepare('DELETE FROM chat_messages WHERE project_id = ?').run(projectId)
+}
+
+/* ──────────── Architecture / Knowledge / Interview ──────────── */
+
+export function getArchitectureSummary(projectId: string): ArchitectureSummary | null {
+  const row = getDb().prepare('SELECT summary_json FROM architecture_summaries WHERE project_id = ?').get(projectId) as
+    | { summary_json: string }
+    | undefined
+  if (!row) return null
+  try {
+    return JSON.parse(row.summary_json) as ArchitectureSummary
+  } catch {
+    return null
+  }
+}
+
+export function replaceArchitectureSummary(projectId: string, summary: ArchitectureSummary): void {
+  const now = new Date().toISOString()
+  getDb().prepare(`
+    INSERT INTO architecture_summaries (project_id, summary_json, updated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(project_id) DO UPDATE SET summary_json = excluded.summary_json, updated_at = excluded.updated_at
+  `).run(projectId, JSON.stringify({ ...summary, projectId }), now)
+}
+
+export function listKnowledgeNodes(projectId: string): KnowledgeNode[] {
+  const rows = getDb().prepare(
+    'SELECT * FROM knowledge_nodes WHERE project_id = ? ORDER BY created_at ASC',
+  ).all(projectId) as Array<{
+    id: string
+    project_id: string
+    concept: string
+    principle: string
+    tradeoffs: string
+    examples: string
+    related_node_ids: string
+    created_at: string
+  }>
+  return rows.map(r => ({
+    id: r.id,
+    projectId: r.project_id,
+    concept: r.concept,
+    principle: r.principle,
+    tradeoffs: r.tradeoffs,
+    examples: r.examples,
+    relatedNodeIds: safeJsonArray(r.related_node_ids),
+    createdAt: r.created_at,
+  }))
+}
+
+export function replaceKnowledgeNodes(
+  projectId: string,
+  nodes: Array<Omit<KnowledgeNode, 'id' | 'createdAt'> & { id?: string }>,
+): KnowledgeNode[] {
+  const db = getDb()
+  const now = new Date().toISOString()
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM knowledge_nodes WHERE project_id = ?').run(projectId)
+    const insert = db.prepare(`
+      INSERT INTO knowledge_nodes (id, project_id, concept, principle, tradeoffs, examples, related_node_ids, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    for (const n of nodes) {
+      const id = n.id || `kn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      insert.run(
+        id,
+        projectId,
+        n.concept,
+        n.principle || '',
+        n.tradeoffs || '',
+        n.examples || '',
+        JSON.stringify(n.relatedNodeIds || []),
+        now,
+      )
+    }
+  })
+  tx()
+  return listKnowledgeNodes(projectId)
+}
+
+export function listQuestions(projectId: string): InterviewQuestion[] {
+  const rows = getDb().prepare(
+    'SELECT * FROM interview_questions WHERE project_id = ? ORDER BY created_at ASC',
+  ).all(projectId) as Array<{
+    id: string
+    project_id: string
+    problem: string
+    context: string
+    answer: string
+    related_concepts: string
+    knowledge_ids: string
+    related_node_ids: string
+    created_at: string
+  }>
+  return rows.map(r => ({
+    id: r.id,
+    projectId: r.project_id,
+    problem: r.problem,
+    context: r.context,
+    answer: r.answer,
+    relatedConcepts: safeJsonArray(r.related_concepts),
+    knowledgeIds: safeJsonArray(r.knowledge_ids),
+    relatedNodeIds: safeJsonArray(r.related_node_ids),
+    createdAt: r.created_at,
+  }))
+}
+
+export function replaceQuestions(
+  projectId: string,
+  questions: Array<Omit<InterviewQuestion, 'id' | 'createdAt'> & { id?: string }>,
+): InterviewQuestion[] {
+  const db = getDb()
+  const now = new Date().toISOString()
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM interview_questions WHERE project_id = ?').run(projectId)
+    const insert = db.prepare(`
+      INSERT INTO interview_questions
+        (id, project_id, problem, context, answer, related_concepts, knowledge_ids, related_node_ids, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    for (const q of questions) {
+      const id = q.id || `q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      insert.run(
+        id,
+        projectId,
+        q.problem,
+        q.context || '',
+        q.answer || '',
+        JSON.stringify(q.relatedConcepts || []),
+        JSON.stringify(q.knowledgeIds || []),
+        JSON.stringify(q.relatedNodeIds || []),
+        now,
+      )
+    }
+  })
+  tx()
+  return listQuestions(projectId)
+}
+
+function safeJsonArray(raw: string): string[] {
+  try {
+    const v = JSON.parse(raw || '[]')
+    return Array.isArray(v) ? v.map(String) : []
+  } catch {
+    return []
+  }
 }
 
 export function closeDb(): void {

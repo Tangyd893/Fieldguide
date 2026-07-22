@@ -10,13 +10,27 @@ interface Props {
   renderCode: (filePath?: string) => ReactNode
   renderChat: () => ReactNode
   renderTour?: () => ReactNode
+  renderOverview?: () => ReactNode
+  renderKnowledge?: () => ReactNode
+  renderInterview?: () => ReactNode
   t: (key: string) => string
   layout: ReturnType<typeof useWorkspaceLayout>
   /** When true, layout buttons live in the title bar instead. */
   hideChromeControls?: boolean
 }
 
-export default function SplitPanel({ renderGraph, renderCode, renderChat, renderTour, t, layout: ctrl, hideChromeControls }: Props) {
+export default function SplitPanel({
+  renderGraph,
+  renderCode,
+  renderChat,
+  renderTour,
+  renderOverview,
+  renderKnowledge,
+  renderInterview,
+  t,
+  layout: ctrl,
+  hideChromeControls,
+}: Props) {
   const {
     layout,
     setActivePanel,
@@ -53,20 +67,29 @@ export default function SplitPanel({ renderGraph, renderCode, renderChat, render
   }, [isVertical, setPos])
 
   const TAB_LABELS: Record<PanelTab, string> = {
+    overview: t('panels.overview'),
     graph: t('panels.graph'),
     code: t('panels.code'),
     chat: t('panels.chat'),
     tour: t('panels.tour'),
+    knowledge: t('panels.knowledge'),
+    interview: t('panels.interview'),
   }
 
   function renderContent(panelIndex: number) {
     const panel = panels[panelIndex]
     if (!panel) return null
     switch (panel.activeTab) {
+      case 'overview':
+        return renderOverview?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.overviewUnavailable')}</div>
       case 'graph': return renderGraph()
       case 'code': return renderCode(panel.filePath)
       case 'chat': return renderChat()
       case 'tour': return renderTour?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.tourUnavailable')}</div>
+      case 'knowledge':
+        return renderKnowledge?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.knowledgeUnavailable')}</div>
+      case 'interview':
+        return renderInterview?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.interviewUnavailable')}</div>
     }
   }
 
@@ -179,9 +202,9 @@ function PanelChrome({
     >
       <div className="flex items-center h-8 border-b border-[var(--fg-border)] bg-[var(--fg-panel-chrome,var(--fg-card))] px-1 shrink-0" data-fg-surface>
         <Tabs value={panel.activeTab} onValueChange={(v) => onTabChange(v as PanelTab)} className="flex-1 min-w-0">
-          <TabsList className="h-8 bg-transparent p-0 gap-0 w-full justify-start">
+          <TabsList className="h-8 bg-transparent p-0 gap-0 w-full justify-start overflow-x-auto">
             {panel.tabs.map(tab => (
-              <TabsTrigger key={tab} value={tab} className="h-7 px-3 text-xs rounded-none">
+              <TabsTrigger key={tab} value={tab} className="h-7 px-2.5 text-[11px] rounded-none shrink-0">
                 {tabLabels[tab]}
               </TabsTrigger>
             ))}
