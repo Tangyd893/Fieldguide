@@ -1,4 +1,10 @@
+<div align="center">
+
 # Fieldguide
+
+**把陌生仓库读成自己的项目：知识图谱 + 问答 Agent 的本地学习工作台**
+
+*A local workbench for learning unfamiliar codebases — an interactive knowledge graph plus a Q&A coach that actually knows the project*
 
 [![Electron](https://img.shields.io/badge/Electron-33-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![React](https://img.shields.io/badge/React-18-149ECA?logo=react&logoColor=white)](https://react.dev/)
@@ -7,48 +13,130 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](./NOTICE.md)
 [![Built on UA](https://img.shields.io/badge/built--on-Understand--Anything-blueviolet)](https://github.com/Egonex-AI/Understand-Anything)
 
-> Fieldguide 是面向**项目学习**的本地桌面应用：用**知识图谱**看清仓库结构，用**问答 Agent**带着你读代码、追链路、连论文。
+[快速开始](#快速开始) · [为什么](#为什么会有这个项目) · [功能预览](#功能预览) · [核心特性](#核心特性) · [架构概览](#架构概览) · [给贡献者](#给贡献者)
+
+</div>
+
+> ### 🆕 当前状态：v0.2.0
 >
-> **图谱用来教，Agent 用来问，目标是学会这个项目。**
+> 核心闭环已经通了：知识图谱、学习教练、论文桥接都能用；Phase 4 发布准备中（约 70%），干净机器实测还没做完。当前只支持 Windows 10/11。
 
----
+## 10 秒看懂 Fieldguide
 
-## 为什么存在
+clone 一个热门仓库下来，打开后对着目录发呆——入口在哪、核心逻辑在哪、哪些文件可以直接忽略，全凭猜。Fieldguide 把学习压成三件事：
 
-打开一个陌生仓库，常见的卡点不是「缺工具」，而是：
+| 🗺️ 知识图谱 | 🧑‍🏫 问答教练 | 📚 项目学习 |
+|---|---|---|
+| 仓库 → 节点 / 边 / 架构层 / 引导 Tour，点节点能跳到源码，顺着依赖往前走 | 回答前先带上项目身份、当前焦点和图谱上下文，先给上下文、再按需查图，而不是空聊 | 多项目库、全量 / 增量索引、论文 RAG、论文段落 ↔ 代码节点的概念桥接 |
 
-- **不知道从哪读起** — 入口、核心、边界糊成一团
-- **看图仍看不懂** — 静态架构图告诉你有什么，不告诉你怎么学
-- **问答对不上项目** — 通用聊天不知道你的图谱、Tour 和当前焦点
+## 快速开始
 
-Fieldguide 把学习压成三件事：
+普通用户和开发者都从源码跑（安装包在 `dist\`，还没正式发布）：
 
-1. **知识图谱** — 把仓库解析成可探索的代码地图：节点、边、架构层、引导 Tour。点节点能跳到源码，顺着依赖走。
-2. **问答 Agent** — 内置学习教练（Coach）：带着项目身份、当前焦点与图谱上下文回答「这是干什么的 / 从哪进 / 和谁连」。先给上下文，再按需查图，而不是空聊。
-3. **项目学习** — 以「学会这个项目」为主线：多项目库、索引与 Tour、论文与代码概念桥接，把理论与实现放在同一张学习路径上。
+1. **准备环境** —— `node >= 20`、`pnpm >= 9`（Windows 10/11）。
+2. **克隆 + 准备图谱引擎** —— 图谱能力来自 [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)（MIT），`bootstrap:ua` 会把它 clone 到 sibling 目录并构建 Dashboard：
 
-> Fieldguide 不是又一个图谱可视化，也不是通用 IDE 聊天。它是**图谱 + Agent + 项目学习**合在一起的本地学习工作台。
+   ```bash
+   git clone https://github.com/Tangyd893/Fieldguide.git
+   cd Fieldguide
+   pnpm bootstrap:ua   # clone UA 到 sibling、构建 Dashboard -> resources/dashboard
+   pnpm install
+   ```
 
----
+3. **启动** —— `pnpm dev`。
+4. **首次向导** —— 欢迎 → 选语言 → 项目目录 → 用内置 Demo 还是本地项目（也可以直接跳过）。索引完成后，去「代码地图」看图谱和 Tour，在聊天里问学习教练。
 
-## 它最终的样子
+**没有 LLM Key 也能用**：图谱退化成纯结构图，节点和源码照样能看；配了 Key 之后摘要、架构分层和 Tour 会更完整（也有启发式兜底）。LLM Key 在设置页配，向导里不强制。
 
-像一本野外指南：打开陌生仓库，图谱告诉你「入口 / 心脏 / 边界」；卡住时问 Agent，它按你的图与焦点讲解；需要理论时，在同一应用里把论文段落桥接到对应实现。
+<details>
+<summary>打包（Windows NSIS）</summary>
 
-当前已实现的核心：
+> 工作目录始终是 Fieldguide 根目录。
 
-- **知识图谱**：交互式代码地图、架构层、Tour、节点 ↔ 源码联动
-- **问答 Agent**：学习教练（上下文打包、图谱工具、论文 RAG 引用）
-- **项目学习**：多项目库、LLM / 启发式索引、论文阅读与概念桥接
-- 5 套主题 + 双面板布局；Windows NSIS 安装包
+| 产物 | 路径 |
+|------|------|
+| 安装包 | `dist\Fieldguide Setup 0.2.0.exe` |
+| 免安装版 | `dist\win-unpacked\Fieldguide.exe` |
 
-macOS / Linux 支持后续评估。
+标准流程（建议先关掉正在运行的 Fieldguide）：
 
----
+```powershell
+pnpm bootstrap:ua
+pnpm dist
+```
 
-## 架构：拼图，不是造轮子
+`pnpm dist` = `prepare-pack` -> `electron-vite build` -> `electron-builder --win --publish never`。
 
-图谱与索引能力来自 [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)（MIT）。Fieldguide 在其上叠加**项目学习壳**与**问答 Agent**：
+**备用流程**：`dist\` 被锁或 node-gyp 找不到 VS 时，用 `dist-build` 输出目录并跳过原生模块重编译：
+
+```powershell
+node scripts\prepare-pack.mjs
+pnpm exec electron-vite build
+npx electron-builder --win --publish never --config.directories.output=dist-build --config.npmRebuild=false
+```
+
+踩过的坑，列在这免得再踩：
+
+| 现象 | 处理 |
+|------|------|
+| `Dashboard dist not found` | 先跑 Dashboard 的 `npx vite build` |
+| `EBUSY` / asar 无法删除 | 关掉 Fieldguide 和资源管理器预览再打包 |
+| `node-gyp` / Visual Studio 报错 | 走备用流程（`npmRebuild=false` + `dist-build`） |
+| UA commit mismatch 警告 | 能继续跑；完整校验在 `scripts/prepare-pack.mjs` |
+
+</details>
+
+## 为什么会有这个项目
+
+做这个项目的起因挺朴素：我经常 clone 一些热门仓库，打开之后对着目录发呆。入口在哪、核心逻辑在哪、哪些文件可以直接忽略，全凭猜。IDE 的跳转工具能告诉你「这个函数被谁调了」，但不会告诉你「这个项目到底在讲一个什么故事」。
+
+市面上不是没有工具，但要么是 IDE 里的结构插件（给你一张静态架构图就完了），要么是通用聊天（它不知道你手里这个仓库的图谱、Tour 和当前焦点）：
+
+| | IDE 结构插件 | 通用聊天 | Fieldguide |
+|---|---|---|---|
+| 项目上下文 | 没有，只看单个文件 | 没有，靠你临时粘贴 | 图谱 + Tour + 当前焦点 |
+| 导航 | 静态跳转 | 无 | 可交互知识图谱，点节点进源码 |
+| 学习路径 | 无 | 无 | 引导 Tour + 论文 ↔ 实现对照 |
+| 数据 | 云端 / 本地 | 云端 | 100% 本地，图谱就地索引 |
+
+所以就有了 Fieldguide。名字来自 field guide（野外指南）：打开一个陌生仓库，图谱告诉你入口和心脏在哪，卡住了问教练，缺理论了在同一应用里把论文桥接到实现。
+
+图谱引擎我没有自己造轮子，直接集成 [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)（MIT）。它已经有成熟的索引管线和图谱 Dashboard，我在上面做桌面壳、项目学习场景，以及跨「论文 + 代码」的问答 Agent。
+
+## 📸 功能预览
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="picture/gdd01.png" width="560" alt="代码地图：知识图谱与分屏面板" /><br/>
+      <b>代码地图</b><br/>
+      <sub>左侧文件树，右侧图谱与可分隔面板，点节点直接打开源码</sub>
+    </td>
+    <td align="center">
+      <img src="picture/gdd02.png" width="560" alt="项目库：项目卡片与索引状态" /><br/>
+      <b>项目库</b><br/>
+      <sub>多项目管理、索引状态与 stale 提示，首次启动向导三选一</sub>
+    </td>
+  </tr>
+</table>
+
+## ✨ 核心特性
+
+- 🗺️ **知识图谱** —— 交互式代码地图、架构分层、引导 Tour、节点 ↔ 源码联动。没有 LLM Key 也能看结构图（[设计](docs/product-spec.md)）。
+- 🧑‍🏫 **问答教练** —— 注入项目身份、layers、Tour、当前焦点和图谱检索结果；工具可查邻居、层、Tour 步骤；回答里能引用论文段落。图上点到哪，它就围着哪讲。
+- 📚 **理论与桥接** —— arXiv 搜索、PDF 导入与阅读、论文 RAG；论文段落 ↔ 代码节点的概念桥接，AI 推荐 + 一键生成「论文概念 → 代码实现」对照 Tour。
+- 🧩 **分屏工作台** —— VS Code 风格布局：左文件树 + 右可分隔面板（总览 / 图谱 / 代码 / 问答 / 导览 / 知识 / 面试七种），布局可持久化（[界面规格](docs/ui-spec.md)）。
+- 🚀 **增量索引** —— 指纹合并，改一个文件不会把整张图重画；索引过程非阻塞，状态栏有进度。
+- 🎨 **主题与外观** —— 5 套主题预设（parchment / forest / slate / midnight / paper-dark）、50%–200% 缩放、UI 与代码字体分开。
+- 🌐 **三语界面** —— 简体中文 / 繁體中文 / English (US)，UI 和系统菜单即时切换。
+- 💾 **本地优先** —— 应用数据在 `%APPDATA%/Fieldguide/`，图谱权威源在项目目录就地生成，不复制源码、默认不出本机。
+- 📦 **Windows 安装包** —— NSIS 安装包与免安装版可构建。
+
+macOS / Linux 暂时不做，我只有 Windows 开发机，先把自己平台的体验做扎实。
+
+## 🏛️ 架构概览
+
+图谱与索引能力来自 [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)（MIT），Fieldguide 在其上叠加项目学习壳与问答 Agent：
 
 ```
   用户（学项目 / 问问题）
@@ -69,219 +157,74 @@ macOS / Linux 支持后续评估。
                                          +------------------+
 ```
 
-- **壳层**（Fieldguide）：项目管理、问答 Agent、理论与桥接、设置、主题
-- **图谱层**（UA Dashboard）：iframe 渲染；节点选中、Tour、缩放与壳联动
-- **索引层**（UA Core）：解析 + LLM 摘要 → `.understand-anything/knowledge-graph.json`
-- **数据层**：本地优先（配置 / 论文 / 桥接在 `%APPDATA%/Fieldguide/`；图谱在项目目录）
+分四层：
 
----
+- **壳层（Fieldguide）**：项目管理、问答 Agent、理论与桥接、设置、主题。图谱渲染不做，用 iframe 嵌 UA Dashboard，通过 postMessage 双向通信（节点选中、Tour 同步、Ctrl+K 跳转）。
+- **图谱层（UA Dashboard）**：分层 / 力导向 / 业务域视图、缩放、节点选中、Tour 播放，都是 UA 的活。
+- **索引层（UA Core）**：解析 + LLM 摘要，产出 `.understand-anything/knowledge-graph.json`。增量索引用指纹合并，不会因为改了一个文件就把整张图重画。
+- **数据层**：本地优先。应用数据（项目、论文、桥接、聊天）在 `%APPDATA%/Fieldguide/` 的 SQLite 里；图谱权威源在**项目目录下**就地生成，不复制源码。
 
-## 模块说明
+有几个设计约束是写死在文档里的，防止我哪天手痒重复造轮子：不自研 Tree-sitter parser、不把图谱节点写进 SQLite、不自己实现图谱画布。完整设计见 [docs/architecture.md](docs/architecture.md)。
 
-### 知识图谱
+## 当前状态与路线
 
-> 不是给你一张图，是带你走一条路。
+Phase 0 设计 ✅ · Phase 1 桌面壳 + UA 集成 ✅ · Phase 2 智能层 ✅ · Phase 3 理论 + 桥接 ✅ · Phase 4 发布 🔵（约 70%）
 
-仓库 → 知识图谱：节点浏览、架构分层、引导 Tour；选中节点可打开对应源码。无 LLM Key 时仍可看结构图。
+- [x] 命名与设计文档全套（入口：docs/doc-index.md）
+- [x] Electron 脚手架 + UA 集成层 + postMessage 双向通信
+- [x] LLM 索引（摘要 / 架构层 / Tour / heuristic fallback）+ 增量合并
+- [x] 学习教练 Agent（ReAct，工具：搜索节点 / 查论文 / 取源码 / 列桥接）
+- [x] 理论 Tab（arXiv / PDF 阅读 / RAG）与概念桥接（AI 推荐 + 对照 Tour）
+- [x] 七种面板 + 分屏布局 + 5 套主题 + 三语 i18n + NSIS 安装包
+- [x] 单测与冒烟脚本全绿（`pnpm qa:graph` 含打包产物校验）
+- [ ] Phase 4：干净机器实测 + 场景 A 用户自测（见 [docs/todos.md](docs/todos.md)）
 
-### 问答 Agent
+明确延期的：业务域视图、完整六 Agent 管线、Dashboard 深度主题统一。这几个不影响主路径，等发布之后再说。
 
-> 问的是「这个项目」，不是泛泛的代码助手。
-
-学习教练注入项目身份、layers、Tour、当前焦点与图谱检索结果；工具可查邻居、层、Tour 步骤；聊天可引用论文段落。与图谱焦点联动：你在图上点到哪，Agent 就围着哪讲。
-
-### 项目学习
-
-多项目（Git clone / 本地目录）、索引与 stale 提示、启发式 Tour fallback；理论 Tab（arXiv / PDF）与概念桥接，把论文段落和代码节点串成对照学习路径。
-
-### 外观与主题
-
-5 套预设（parchment / forest / slate / midnight / paper-dark），界面缩放 50%–200%，布局持久化。
-
----
-
-## 快速开始
-
-```bash
-# 1. 前置条件
-node -v    # >= 20 LTS
-pnpm -v    # >= 9
-
-# 2. 克隆 + 构建 UA Dashboard
-git clone https://github.com/Tangyd893/Fieldguide.git
-cd Fieldguide
-pnpm bootstrap:ua   # clone UA、构建 Dashboard -> resources/dashboard
-pnpm install
-pnpm dev            # 启动桌面应用
-
-# 3. 首次启动向导：选语言 -> 配 LLM Key（可跳过）-> 选 Demo / 本地项目
-# 4. 索引完成后：在「代码地图」看图谱 / Tour，在聊天里问学习教练
-```
-
-**无 LLM Key 也能用**：图谱退化为结构图，仍可浏览节点与源码；配 Key 后 Agent 与摘要/Tour 更完整。
-
-### 仓库布局
-
-`pnpm bootstrap:ua` 会自动准备 sibling UA 并把 Dashboard 复制到本仓库：
-
-```text
-D:\workspace\coding\
-  Fieldguide\                 <- 本仓库
-    resources\dashboard\      <- bootstrap 生成，图谱 iframe 优先加载
-  Understand-Anything\        <- sibling（workspace:@understand-anything/core）
-```
-
-若启动时提示 Dashboard 不可用，重新执行 `pnpm bootstrap:ua`。
-
----
-
-## 技术栈
-
-| 层 | 技术 |
-|----|------|
-| 桌面壳 | Electron 33 + electron-vite |
-| UI | React 18 + TypeScript 5.7 + Tailwind + Radix UI |
-| 图谱 | @understand-anything/core + Dashboard (iframe + postMessage) |
-| 数据 | SQLite (better-sqlite3) + 本地文件系统 |
-| 论文 | pdf-parse + pdfjs-dist + 向量检索 |
-| 国际化 | i18next（简中 / 繁中 / en-US） |
-| LLM | OpenAI 兼容 API（用户自配 Key） |
-
----
-
-## 打包（Windows NSIS）
-
-> 工作目录始终是 Fieldguide 根目录。
-
-### 产物
-
-| 产物 | 路径 | 说明 |
-|------|------|------|
-| 安装包 | `dist\Fieldguide Setup 0.2.0.exe` | 双击安装 |
-| 免安装版 | `dist\win-unpacked\Fieldguide.exe` | 直接运行 |
-
-### 标准流程
-
-```powershell
-# 1. 确保 Dashboard 已构建
-pnpm bootstrap:ua
-
-# 2. 打包（建议先关掉正在运行的 Fieldguide）
-pnpm dist
-```
-
-`pnpm dist` = `prepare-pack` -> `electron-vite build` -> `electron-builder --win --publish never`。
-
-### 备用流程
-
-`dist\` 被锁 或 node-gyp 找不到 VS 时：
-
-```powershell
-node scripts\prepare-pack.mjs
-pnpm exec electron-vite build
-npx electron-builder --win --publish never --config.directories.output=dist-build --config.npmRebuild=false
-```
-
-产物在 `dist-build\`（同结构）。
-
-### 常见问题
-
-| 现象 | 处理 |
-|------|------|
-| `Dashboard dist not found` | 先跑 Dashboard 的 `npx vite build` |
-| `EBUSY` / asar 无法删除 | 关掉 Fieldguide / 资源管理器预览后再 `pnpm dist` |
-| `node-gyp` / Visual Studio | 用备用流程（`npmRebuild=false` + `dist-build`） |
-| UA commit mismatch 警告 | 可继续；完整校验见 `scripts/prepare-pack.mjs` |
-
----
-
-## 项目结构
+## 🏗️ 项目结构
 
 ```
 Fieldguide/
-  docs/                       设计文档
+  docs/                       设计文档（入口：docs/doc-index.md）
   src/
     main/                     Electron 主进程
-      ua/                     UA 集成层（client / dashboard / config-bridge / graph-reader）
+      ua/                     UA 集成层（client / dashboard / config-bridge / graph-reader / diff / cross-tour）
+      agent/                  学习教练（ReAct 循环 + 工具）
+      vector/                 PDF 分块 + 论文向量检索
       ipc/                    IPC handler 聚合
-      db/                     SQLite 接入
+      db/                     SQLite（projects / papers / concept_links / chat）
     preload/                  contextBridge 暴露的安全 API
-    renderer/                 React UI（Tab / Onboarding / Settings / Bridge / Theory ...）
+    renderer/                 React UI（项目库 / 代码地图 / 理论 / 桥接 / 设置）
     shared/                   三端共用的类型与 IPC schema
-  tests/                      Vitest + 集成测试
-  resources/                  应用图标、安装包资源、Dashboard、sample-project
+  resources/                  图标、内置 sample-project（Demo，~13 节点自带图谱）
+  scripts/                    bootstrap / QA / 打包脚本
+  tests/                      Vitest 单测 + fixture
+  picture/                    运行截图
   out/ / dist/ / dist-build/  构建与打包产物（git ignored）
-  pnpm-workspace.yaml         引用本地 UA core
 ```
 
----
+## 🤝 给贡献者
 
-## 当前状态
+面向用户的部分到「快速开始」就结束了，想动代码的先看文档，尤其是这两个：
 
-**Phase 0 设计** ✅ · **Phase 1 桌面壳 + UA 集成** ✅ · **Phase 2 智能层** ✅ · **Phase 3 理论 + 桥接** ✅ · **Phase 4 发布** 🔵
+1. [docs/doc-index.md](docs/doc-index.md) —— 文档地图、一致性检查、动工门禁
+2. [docs/understand-anything-integration.md](docs/understand-anything-integration.md) —— UA 集成边界和数据流，**改 UA 相关决策必须先改它**
 
-- [x] 产品命名与设计文档全套
-- [x] Electron 脚手架 + UA 集成层
-- [x] LLM 索引（摘要 / 架构层 / Tour / heuristic fallback）
-- [x] postMessage 双向通信（节点高亮 / Tour 同步 / Ctrl+K 跳转）
-- [x] 理论 Tab（arXiv 搜索 / PDF 摘要 / RAG）
-- [x] 概念桥接（论文 <-> 代码 + AI 推荐 + 对照 Tour）
-- [x] Obsidian UX（主题 v2 + 分屏 + 索引进度 + Lucide 图标）
-- [x] 三语 i18n
-- [x] Vitest 47 tests 通过
-- [x] NSIS 安装包可构建
-- [ ] Phase 4：干净机器实测 + 场景 A 用户自测（见 `docs/todos.md`）
+**几个硬性约束**（都是踩过坑之后的决定）：
 
----
+- **禁止**自研 Tree-sitter parser / FileAnalyzer / 独立图谱画布——UA 已有能力，重复实现只会让两边漂移。
+- **禁止**把图谱节点 / 边写进 SQLite——权威源是 `.understand-anything/knowledge-graph.json`。
+- 动工前请先跑完 [docs/spike-ua.md](docs/spike-ua.md) 里的集成 Spike（硬门禁）。
 
-## 设计文档
+质量基线：`pnpm typecheck` + `pnpm test:unit` 全绿；`pnpm qa:graph` 自动验收「Demo 图谱 + Dashboard 加载 + 点节点开文件」闭环；`pnpm qa:his-go` 是对一个真实 Go 项目（HIS-Go，3656 节点）的无头冒烟。说实话，图谱「点击节点 → 打开文件」这个闭环我修了两轮才通——UA Dashboard 内部用的是 Zustand，桥接脚本得直接调 `store.getState()` 而不是 hook，后来 `qa:graph` 里加了对 `__uaStore` 的自动检查，防止回归。
 
-> 面向贡献者。用户请看「快速开始」即可。
+## 许可与致谢
 
-| 文档 | 说明 |
-|------|------|
-| [doc-index.md](docs/doc-index.md) | 文档地图、一致性检查、动工门禁 |
-| [understand-anything-integration.md](docs/understand-anything-integration.md) | UA 集成规格 |
-| [getting-started.md](docs/getting-started.md) | 动工前引导 |
-| [product-spec.md](docs/product-spec.md) | 产品需求 |
-| [architecture.md](docs/architecture.md) | 技术架构 |
-| [ui-spec.md](docs/ui-spec.md) | 界面与交互 |
-| [roadmap.md](docs/roadmap.md) | 路线图 |
-| [todos.md](docs/todos.md) | 工程待办 |
-| [design-review.md](docs/design-review.md) | 设计审视 |
-| [onboarding-spec.md](docs/onboarding-spec.md) | 首次启动引导 |
-| [testing-strategy.md](docs/testing-strategy.md) | 测试策略 |
-| [spike-ua.md](docs/spike-ua.md) | UA 集成 Spike（历史记录） |
-| [fixtures-tiny-go-spec.md](docs/fixtures-tiny-go-spec.md) | 测试 fixture 规格 |
-
-建议阅读顺序：doc-index -> understand-anything-integration -> getting-started -> product-spec -> architecture -> ui-spec -> roadmap。
-
----
-
-## 动工前（贡献者门禁）
-
-准备写代码时，请先阅读：
-
-1. [doc-index.md](docs/doc-index.md) — 文档地图、一致性检查、动工门禁
-2. [understand-anything-integration.md](docs/understand-anything-integration.md) — UA 集成边界、数据流
-3. [getting-started.md](docs/getting-started.md) — 动工清单、Phase 边界
-4. 完成 [spike-ua.md](docs/spike-ua.md) — UA 集成 Spike（**硬门禁**）
-
-**禁止**：
-
-- 自研 Tree-sitter parser / FileAnalyzer / 独立画图谱（UA 已有能力）
-- 把图谱节点 / 边写入 SQLite（权威源是 `.understand-anything/knowledge-graph.json`）
-- 引入与 UA Dashboard 重复的图谱渲染组件
-
----
-
-## 致谢与许可
-
-- **代码地图引擎**：[Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) · MIT（上游）
-- **Fieldguide**：MIT（与上游一致）；UA 归属保留于 [NOTICE.md](./NOTICE.md)
+- **代码地图引擎**：[Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) · MIT（上游，归属保留在 [NOTICE.md](./NOTICE.md)）
+- **Fieldguide**：MIT，与上游一致
 
 ---
 
 <p align="center">
-  <sub>图谱用来教，不是用来炫。 -- Fieldguide</sub>
+  <sub>如果你也在读别人的仓库时卡过壳，欢迎试用、提 issue 或 Star。</sub>
 </p>
