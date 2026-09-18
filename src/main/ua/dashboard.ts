@@ -8,7 +8,7 @@ import { app, protocol } from 'electron'
 import { join, extname } from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'
 import { buildUARuntimeConfig } from './config-bridge'
-import { ensureProjectGraphLayers, ensureLayersInGraphJson } from './ensure-layers'
+import { ensureLayersInGraphJson } from './ensure-layers'
 import { projectRootFromGraphFile, readProjectSourceFile } from './file-content'
 
 const DASHBOARD_SCHEME = 'ua-dashboard'
@@ -64,14 +64,10 @@ export function setDashboardGraph(projectRoot: string | null): void {
     projectGraphPath = existsSync(p) ? p : null
     const d = join(projectRoot, '.understand-anything', 'diff-overlay.json')
     diffOverlayPath = existsSync(d) ? d : null
-    // Repair empty layers on project switch (HIS-Go structure-only indexes)
-    if (projectGraphPath) {
-      try {
-        ensureProjectGraphLayers(projectRoot)
-      } catch (err) {
-        console.warn('[dashboard] ensure layers failed:', err)
-      }
-    }
+    // NOTE: opening a project must not touch the user's graph file. Missing
+    // layers are backfilled in memory when the graph is served
+    // (ensureLayersInGraphJson) and when it is read for the shell
+    // (loadGraph → ensureGraphLayersSync); persisting happens on indexing only.
   } else {
     projectRootPath = null
     projectGraphPath = null

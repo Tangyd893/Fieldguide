@@ -96,11 +96,15 @@ flowchart TD
 | Demo | `resources/sample-project/`（应用内安装） | 见 Project Library「安装内置 Demo」 |
 | slug | `demo` |
 | 落盘路径 | `{projectsRoot}/demo/` |
-| 体量 | Go + TypeScript 混合，~500 行，含 HTTP 入口 → service → 数据层 |
+| 体量 | 纯 Go 分层示例 `pulsegate`（事件接入网关）：15 个源文件 / 104 图节点 / 9 个架构分层 / 1 条 5 步导览，含 HTTP 入口 → service → worker pool → 存储，另有无 Key 可读的预置图谱 |
 | 分发 | **按需 clone**，不内嵌安装包 |
 | 失败降级 | clone 失败 → toast + 提供「打开本地项目」 |
 
 索引完成后自动生成 Intro Tour（UA + LLM；无 Key 时仅结构图）。
+
+内置 Demo 的图谱是**预置**的（`resources/sample-project/.understand-anything/knowledge-graph.json`），
+由真实管线在无 LLM 模式下生成后再补入人工撰写的摘要 / 分层 / 导览——因此不需要 Key 也能看到完整效果。
+改动 Demo 源码后重新生成：`pnpm regen:sample-graph`（见 `scripts/regen-sample-graph.test.ts`）。
 
 ---
 

@@ -26,6 +26,7 @@ interface MenuStrings {
   zoomOut: string
   zoomReset: string
   about: string
+  shortcuts: string
 }
 
 const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
@@ -49,6 +50,7 @@ const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
     zoomOut: '缩小',
     zoomReset: '重置缩放',
     about: '关于 Fieldguide',
+    shortcuts: '键盘快捷键…',
   },
   'zh-TW': {
     file: '檔案',
@@ -70,6 +72,7 @@ const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
     zoomOut: '縮小',
     zoomReset: '重設縮放',
     about: '關於 Fieldguide',
+    shortcuts: '鍵盤快速鍵…',
   },
   'en-US': {
     file: 'File',
@@ -91,6 +94,7 @@ const MENU_STRINGS: Record<MenuLocale, MenuStrings> = {
     zoomOut: 'Zoom Out',
     zoomReset: 'Reset Zoom',
     about: 'About Fieldguide',
+    shortcuts: 'Keyboard shortcuts…',
   },
 }
 
@@ -163,6 +167,11 @@ export function buildApplicationMenu(locale: MenuLocale): Menu {
   ]
 
   const helpSubmenu: MenuItemConstructorOptions[] = [
+    {
+      label: s.shortcuts,
+      accelerator: 'CmdOrCtrl+/',
+      click: () => focusedWindow()?.webContents.send('menu:shortcuts'),
+    },
     {
       label: s.about,
       click: () => focusedWindow()?.webContents.send('menu:about'),

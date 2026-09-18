@@ -6,10 +6,11 @@
  * still reports thousands of nodes. Heuristic `detectLayers` from UA core
  * fixes this without an API key.
  */
-import { writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { app } from 'electron'
+import { atomicWriteJson } from '../fs-atomic'
 
 type Layer = { id: string; name: string; description?: string; nodeIds?: string[] }
 type GraphLike = {
@@ -95,7 +96,10 @@ export function ensureGraphLayersSync(graph: GraphLike): boolean {
 
 /**
  * Load project graph, inject heuristic layers if missing, and persist once.
- * Call when opening a project so Dashboard + IPC both see layers.
+ *
+ * Only call this from paths that are *meant* to write (indexing, maintenance
+ * scripts) — opening or browsing a project must not modify the user's files.
+ * Writes atomically so an interrupted save cannot leave a corrupt graph.
  */
 export function ensureProjectGraphLayers(projectRoot: string): boolean {
   const p = join(projectRoot, '.understand-anything', 'knowledge-graph.json')
@@ -109,7 +113,7 @@ export function ensureProjectGraphLayers(projectRoot: string): boolean {
   const added = ensureGraphLayersSync(graph)
   if (added) {
     try {
-      writeFileSync(p, JSON.stringify(graph, null, 2), 'utf-8')
+      atomicWriteJson(p, graph)
       console.log(`[ensure-layers] wrote heuristic layers → ${p} (${graph.layers?.length ?? 0} layers)`)
     } catch (err) {
       console.warn('[ensure-layers] persist failed:', err)

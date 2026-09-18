@@ -62,6 +62,5 @@ export function progressPercent(p: IndexProgress | null): number {
   if (p.phase === 'architecture') return 82
   if (p.phase === 'knowledge') return 90
   if (p.phase === 'interview') return 96
-  if (p.phase === 'save') return 90
   return -1
 }

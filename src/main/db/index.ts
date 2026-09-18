@@ -9,6 +9,7 @@ import { app } from 'electron'
 import { join } from 'node:path'
 import { existsSync, mkdirSync } from 'node:fs'
 import type { ArchitectureSummary, KnowledgeNode, InterviewQuestion } from '../../shared/understand'
+import { SCHEMA_VERSION, planMigrations, migrationSql } from './migrations'
 
 let db: Database.Database | null = null
 
@@ -30,7 +31,27 @@ export function getDb(): Database.Database {
   return db
 }
 
+/**
+ * Schema version lives in db/migrations.ts along with the planning rules, so
+ * that the migration logic stays testable without the native driver.
+ */
+export function getSchemaVersion(): number {
+  return getDb().pragma('user_version', { simple: true }) as number
+}
+
+/** Column names of a table, or undefined when the table does not exist. */
+function tableColumns(db: Database.Database, table: string): string[] | undefined {
+  const exists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+  ).get(table)
+  if (!exists) return undefined
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  return rows.map((r) => r.name)
+}
+
 function migrate(db: Database.Database): void {
+  const from = db.pragma('user_version', { simple: true }) as number
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
@@ -99,6 +120,7 @@ function migrate(db: Database.Database): void {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       steps_json TEXT DEFAULT '',
+      node_refs TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id)
     );
@@ -135,6 +157,33 @@ function migrate(db: Database.Database): void {
       FOREIGN KEY (project_id) REFERENCES projects(id)
     );
   `)
+
+  // ── Additive migrations ──
+  // A database created by an earlier version already has its tables, so the
+  // CREATE TABLE statements above are no-ops for it and new columns must be
+  // added here. The rules live in db/migrations.ts.
+  const steps = planMigrations(from, {
+    chat_messages: tableColumns(db, 'chat_messages'),
+  })
+  for (const step of steps) {
+    db.exec(migrationSql(step))
+    console.log(`[db] added column ${step.table}.${step.column}`)
+  }
+
+  // Indexes the hot query paths rely on.
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_project
+      ON chat_messages(project_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_knowledge_nodes_project
+      ON knowledge_nodes(project_id);
+    CREATE INDEX IF NOT EXISTS idx_interview_questions_project
+      ON interview_questions(project_id);
+  `)
+
+  if (from !== SCHEMA_VERSION) {
+    db.pragma(`user_version = ${SCHEMA_VERSION}`)
+    console.log(`[db] schema migrated: v${from} → v${SCHEMA_VERSION}`)
+  }
 }
 
 export interface ProjectRow {
@@ -181,8 +230,24 @@ export function updateProjectStatus(id: string, status: ProjectRow['status'], no
   }
 }
 
-export function removeProject(id: string): void {
+/**
+ * Reset projects left in `indexing` by a crash or a kill.
+ *
+ * Indexing only ever runs inside this process, so any row still marked
+ * `indexing` when the app starts is stale — without this the project could never
+ * be indexed again (the IPC guard rejects a second run).
+ *
+ * Returns the ids that were reset.
+ */
+export function resetStaleIndexingStatus(): string[] {
   const db = getDb()
+  const rows = db.prepare("SELECT id FROM projects WHERE status = 'indexing'").all() as Array<{ id: string }>
+  if (rows.length === 0) return []
+  db.prepare("UPDATE projects SET status = 'pending' WHERE status = 'indexing'").run()
+  return rows.map((r) => r.id)
+}
+
+export function removeProject(id: string): void {  const db = getDb()
   db.prepare('DELETE FROM index_jobs WHERE project_id = ?').run(id)
   db.prepare('DELETE FROM concept_links WHERE project_id = ?').run(id)
   db.prepare('DELETE FROM architecture_summaries WHERE project_id = ?').run(id)
@@ -326,6 +391,8 @@ export interface ChatMessageRow {
   role: string
   content: string
   steps_json: string
+  /** JSON array of graph node ids cited by an assistant answer. */
+  node_refs: string
   created_at: string
 }
 
@@ -335,13 +402,15 @@ export function listChatMessages(projectId: string, limit = 50): ChatMessageRow[
   ).all(projectId, limit).reverse() as ChatMessageRow[]
 }
 
-export function insertChatMessage(m: Omit<ChatMessageRow, 'id' | 'created_at'>): ChatMessageRow {
+export function insertChatMessage(
+  m: Omit<ChatMessageRow, 'id' | 'created_at' | 'node_refs'> & { node_refs?: string },
+): ChatMessageRow {
   const id = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   const now = new Date().toISOString()
   getDb().prepare(`
-    INSERT INTO chat_messages (id, project_id, role, content, steps_json, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, m.project_id, m.role, m.content, m.steps_json, now)
+    INSERT INTO chat_messages (id, project_id, role, content, steps_json, node_refs, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, m.project_id, m.role, m.content, m.steps_json, m.node_refs ?? '[]', now)
   return getDb().prepare('SELECT * FROM chat_messages WHERE id = ?').get(id) as ChatMessageRow
 }
 

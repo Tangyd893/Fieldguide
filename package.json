@@ -16,6 +16,7 @@
     "bootstrap:ua": "node scripts/bootstrap-ua.mjs",
     "qa:graph": "node scripts/graph-e2e-smoke.mjs",
     "qa:his-go": "node scripts/his-go-smoke.mjs",
+    "regen:sample-graph": "vitest run --config scripts/vitest.regen.config.ts",
     "clean:dist": "node scripts/clean-dist.mjs",
     "pack": "node scripts/prepare-pack.mjs && electron-vite build && electron-builder --win --config",
     "dist": "node scripts/prepare-pack.mjs && electron-vite build && electron-builder --win --publish never"

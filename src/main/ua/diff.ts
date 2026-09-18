@@ -6,10 +6,11 @@
  * and pushes results to the dashboard via postMessage.
  */
 import { join } from 'node:path'
-import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { loadGraph } from './graph-reader'
+import { atomicWriteJson } from '../fs-atomic'
 import type { ProjectRow } from '../db'
 
 // ─── Diff overlay types ───
@@ -183,7 +184,7 @@ export function analyzeProjectDiff(project: ProjectRow): DiffAnalysisResult | nu
   }
 
   const overlayPath = join(project.root_path, '.understand-anything', 'diff-overlay.json')
-  writeFileSync(overlayPath, JSON.stringify(overlay, null, 2), 'utf-8')
+  atomicWriteJson(overlayPath, overlay)
 
   // 5. Build summary
   const changedNames = nodes

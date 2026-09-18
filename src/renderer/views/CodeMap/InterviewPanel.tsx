@@ -2,7 +2,7 @@
  * InterviewPanel — project-grounded interview drill.
  */
 import { useEffect, useState } from 'react'
-import type { InterviewQuestion } from '../../../shared/understand'
+import type { InterviewQuestion, AnalysisStage } from '../../../shared/understand'
 import { postToDashboard } from './GraphPanel'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -43,7 +43,10 @@ export default function InterviewPanel({ projectId, t, onOpenNode }: Props) {
   async function regenerate() {
     setRunning(true)
     try {
-      await window.fieldguide.understandRun(projectId, ['architecture', 'knowledge', 'interview'])
+      await window.fieldguide.understandRun(
+        projectId,
+        ['architecture', 'knowledge', 'interview'] satisfies AnalysisStage[],
+      )
       await load()
     } finally {
       setRunning(false)

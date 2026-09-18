@@ -14,7 +14,7 @@ import {
 } from '../ua/graph-reader'
 import { buildCrossSourceContext } from '../ua/cross-tour'
 import { queryPaper } from '../vector'
-import { searchNodesFuzzy, type SearchableNode } from './ua-search'
+import { searchNodesFuzzy, type SearchableNode } from '../ua/search'
 import type { AgentContext } from './types'
 
 export type CoachIntent = 'overview' | 'paper' | 'code' | 'general'

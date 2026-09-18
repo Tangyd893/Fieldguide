@@ -1,9 +1,14 @@
 /**
- * TheoryView — arXiv search + paper library + notes.
- * Phase 3: full paper management.
+ * TheoryView — arXiv search + paper library + notes + local RAG.
+ *
+ * Phase 3 shipped `paper:index` / `paper:query` / `paper:indexStatus` in the main
+ * process, but the renderer never called them, so the vector index was never built
+ * and `query_paper` always returned nothing. This view now owns that lifecycle:
+ * build/rebuild the index, report chunk counts, auto-index after a PDF download,
+ * and expose in-paper semantic lookup.
  */
 import { useState, useEffect } from 'react'
-import { Library, Search, BookOpen, Download, StickyNote } from 'lucide-react'
+import { Library, Search, BookOpen, Download, StickyNote, Sparkles, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react'
 import ConceptBridge from './ConceptBridge'
 import PdfReader from './PdfReader'
 
@@ -22,8 +27,14 @@ interface ArxivEntry {
   link: string
 }
 
+/** One RAG hit from `paper:query` (see env.d.ts PaperChunkHit). */
+interface RagHit {
+  score: number
+  chunk: { id: string; paper_id: string; chunk_index: number; text: string }
+}
+
 interface Props {
-  t: (key: string) => string
+  t: (key: string, opts?: Record<string, unknown>) => string
   projectId?: string
 }
 
@@ -47,13 +58,41 @@ export default function TheoryView({ t, projectId }: Props) {
   const [showPdfReader, setShowPdfReader] = useState(false)
   const [pdfAnchorText, setPdfAnchorText] = useState('')
 
+  // Local RAG (paper vector index)
+  const [chunkMap, setChunkMap] = useState<Record<string, number>>({})
+  const [indexing, setIndexing] = useState(false)
+  const [ragNote, setRagNote] = useState<{ kind: 'ok' | 'warn'; text: string } | null>(null)
+  const [ragQuery, setRagQuery] = useState('')
+  const [ragHits, setRagHits] = useState<RagHit[]>([])
+  const [ragSearching, setRagSearching] = useState(false)
+
   useEffect(() => { loadPapers() }, [])
 
   async function loadPapers() {
     try {
       const r = await window.fieldguide.paperList()
-      if (r.ok && r.data) setPapers(r.data)
+      if (r.ok && r.data) {
+        setPapers(r.data)
+        void loadChunkCounts(r.data)
+      }
     } catch { /* ignore */ }
+  }
+
+  /** Chunk counts drive the "RAG 就绪" badges; one cheap COUNT per paper. */
+  async function loadChunkCounts(list: PaperRow[]) {
+    if (list.length === 0) return
+    const entries = await Promise.all(
+      list.slice(0, 60).map(async (p) => {
+        try {
+          const r = await window.fieldguide.paperIndexStatus(p.id)
+          const count = r.ok && r.data ? Number(r.data.chunkCount) || 0 : 0
+          return [p.id, count] as const
+        } catch {
+          return [p.id, 0] as const
+        }
+      }),
+    )
+    setChunkMap(Object.fromEntries(entries))
   }
 
   async function search() {
@@ -127,6 +166,9 @@ export default function TheoryView({ t, projectId }: Props) {
     setSelectedPaper(paper)
     setNotes(paper.notes || '')
     setPdfPath(paper.pdf_path || null)
+    setRagQuery('')
+    setRagHits([])
+    setRagNote(null)
     setView('detail')
   }
 
@@ -138,9 +180,70 @@ export default function TheoryView({ t, projectId }: Props) {
       if (r.ok && r.data) {
         const d = r.data as { pdf_path: string }
         setPdfPath(d.pdf_path)
+        // RAG is useless until the downloaded PDF is chunked + embedded.
+        if ((chunkMap[selectedPaper.id] ?? 0) === 0) {
+          await indexForRag(selectedPaper.id, { silent: true })
+        }
+      } else if (r.error) {
+        setRagNote({ kind: 'warn', text: r.error.message })
       }
     } catch { /* ignore */ }
     finally { setDownloading(false) }
+  }
+
+  /**
+   * Build (or rebuild) the paper's vector index. `silent` keeps the auto-run after
+   * a PDF download from hijacking the UI, but still records the outcome.
+   */
+  async function indexForRag(paperId: string, opts?: { silent?: boolean }) {
+    if (!opts?.silent) setIndexing(true)
+    try {
+      const r = await window.fieldguide.paperIndex(paperId)
+      if (r.ok && r.data) {
+        const count = Number(r.data.chunkCount) || 0
+        setChunkMap((m) => ({ ...m, [paperId]: count }))
+        setRagNote({
+          kind: 'ok',
+          text: t('theory.ragIndexed', { count }),
+        })
+      } else {
+        const code = r.error?.code
+        setRagNote({
+          kind: 'warn',
+          text: code === 'LLM_NOT_CONFIGURED' ? t('theory.ragMissingEmbed') : (r.error?.message || t('theory.ragIndexFailed')),
+        })
+      }
+    } catch (err) {
+      setRagNote({ kind: 'warn', text: String(err) })
+    } finally {
+      if (!opts?.silent) setIndexing(false)
+    }
+  }
+
+  async function runRagSearch() {
+    if (!selectedPaper || !ragQuery.trim()) return
+    setRagSearching(true)
+    try {
+      const r = await window.fieldguide.paperQuery(ragQuery.trim(), selectedPaper.id, 5)
+      if (r.ok && Array.isArray(r.data)) {
+        setRagHits(r.data)
+        if (r.data.length === 0) {
+          setRagNote({
+            kind: 'warn',
+            text: (chunkMap[selectedPaper.id] ?? 0) === 0 ? t('theory.ragNotIndexed') : t('theory.ragNoHits'),
+          })
+        }
+      } else if (r.error) {
+        setRagNote({
+          kind: 'warn',
+          text: r.error.code === 'LLM_NOT_CONFIGURED' ? t('theory.ragMissingEmbed') : r.error.message,
+        })
+      }
+    } catch (err) {
+      setRagNote({ kind: 'warn', text: String(err) })
+    } finally {
+      setRagSearching(false)
+    }
   }
 
   async function openPdfInApp() {
@@ -270,6 +373,14 @@ export default function TheoryView({ t, projectId }: Props) {
                         {p.notes ? ` · ${t('theory.hasNotes')}` : ''}
                       </p>
                     </div>
+                    {(chunkMap[p.id] ?? 0) > 0 && (
+                      <span
+                        className="shrink-0 self-center text-[10px] px-1.5 py-0.5 rounded bg-[var(--fg-status-success-bg)] text-[var(--fg-status-success)] whitespace-nowrap"
+                        title={t('theory.ragReadyHint')}
+                      >
+                        {t('theory.ragBadge', { count: chunkMap[p.id] })}
+                      </span>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); deletePaper(p.id) }}
                       disabled={deleting === p.id}
@@ -331,6 +442,83 @@ export default function TheoryView({ t, projectId }: Props) {
                   className="px-4 py-1.5 bg-[var(--fg-accent)] text-white rounded-lg text-xs font-medium hover:opacity-90"
                 >{t('theory.saveNotes')}</button>
               </div>
+            </div>
+
+            {/* Local RAG: vector index + in-paper semantic lookup */}
+            <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-[var(--fg-text-primary)] inline-flex items-center gap-1.5">
+                    <Sparkles size={14} />{t('theory.ragTitle')}
+                  </h3>
+                  <p className="text-xs text-[var(--fg-text-tertiary)] mt-1">
+                    {(() => {
+                      const count = chunkMap[selectedPaper.id] ?? 0
+                      return count > 0
+                        ? t('theory.ragStatusReady', { count })
+                        : t('theory.ragStatusEmpty')
+                    })()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => indexForRag(selectedPaper.id)}
+                  disabled={indexing || !pdfPath}
+                  title={!pdfPath ? t('theory.ragNeedPdf') : undefined}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] rounded-lg text-xs font-medium hover:bg-[var(--fg-accent-muted)]/70 border border-[var(--fg-accent)] disabled:opacity-40 shrink-0"
+                >
+                  {indexing
+                    ? <><RefreshCw size={13} className="animate-spin" />{t('theory.ragIndexing')}</>
+                    : <>{(chunkMap[selectedPaper.id] ?? 0) > 0 ? <RefreshCw size={13} /> : <Sparkles size={13} />}
+                        {(chunkMap[selectedPaper.id] ?? 0) > 0 ? t('theory.ragReindex') : t('theory.ragIndex')}</>}
+                </button>
+              </div>
+
+              {ragNote && (
+                <div
+                  className="mt-3 flex items-start gap-1.5 text-xs px-2.5 py-1.5 rounded"
+                  style={{
+                    background: ragNote.kind === 'ok' ? 'var(--fg-status-success-bg)' : 'var(--fg-status-warning-bg)',
+                    color: ragNote.kind === 'ok' ? 'var(--fg-status-success)' : 'var(--fg-status-warning)',
+                  }}
+                >
+                  {ragNote.kind === 'ok' ? <CheckCircle2 size={13} className="mt-0.5 shrink-0" /> : <AlertTriangle size={13} className="mt-0.5 shrink-0" />}
+                  <span>{ragNote.text}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-3">
+                <input
+                  type="text"
+                  value={ragQuery}
+                  onChange={(e) => setRagQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && runRagSearch()}
+                  placeholder={t('theory.ragSearchPlaceholder')}
+                  className="flex-1 px-3 py-1.5 border border-[var(--fg-border)] rounded-lg text-xs fg-input focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]"
+                />
+                <button
+                  onClick={runRagSearch}
+                  disabled={ragSearching || !ragQuery.trim()}
+                  className="px-3 py-1.5 bg-[var(--fg-accent)] text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-40 shrink-0"
+                >
+                  {ragSearching ? '…' : t('theory.ragSearchBtn')}
+                </button>
+              </div>
+
+              {ragHits.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {ragHits.map((hit, i) => (
+                    <div key={hit.chunk.id || i} className="border border-[var(--fg-border)] rounded-lg p-2.5">
+                      <div className="flex items-center justify-between text-[10px] text-[var(--fg-text-tertiary)] mb-1">
+                        <span>{t('theory.ragChunk', { index: hit.chunk.chunk_index + 1 })}</span>
+                        <span className="tabular-nums">{hit.score.toFixed(3)}</span>
+                      </div>
+                      <p className="text-xs text-[var(--fg-text-secondary)] whitespace-pre-wrap line-clamp-6">
+                        {hit.chunk.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Concept Bridge */}

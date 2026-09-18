@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   loadGraph,
+  invalidateGraphCache,
   getNode,
   getNeighbors,
   searchNodes,
@@ -86,6 +87,64 @@ describe('loadGraph', () => {
       expect(loaded!.nodes).toHaveLength(5)
       expect(loaded!.edges).toHaveLength(3)
     } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('serves a cached parse while the file is unchanged, and reloads after it changes', () => {
+    const dir = join(tmpdir(), `fg-test-cache-${Date.now()}`)
+    const uaDir = join(dir, '.understand-anything')
+    mkdirSync(uaDir, { recursive: true })
+    const file = join(uaDir, 'knowledge-graph.json')
+
+    const first = createFixtureGraph()
+    writeFileSync(file, JSON.stringify(first))
+
+    try {
+      const a = loadGraph(dir)
+      const b = loadGraph(dir)
+      expect(a).not.toBeNull()
+      // Same file identity → same object, i.e. we did not re-parse
+      expect(b).toBe(a)
+
+      // Rewrite with different content and size: the cache must not serve stale data
+      const second = createFixtureGraph()
+      second.nodes.push({
+        id: 'fn:added', type: 'function', label: 'added', filePath: 'internal/service/user.go',
+        metadata: { summary: 'Added after the first read, longer than before' },
+      })
+      writeFileSync(file, JSON.stringify(second))
+
+      const c = loadGraph(dir)
+      expect(c).not.toBe(a)
+      expect(c!.nodes).toHaveLength(6)
+      expect(getNode(c!, 'fn:added')).toBeDefined()
+    } finally {
+      invalidateGraphCache(dir)
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('invalidateGraphCache forces the next load to re-read the file', () => {
+    const dir = join(tmpdir(), `fg-test-invalidate-${Date.now()}`)
+    const uaDir = join(dir, '.understand-anything')
+    mkdirSync(uaDir, { recursive: true })
+    const file = join(uaDir, 'knowledge-graph.json')
+    writeFileSync(file, JSON.stringify(createFixtureGraph()))
+
+    try {
+      const a = loadGraph(dir)
+      expect(a).not.toBeNull()
+
+      // Simulate an in-process write that keeps mtime+size identical
+      writeFileSync(file, JSON.stringify(createFixtureGraph()))
+      invalidateGraphCache(dir)
+
+      const b = loadGraph(dir)
+      expect(b).not.toBe(a)
+      expect(b!.nodes).toHaveLength(5)
+    } finally {
+      invalidateGraphCache(dir)
       rmSync(dir, { recursive: true, force: true })
     }
   })

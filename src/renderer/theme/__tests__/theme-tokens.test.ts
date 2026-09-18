@@ -42,4 +42,24 @@ describe('theme tokens', () => {
     expect(css).toContain('--fg-bg: #FDFCF8')
     expect(css).toContain('--fg-accent: #4A8B71')
   })
+
+  it('system dark outranks light presets (specificity guard)', () => {
+    // Regression guard: without the :not() guards the system-dark block ties
+    // with `:root[data-theme-preset="..."]` (0,2,0) and, appearing earlier,
+    // loses — so the default parchment preset cancelled OS dark mode.
+    const mediaAt = css.indexOf('@media (prefers-color-scheme: dark)')
+    expect(mediaAt).toBeGreaterThan(-1)
+
+    // Selector is the text between the media query's opening brace and the next one.
+    const afterMedia = css.slice(css.indexOf('{', mediaAt) + 1)
+    const selectorLine = afterMedia.slice(0, afterMedia.indexOf('{'))
+
+    expect(selectorLine).toContain(':not([data-theme="light"])')
+    expect(selectorLine).toContain(':not([data-theme-preset="midnight"])')
+    expect(selectorLine).toContain(':not([data-theme-preset="paper-dark"])')
+
+    // :root + one attribute-level token per :not() guard must exceed a preset's (0,2,0).
+    const guards = [...selectorLine.matchAll(/:not\(/g)].length
+    expect(guards + 1).toBeGreaterThanOrEqual(4)
+  })
 })

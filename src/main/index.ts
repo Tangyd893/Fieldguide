@@ -4,6 +4,7 @@ import { warmLlmProviderCatalog } from './llm/catalog'
 import { createWindow } from './window'
 import { logError } from './logger'
 import { loadConfig } from './config'
+import { resetStaleIndexingStatus } from './db'
 import { setApplicationMenu } from './menu'
 
 // Side-effect import: registers all IPC handlers
@@ -29,6 +30,20 @@ if (!gotSingleInstanceLock) {
 
 app.whenReady().then(() => {
   setApplicationMenu(loadConfig().locale)
+
+  // A crash mid-index leaves projects marked `indexing` forever, which would
+  // block re-indexing for good. Indexing only runs in-process, so any such row
+  // is stale by definition.
+  try {
+    const stale = resetStaleIndexingStatus()
+    if (stale.length > 0) {
+      logError('index:stale-status-reset', { projectIds: stale })
+    }
+  } catch (err) {
+    logError('index:stale-status-reset-failed', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+  }
 
   // Builtin provider catalog + optional local Ollama model discovery
   void warmLlmProviderCatalog().catch((err) => {

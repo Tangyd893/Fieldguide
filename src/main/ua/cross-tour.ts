@@ -6,7 +6,8 @@
  * roadmap 3.8: "cross-source Agent context"
  */
 import { join } from 'node:path'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { atomicWriteJson } from '../fs-atomic'
 import { listConceptLinks, getPaper, getProject } from '../db'
 import type { ConceptLinkRow, PaperRow, ProjectRow } from '../db'
 import { loadGraph } from './graph-reader'
@@ -105,9 +106,22 @@ export function generateCrossTour(projectId: string): CrossTourResult | null {
 
   const uaSteps = tourSteps.map(s => ({ order: s.order, title: s.title, description: s.description, nodeIds: s.nodeIds }))
 
-  const graphJson = JSON.parse(readFileSync(graphPath, 'utf-8'))
-  graphJson.tour = uaSteps
-  writeFileSync(graphPath, JSON.stringify(graphJson, null, 2), 'utf-8')
+  const graphJson = JSON.parse(readFileSync(graphPath, 'utf-8')) as {
+    tour?: Array<{ id?: string; name?: string }>
+    [k: string]: unknown
+  }
+
+  // Merge instead of replace: the architecture Tour generated at index time must
+  // survive generating a paper↔code tour. Any previous cross tour is replaced so
+  // repeated generations don't pile up.
+  const CROSS_TOUR_ID = 'tour:paper-code-bridge'
+  const existingTours = normalizeTours(graphJson.tour).filter((tour) => tour.id !== CROSS_TOUR_ID)
+
+  graphJson.tour = [
+    ...existingTours,
+    toCatalogTour(uaSteps, CROSS_TOUR_ID),
+  ]
+  atomicWriteJson(graphPath, graphJson)
 
   const summaryLines = [
     `## 跨源对照 Tour: ${project.name}`,
@@ -119,8 +133,52 @@ export function generateCrossTour(projectId: string): CrossTourResult | null {
   return { stepCount: uaSteps.length, tourSteps: uaSteps, summary: summaryLines.join('\n') }
 }
 
-function buildSummary(items: Array<{ paper: PaperRow; node: GraphNode; link: ConceptLinkRow }>, project: ProjectRow): string {
-  const paperSet = new Set(items.map(i => i.paper.arxiv_id))
+/** A tour entry as the shell's TourPanel expects it. */
+interface CatalogTour {
+  id: string
+  name: string
+  description?: string
+  steps: Array<{ order: number; title: string; description: string; nodeIds: string[] }>
+}
+
+/**
+ * Normalize whatever shape `graph.tour` currently has into a tour list.
+ *
+ * The indexer may leave a flat `TourStep[]` (no `steps`), while the shell and
+ * our own writes use `{ id, name, steps }`. Merging has to cope with both.
+ */
+function normalizeTours(tour: unknown): CatalogTour[] {
+  if (!Array.isArray(tour) || tour.length === 0) return []
+  const first = tour[0] as Record<string, unknown> | undefined
+  if (first && typeof first === 'object' && 'steps' in first && Array.isArray(first.steps)) {
+    return (tour as CatalogTour[]).filter((t) => t && Array.isArray(t.steps))
+  }
+  // Flat step list → wrap into a single tour.
+  return [{
+    id: 'tour:guided',
+    name: 'Guided Tour',
+    steps: (tour as Array<Record<string, unknown>>).map((step, i) => ({
+      order: Number(step.order ?? i + 1),
+      title: String(step.title ?? `Step ${i + 1}`),
+      description: String(step.description ?? ''),
+      nodeIds: Array.isArray(step.nodeIds) ? (step.nodeIds as string[]) : [],
+    })),
+  }]
+}
+
+function toCatalogTour(
+  steps: Array<{ order: number; title: string; description: string; nodeIds: string[] }>,
+  id: string,
+): CatalogTour {
+  return {
+    id,
+    name: '论文 ↔ 代码对照',
+    description: '按概念桥接交替阅读论文段落与对应实现。',
+    steps,
+  }
+}
+
+function buildSummary(items: Array<{ paper: PaperRow; node: GraphNode; link: ConceptLinkRow }>, project: ProjectRow): string {  const paperSet = new Set(items.map(i => i.paper.arxiv_id))
   const nodeCount = new Set(items.map(i => i.node.id)).size
   return [
     `本项目 **${project.name}** 通过概念桥接关联了:`,

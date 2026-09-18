@@ -48,6 +48,7 @@ doc-index（本文）
 | [ui-spec.md](./ui-spec.md) | 布局、文件树、可分隔面板、面板 Tab 分工 | graph schema |
 | [roadmap.md](./roadmap.md) | Phase 任务 ID、验收、周期 | 架构细节 |
 | [todos.md](./todos.md) | **工程待办**、优先级、完成勾选 | Phase 级排期（见 roadmap） |
+| [gap-analysis-and-feature-roadmap.md](./gap-analysis-and-feature-roadmap.md) | **差距审计 + 功能点扩展规划**（P0 缺陷 / 功能缺口 / A–D 档功能点 / 评测实验设计） | Phase 任务 ID（见 roadmap）、IPC 字段规格 |
 | [onboarding-spec.md](./onboarding-spec.md) | 引导四步、Demo 仓库约定 | — |
 | [testing-strategy.md](./testing-strategy.md) | 测试金字塔、fixture | 产品愿景 |
 | [design-review.md](./design-review.md) | 最终验收 §3.5、风险、已决项 | 任务拆解 |

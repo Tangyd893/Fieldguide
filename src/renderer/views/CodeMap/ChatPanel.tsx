@@ -1,7 +1,13 @@
 /**
  * ChatPanel — Fieldguide Coach Agent 问答面板 (ui-spec §3.2.5)
+ *
+ * Answers render as Markdown (see lib/markdown) and keep their cited code nodes:
+ * the references are persisted with the message, so the jump-to-graph chips work
+ * again after a restart instead of vanishing with the in-memory state.
  */
 import { useState, useRef, useEffect } from 'react'
+import { Copy, Check, RotateCw } from 'lucide-react'
+import { renderMarkdown } from '@/lib/markdown'
 
 interface AgentStep {
   type: 'thought' | 'action' | 'observation' | 'answer' | 'context'
@@ -40,7 +46,17 @@ export default function ChatPanel({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const messagesEnd = useRef<HTMLDivElement>(null)
+
+  function welcome(): Message {
+    return {
+      id: 'welcome',
+      role: 'assistant',
+      content: t('chat.welcomeWithProject', { name: projectName }),
+      timestamp: new Date().toISOString(),
+    }
+  }
 
   useEffect(() => {
     if (!projectId) {
@@ -61,23 +77,16 @@ export default function ChatPanel({
           content: m.content,
           timestamp: m.timestamp || new Date().toISOString(),
           steps: m.steps,
+          // Citations are persisted with the answer, so restore them too.
+          nodeRefs: Array.isArray(m.nodeRefs) ? m.nodeRefs : [],
         })))
       } else {
-        setMessages([{
-          id: 'welcome',
-          role: 'assistant',
-          content: t('chat.welcomeWithProject', { name: projectName }),
-          timestamp: new Date().toISOString(),
-        }])
+        setMessages([welcome()])
       }
     }).catch(() => {
-      setMessages([{
-        id: 'welcome',
-        role: 'assistant',
-        content: t('chat.welcomeWithProject', { name: projectName }),
-        timestamp: new Date().toISOString(),
-      }])
+      setMessages([welcome()])
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, projectName, t])
 
   useEffect(() => {
@@ -93,19 +102,9 @@ export default function ChatPanel({
     })
   }
 
-  async function send() {
-    const text = input.trim()
-    if (!text || !projectId) return
-
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: text,
-      timestamp: new Date().toISOString(),
-    }
-    const history = messages.filter(m => m.role !== 'system' && m.id !== 'welcome')
-    setMessages((prev) => [...prev, userMsg])
-    setInput('')
+  /** Run one turn against the coach agent; `history` excludes the placeholder welcome. */
+  async function ask(history: Message[], userMsg: Message, assistantId: string) {
+    if (!projectId) return
     setSending(true)
     setError(null)
 
@@ -122,7 +121,7 @@ export default function ChatPanel({
       if (result.ok && result.data) {
         const data = result.data as { content: string; steps?: AgentStep[]; nodeRefs?: string[] }
         const assistantMsg: Message = {
-          id: (Date.now() + 1).toString(),
+          id: assistantId,
           role: 'assistant',
           content: data.content || t('chat.noReply'),
           timestamp: new Date().toISOString(),
@@ -140,15 +139,55 @@ export default function ChatPanel({
     }
   }
 
+  async function send() {
+    const text = input.trim()
+    if (!text || !projectId) return
+
+    const userMsg: Message = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content: text,
+      timestamp: new Date().toISOString(),
+    }
+    const history = messages.filter(m => m.role !== 'system' && m.id !== 'welcome')
+    setMessages((prev) => [...prev, userMsg])
+    setInput('')
+    await ask(history, userMsg, `a-${Date.now()}`)
+  }
+
+  /** Drop the trailing exchange and ask the last question again. */
+  async function regenerate() {
+    if (!projectId || sending) return
+
+    let lastUserId = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') { lastUserId = i; break }
+    }
+    if (lastUserId === -1) return
+
+    const userMsg = messages[lastUserId]
+    const history = messages
+      .slice(0, lastUserId)
+      .filter(m => m.role !== 'system' && m.id !== 'welcome')
+
+    setMessages(messages.slice(0, lastUserId + 1))
+    await ask(history, userMsg, `a-${Date.now()}`)
+  }
+
+  async function copyAnswer(msg: Message) {
+    try {
+      await navigator.clipboard.writeText(msg.content)
+      setCopiedId(msg.id)
+      setTimeout(() => setCopiedId(prev => (prev === msg.id ? null : prev)), 1500)
+    } catch {
+      /* clipboard unavailable (e.g. no permission) — ignore silently */
+    }
+  }
+
   async function clearHistory() {
     if (!projectId) return
     await window.fieldguide.chatClear(projectId)
-    setMessages([{
-      id: 'welcome',
-      role: 'assistant',
-      content: t('chat.welcomeWithProject', { name: projectName }),
-      timestamp: new Date().toISOString(),
-    }])
+    setMessages([welcome()])
   }
 
   function stepLabel(step: AgentStep): string {
@@ -162,9 +201,20 @@ export default function ChatPanel({
     }
   }
 
+  const hasUserMessage = messages.some(m => m.role === 'user')
+
   return (
     <div className="h-full flex flex-col bg-[var(--fg-bg)]">
-      <div className="flex items-center justify-end px-3 py-1.5 border-b border-[var(--fg-border)]">
+      <div className="flex items-center justify-end gap-2 px-3 py-1.5 border-b border-[var(--fg-border)]">
+        <button
+          onClick={regenerate}
+          disabled={!projectId || sending || !hasUserMessage}
+          title={t('chat.regenerateHint')}
+          className="inline-flex items-center gap-1 text-xs text-[var(--fg-text-tertiary)] hover:text-[var(--fg-accent)] disabled:opacity-40"
+        >
+          <RotateCw size={12} />
+          {t('chat.regenerate')}
+        </button>
         <button
           onClick={clearHistory}
           disabled={!projectId}
@@ -176,21 +226,38 @@ export default function ChatPanel({
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className="max-w-[85%] space-y-2">
+            <div className="max-w-[85%] space-y-2 min-w-0">
               <div
-                className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
                   msg.role === 'user'
-                    ? 'bg-[var(--fg-accent)] text-white'
+                    ? 'bg-[var(--fg-accent)] text-white whitespace-pre-wrap'
                     : msg.role === 'system'
-                      ? 'bg-[var(--fg-status-warning-bg)] border border-[var(--fg-status-warning)] text-[var(--fg-status-warning)]'
+                      ? 'bg-[var(--fg-status-warning-bg)] border border-[var(--fg-status-warning)] text-[var(--fg-status-warning)] whitespace-pre-wrap'
                       : 'bg-[var(--fg-card)] border border-[var(--fg-border)] text-[var(--fg-text-primary)]'
                 }`}
               >
-                {msg.content}
+                {msg.role === 'assistant' && msg.id !== 'welcome'
+                  ? renderMarkdown(msg.content)
+                  : msg.content}
                 <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white/70' : 'text-[var(--fg-text-tertiary)]'}`}>
                   {new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
+
+              {msg.role === 'assistant' && msg.id !== 'welcome' && (
+                <div className="flex items-center gap-3 text-xs">
+                  <button
+                    onClick={() => copyAnswer(msg)}
+                    aria-label={t('chat.copyAnswer')}
+                    className="inline-flex items-center gap-1 text-[var(--fg-text-tertiary)] hover:text-[var(--fg-accent)]"
+                  >
+                    {copiedId === msg.id
+                      ? <><Check size={12} />{t('chat.copied')}</>
+                      : <><Copy size={12} />{t('chat.copyAnswer')}</>}
+                  </button>
+                </div>
+              )}
+
               {msg.steps && msg.steps.length > 0 && (
                 <div className="text-xs">
                   <button
@@ -211,17 +278,24 @@ export default function ChatPanel({
                   )}
                 </div>
               )}
+
               {msg.nodeRefs && msg.nodeRefs.length > 0 && onNodeRefClick && (
-                <div className="flex flex-wrap gap-1">
-                  {msg.nodeRefs.map(ref => (
-                    <button
-                      key={ref}
-                      onClick={() => onNodeRefClick(ref)}
-                      className="text-xs px-2 py-0.5 rounded-full bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] hover:opacity-80"
-                    >
-                      {ref.split('/').pop() || ref}
-                    </button>
-                  ))}
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--fg-text-tertiary)]">
+                    {t('chat.citations')}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {msg.nodeRefs.map(ref => (
+                      <button
+                        key={ref}
+                        onClick={() => onNodeRefClick(ref)}
+                        title={ref}
+                        className="text-xs px-2 py-0.5 rounded-full bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] hover:opacity-80 max-w-[220px] truncate"
+                      >
+                        {ref.split('/').pop() || ref}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -260,6 +334,7 @@ export default function ChatPanel({
               }
             }}
             placeholder={projectId ? t('chat.placeholder') : t('chat.noProject')}
+            aria-label={t('chat.placeholder')}
             disabled={sending || !projectId}
             className="flex-1 px-3 py-2 border border-[var(--fg-border)] rounded-lg text-sm bg-[var(--fg-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)] disabled:opacity-50"
           />

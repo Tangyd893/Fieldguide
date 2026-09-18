@@ -1,3 +1,3 @@
-module github.com/fieldguide-app/tiny-go
+module github.com/fieldguide-app/pulsegate
 
-go 1.23
+go 1.22

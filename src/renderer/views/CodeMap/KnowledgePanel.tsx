@@ -2,7 +2,7 @@
  * KnowledgePanel — in-app knowledge cards extracted from the project.
  */
 import { useEffect, useState } from 'react'
-import type { KnowledgeNode } from '../../../shared/understand'
+import type { KnowledgeNode, AnalysisStage } from '../../../shared/understand'
 import { postToDashboard } from './GraphPanel'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -42,7 +42,7 @@ export default function KnowledgePanel({ projectId, t, onOpenNode }: Props) {
   async function regenerate() {
     setRunning(true)
     try {
-      await window.fieldguide.understandRun(projectId, ['architecture', 'knowledge'])
+      await window.fieldguide.understandRun(projectId, ['architecture', 'knowledge'] satisfies AnalysisStage[])
       await load()
     } finally {
       setRunning(false)

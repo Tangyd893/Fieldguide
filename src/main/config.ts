@@ -1,10 +1,19 @@
 /**
  * Config service — reads/writes %APPDATA%/Fieldguide/config.json.
  * See architecture.md §四 for schema.
+ *
+ * The LLM API key is encrypted at rest with Electron's safeStorage (DPAPI on
+ * Windows, Keychain on macOS, libsecret on Linux). It used to be written to
+ * config.json in plaintext. The in-memory shape is unchanged (`llm.apiKey`), so
+ * callers do not care which form is on disk.
+ *
+ * If the OS keyring is unavailable, the key is stored in plaintext as before and
+ * `llm.apiKeyPlaintext` is set so the UI can say so.
  */
-import { app } from 'electron'
+import { app, safeStorage } from 'electron'
 import { join, dirname } from 'node:path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { existsSync, readFileSync, mkdirSync } from 'node:fs'
+import { atomicWriteFileSync } from './fs-atomic'
 import { migrateLegacyChatModel } from '../shared/llm-catalog'
 
 export interface LLMConfig {
@@ -12,6 +21,8 @@ export interface LLMConfig {
   apiKey: string
   chatModel: string
   embedModel: string
+  /** Set when the key had to be persisted unencrypted (no OS keyring). */
+  apiKeyPlaintext?: boolean
 }
 
 export interface UAConfig {
@@ -121,15 +132,45 @@ export function loadConfig(): AppConfig {
     return { ...DEFAULT_CONFIG, llm: { ...DEFAULT_CONFIG.llm }, appearance: { ...DEFAULT_CONFIG.appearance }, ua: { ...DEFAULT_CONFIG.ua } }
   }
   try {
-    const parsed = JSON.parse(readFileSync(p, 'utf-8')) as Partial<AppConfig>
-    const merged = mergeConfig(parsed)
-    // Persist legacy DeepSeek model id migration once
-    if (parsed.llm?.chatModel && parsed.llm.chatModel !== merged.llm.chatModel) {
+    const parsed = JSON.parse(readFileSync(p, 'utf-8')) as Partial<AppConfig> & {
+      llm?: Partial<LLMConfig> & { apiKeyEnc?: string }
+    }
+    const encrypted = parsed.llm?.apiKeyEnc
+    if (encrypted && parsed.llm) {
+      parsed.llm.apiKey = decryptApiKey(encrypted) ?? ''
+    }
+    const merged = mergeConfig(parsed as Partial<AppConfig>)
+    // Persist legacy DeepSeek model id migration once, and re-save so a
+    // plaintext key gets encrypted by the writer below.
+    const needsRewrite =
+      (parsed.llm?.chatModel && parsed.llm.chatModel !== merged.llm.chatModel)
+      || (!!parsed.llm?.apiKey && !encrypted)
+    if (needsRewrite) {
       saveConfig(merged)
     }
     return merged
   } catch {
     return { ...DEFAULT_CONFIG, llm: { ...DEFAULT_CONFIG.llm }, appearance: { ...DEFAULT_CONFIG.appearance }, ua: { ...DEFAULT_CONFIG.ua } }
+  }
+}
+
+/** Encrypt for disk, or null when the OS keyring is unusable. */
+function encryptApiKey(apiKey: string): string | null {
+  if (!apiKey) return null
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null
+    return safeStorage.encryptString(apiKey).toString('base64')
+  } catch {
+    return null
+  }
+}
+
+function decryptApiKey(encoded: string): string | null {
+  try {
+    return safeStorage.decryptString(Buffer.from(encoded, 'base64'))
+  } catch (err) {
+    console.warn('[config] could not decrypt stored API key:', err)
+    return null
   }
 }
 
@@ -141,7 +182,27 @@ export function saveConfig(config: AppConfig): void {
   const toSave = mergeConfig(config)
   // Drop deprecated zoom from persisted file
   const { zoom: _z, ...appearance } = toSave.appearance as AppearanceConfig & { zoom?: number }
-  writeFileSync(configPath(), JSON.stringify({ ...toSave, appearance }, null, 2), 'utf-8')
+
+  const { apiKey, ...llmWithoutKey } = toSave.llm
+  const apiKeyEnc = encryptApiKey(apiKey)
+  const llm: Record<string, unknown> = { ...llmWithoutKey }
+
+  if (apiKeyEnc) {
+    llm.apiKeyEnc = apiKeyEnc
+    llm.apiKeyPlaintext = false
+  } else if (apiKey) {
+    // No OS keyring (e.g. a bare Linux session): keep working, but say so.
+    delete llm.apiKeyEnc
+    llm.apiKey = apiKey
+    llm.apiKeyPlaintext = true
+  } else {
+    // Key cleared: drop both forms so a stale encrypted value cannot resurrect it.
+    delete llm.apiKeyEnc
+    llm.apiKeyPlaintext = false
+  }
+
+  // Atomic: a half-written config would lose the user's settings and key.
+  atomicWriteFileSync(configPath(), `${JSON.stringify({ ...toSave, appearance, llm }, null, 2)}\n`)
 }
 
 export function updateConfig(patch: Partial<AppConfig>): AppConfig {

@@ -3,7 +3,7 @@
  * Heuristic always available; LLM enrichment optional.
  */
 import type { ArchitectureSummary, ArchitectureModule, ArchitectureFlow, TechChoice } from '../../shared/understand'
-import { joinLlmUrl } from '../../shared/llm-url'
+import { callLLM as sharedCallLLM, extractJson as sharedExtractJson } from './llm-utils'
 
 export interface GraphLike {
   project?: { projectName?: string; language?: string }
@@ -167,41 +167,16 @@ export function buildHeuristicArchitecture(projectId: string, graph: GraphLike):
 }
 
 function extractJson(text: string): unknown {
-  const trimmed = text.trim()
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const raw = fence ? fence[1].trim() : trimmed
-  return JSON.parse(raw)
+  return sharedExtractJson(text)
 }
 
-async function callLLM(prompt: string, config: LLMConfig, language?: string): Promise<string> {
-  const url = joinLlmUrl(config.baseUrl, '/v1/chat/completions')
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.chatModel,
-      messages: [
-        {
-          role: 'system',
-          content: language === 'en'
-            ? 'You are a software architecture assistant. Respond with valid JSON only.'
-            : '你是软件架构助手。只回复合法 JSON。',
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 4096,
-    }),
-    signal: AbortSignal.timeout(120_000),
+function callLLM(prompt: string, config: LLMConfig, language?: string): Promise<string> {
+  return sharedCallLLM(prompt, config, language, {
+    system: language === 'en'
+      ? 'You are a software architecture assistant. Respond with valid JSON only.'
+      : '你是软件架构助手。只回复合法 JSON。',
+    temperature: 0.3,
   })
-  if (!resp.ok) throw new Error(`LLM error ${resp.status}`)
-  const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> }
-  const content = data.choices?.[0]?.message?.content
-  if (!content) throw new Error('empty LLM response')
-  return content
 }
 
 export async function enrichArchitectureWithLLM(

@@ -36,13 +36,16 @@ import {
 } from '../db'
 import type { PaperRow } from '../db'
 import { readProjectTree } from '../file-tree'
+import { searchProjectContent } from '../content-search'
+import { writeLearningReport, scanProjectDebt } from '../insights'
 import { getProjectIgnoreFilter } from '../project-ignore'
 import { setApplicationMenu, popupTopLevelMenu, getTopLevelMenuLabels, type TopLevelMenuId } from '../menu'
 import { cloneRepo } from '../git'
 import { installDemoProject } from '../sample-project'
-import { indexProject, beginIndex, cancelIndex } from '../ua/client'
-import { runUnderstandPipeline } from '../understand/pipeline'
-import type { AnalysisStage } from '../../shared/understand'
+import { resolveProjectPath, isAllowedOpenPath } from '../paths'
+import { indexProject, beginIndex, cancelIndex, isIndexRunning } from '../ua/client'
+import { runUnderstandPipeline, type UnderstandRunResult } from '../understand/pipeline'
+import type { AnalysisStage, ArchitectureSummary, InterviewQuestion, KnowledgeNode } from '../../shared/understand'
 import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
 import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
 import { getLlmProviderCatalog, fetchProviderModels } from '../llm/catalog'
@@ -58,6 +61,8 @@ import {
 import { indexPaper, queryPaper, countChunks, getChunks, removeChunks, getIndexStats } from '../vector'
 import { analyzeProjectDiff } from '../ua/diff'
 import { generateCrossTour } from '../ua/cross-tour'
+import { searchNodesDetailed } from '../ua/search'
+import { toSearchableNodes } from '../agent/context-packer'
 import { runAgent } from '../agent/react'
 import { logInfo, logError, logIndexStart, logIndexComplete, logIndexError, logChatRequest } from '../logger'
 import { v4 as uuid } from './uuid'
@@ -190,13 +195,19 @@ ipcMain.handle('dashboard:setProject', (_e, { projectRoot }: { projectRoot: stri
 ipcMain.handle('shell:openPath', async (_e, { projectId, filePath }: { projectId: string; filePath: string }): Promise<IpcResult<null>> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', '项目不存在')
-  const fullPath = join(project.root_path, filePath)
-  const result = await shell.openPath(fullPath)
+  const check = resolveProjectPath(project.root_path, filePath)
+  if (!check.ok) return ipcErr('SOURCE_UNAVAILABLE', `非法路径: ${check.reason}`)
+  const result = await shell.openPath(check.fullPath!)
   if (result) return ipcErr('UNKNOWN', result)
   return ipcOk(null)
 })
 
 ipcMain.handle('shell:openFile', async (_e, { filePath }: { filePath: string }): Promise<IpcResult<null>> => {
+  // Only paths this app owns may be handed to the OS default handler; otherwise
+  // a compromised renderer could launch any local executable.
+  if (!isAllowedOpenPath(filePath)) {
+    return ipcErr('SOURCE_UNAVAILABLE', '该路径不在允许打开的范围内')
+  }
   try {
     const result = await shell.openPath(filePath)
     if (result) return ipcErr('UNKNOWN', result)
@@ -385,15 +396,22 @@ ipcMain.handle('graph:get', (_e, { projectId }: { projectId: string }): IpcResul
   // consumers (TourPanel) expect Tour[] with { name, description, steps }.
   // The Dashboard reads the raw file directly via custom protocol and is
   // compatible with TourStep[] — we only normalize for the shell side.
+  //
+  // Build a copy instead of mutating: loadGraph() is cached, so an in-place
+  // write here would leak the shell-specific shape into every other consumer.
+  let payload: typeof graph = graph
   if (Array.isArray(graph.tour) && graph.tour.length > 0) {
     const first = graph.tour[0]
     // A TourStep has 'order'; a Tour has 'steps'. Only normalize flat arrays.
     if (first && typeof first === 'object' && 'order' in first && !('steps' in first)) {
-      graph.tour = [{ name: 'Guided Tour', steps: graph.tour }] as unknown as typeof graph.tour
+      payload = {
+        ...graph,
+        tour: [{ name: 'Guided Tour', steps: graph.tour }] as unknown as typeof graph.tour,
+      }
     }
   }
 
-  return ipcOk(graph)
+  return ipcOk(payload)
 })
 
 ipcMain.handle('graph:getNode', (_e, { projectId, nodeId }: { projectId: string; nodeId: string }): IpcResult<unknown> => {
@@ -420,15 +438,46 @@ ipcMain.handle('graph:neighbors', (_e, { projectId, nodeId, depth }: { projectId
   return ipcOk(result)
 })
 
-ipcMain.handle('graph:search', (_e, { projectId, query }: { projectId: string; query: string }): IpcResult<unknown> => {
+ipcMain.handle('graph:search', async (_e, {
+  projectId,
+  query,
+  mode,
+  limit,
+}: {
+  projectId: string
+  query: string
+  mode?: 'text' | 'semantic'
+  limit?: number
+}): Promise<IpcResult<unknown>> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
 
   const graph = loadGraph(project.root_path)
   if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
 
-  const nodes = searchNodes(graph, query)
-  return ipcOk(nodes)
+  const cap = Math.min(Math.max(Number(limit) || 20, 1), 50)
+  const trimmed = String(query ?? '').trim()
+  if (!trimmed) return ipcOk({ mode: mode ?? 'text', backend: 'substring', results: [] })
+
+  if (mode === 'semantic') {
+    // UA SearchEngine when available; deterministic substring matcher otherwise.
+    const { hits, backend } = await searchNodesDetailed(
+      toSearchableNodes(graph.nodes),
+      trimmed,
+      cap,
+    )
+    const byId = new Map(graph.nodes.map((n) => [n.id, n]))
+    const results = hits
+      .map((h) => {
+        const node = byId.get(h.nodeId)
+        return node ? { ...node, matchScore: h.score } : null
+      })
+      .filter(Boolean)
+    return ipcOk({ mode: 'semantic', backend, results })
+  }
+
+  const results = searchNodes(graph, trimmed, cap).map((n) => ({ ...n, matchScore: null }))
+  return ipcOk({ mode: 'text', backend: 'substring', results })
 })
 
 ipcMain.handle('graph:getSource', (_e, { projectId, nodeId, path, lineStart, lineEnd }: {
@@ -439,7 +488,9 @@ ipcMain.handle('graph:getSource', (_e, { projectId, nodeId, path, lineStart, lin
 
   // If path is provided directly, read that file
   if (path) {
-    const fullPath = join(project.root_path, path)
+    const check = resolveProjectPath(project.root_path, path)
+    if (!check.ok) return ipcErr('SOURCE_UNAVAILABLE', `非法路径: ${check.reason}`)
+    const fullPath = check.fullPath!
     if (!existsSync(fullPath)) return ipcErr('SOURCE_UNAVAILABLE', `文件不存在: ${path}`)
     try {
       const content = readFileSync(fullPath, 'utf-8')
@@ -503,6 +554,30 @@ ipcMain.handle('graph:meta', (_e, { projectId }: { projectId: string }): IpcResu
 
 /* ──────────── File Tree & Code ──────────── */
 
+ipcMain.handle('file:grep', async (_e, {
+  projectId,
+  query,
+  caseSensitive,
+  limit,
+}: {
+  projectId: string
+  query: string
+  caseSensitive?: boolean
+  limit?: number
+}): Promise<IpcResult<unknown>> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const result = await searchProjectContent(project.root_path, query, {
+      caseSensitive,
+      maxMatches: Math.min(Math.max(Number(limit) || 200, 1), 500),
+    })
+    return ipcOk(result)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
 ipcMain.handle('file:tree', async (_e, { projectId }: { projectId: string }): Promise<IpcResult<unknown>> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
@@ -518,7 +593,9 @@ ipcMain.handle('file:tree', async (_e, { projectId }: { projectId: string }): Pr
 ipcMain.handle('file:read', (_e, { projectId, filePath }: { projectId: string; filePath: string }): IpcResult<unknown> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
-  const fullPath = join(project.root_path, filePath)
+  const check = resolveProjectPath(project.root_path, filePath)
+  if (!check.ok) return ipcErr('SOURCE_UNAVAILABLE', `非法路径: ${check.reason}`)
+  const fullPath = check.fullPath!
   if (!existsSync(fullPath)) return ipcErr('SOURCE_UNAVAILABLE', `文件不存在: ${filePath}`)
   try {
     const content = readFileSync(fullPath, 'utf-8')
@@ -533,6 +610,28 @@ ipcMain.handle('file:read', (_e, { projectId, filePath }: { projectId: string; f
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
+}
+
+/** Parse the persisted node_refs column, tolerating legacy/empty values. */
+function parseNodeRefs(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * LLM options in the shape the index/understand pipelines expect, or undefined
+ * when the user has not configured a key (stages then run heuristically).
+ * Built in one place so a new field cannot be wired into only one caller.
+ */
+function llmOptions(): { baseUrl: string; apiKey: string; chatModel: string } | undefined {
+  if (!isLLMConfigured()) return undefined
+  const { llm } = loadConfig()
+  return { baseUrl: llm.baseUrl, apiKey: llm.apiKey, chatModel: llm.chatModel }
 }
 
 ipcMain.handle('chat:send', async (_e, {
@@ -583,6 +682,8 @@ ipcMain.handle('chat:send', async (_e, {
       role: 'assistant',
       content: result.content,
       steps_json: JSON.stringify(result.steps),
+      // Persist citations so the reference chips survive a restart.
+      node_refs: JSON.stringify(result.nodeRefs ?? []),
     })
 
     logChatRequest(project.name, messages.length, result.content.length)
@@ -608,6 +709,7 @@ ipcMain.handle('chat:history', (_e, { projectId }: { projectId: string }): IpcRe
       role: r.role,
       content: r.content,
       steps: r.steps_json ? JSON.parse(r.steps_json) : [],
+      nodeRefs: parseNodeRefs(r.node_refs),
       timestamp: r.created_at,
     })))
   } catch (err) {
@@ -629,7 +731,17 @@ ipcMain.handle('chat:clear', (_e, { projectId }: { projectId: string }): IpcResu
 ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: { projectId: string; incremental?: boolean; skipLlm?: boolean }): Promise<IpcResult<unknown>> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
-  if (project.status === 'indexing') return ipcErr('INDEX_IN_PROGRESS', '索引正在进行中', true)
+
+  // Gate on the live in-process flag, not on the DB column: a crashed run can
+  // leave `status = 'indexing'` behind (reset at startup, but this is the
+  // authoritative check). A stale row is repaired instead of blocking the user.
+  if (isIndexRunning()) {
+    return ipcErr('INDEX_IN_PROGRESS', '已有索引任务正在进行中，请等待完成或取消', true)
+  }
+  if (project.status === 'indexing') {
+    console.warn(`[ipc] project ${projectId} had a stale 'indexing' status — resetting`)
+    updateProjectStatus(projectId, 'pending')
+  }
 
   // Start indexing
   updateProjectStatus(projectId, 'indexing')
@@ -659,11 +771,7 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: 
         })
       },
       incremental,
-      useLlm ? {
-        baseUrl: config.llm.baseUrl,
-        apiKey: config.llm.apiKey,
-        chatModel: config.llm.chatModel,
-      } : undefined,
+      useLlm ? llmOptions() : undefined,
       signal,
       config.ua?.language,
     )
@@ -679,18 +787,13 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: 
       logIndexComplete(project.name, result.nodeCount, result.edgeCount, Date.now() - startTime)
 
       // Progressive understanding stages (architecture → knowledge → interview)
-      let understand: { architecture: boolean; knowledgeCount: number; questionCount: number } | undefined
+      let understand: UnderstandRunResult | undefined
       try {
         win?.webContents.send('index:progress', { type: 'phase', phase: 'structure', projectId })
-        const llm = useLlm ? {
-          baseUrl: config.llm.baseUrl,
-          apiKey: config.llm.apiKey,
-          chatModel: config.llm.chatModel,
-        } : undefined
         understand = await runUnderstandPipeline({
           projectId,
           rootPath: project.root_path,
-          llm,
+          llm: useLlm ? llmOptions() : undefined,
           language: config.ua?.language,
           onStage: (stage) => {
             win?.webContents.send('index:progress', { type: 'phase', phase: stage, projectId })
@@ -734,7 +837,7 @@ ipcMain.handle('project:indexCancel', (_e, { projectId }: { projectId: string })
   return ipcOk(null)
 })
 
-ipcMain.handle('understand:getArchitecture', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+ipcMain.handle('understand:getArchitecture', (_e, { projectId }: { projectId: string }): IpcResult<ArchitectureSummary | null> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
   try {
@@ -744,7 +847,7 @@ ipcMain.handle('understand:getArchitecture', (_e, { projectId }: { projectId: st
   }
 })
 
-ipcMain.handle('understand:listKnowledge', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+ipcMain.handle('understand:listKnowledge', (_e, { projectId }: { projectId: string }): IpcResult<KnowledgeNode[]> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
   try {
@@ -754,7 +857,7 @@ ipcMain.handle('understand:listKnowledge', (_e, { projectId }: { projectId: stri
   }
 })
 
-ipcMain.handle('understand:listQuestions', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+ipcMain.handle('understand:listQuestions', (_e, { projectId }: { projectId: string }): IpcResult<InterviewQuestion[]> => {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
   try {
@@ -783,11 +886,7 @@ ipcMain.handle('understand:run', async (_e, {
       projectId,
       rootPath: project.root_path,
       stages,
-      llm: useLlm ? {
-        baseUrl: config.llm.baseUrl,
-        apiKey: config.llm.apiKey,
-        chatModel: config.llm.chatModel,
-      } : undefined,
+      llm: useLlm ? llmOptions() : undefined,
       language: config.ua?.language,
       onStage: (stage) => {
         win?.webContents.send('index:progress', { type: 'phase', phase: stage, projectId })
@@ -1006,6 +1105,34 @@ ipcMain.handle('paper:indexStatus', (_e, { id }: { id: string }): IpcResult<unkn
     return ipcOk({ paperId: id, chunkCount: paperChunkCount, totalStats: stats })
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Insights (report / debt) ──────────── */
+
+ipcMain.handle('insights:exportReport', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const dir = join(app.getPath('appData'), 'Fieldguide', 'exports')
+    mkdirSync(dir, { recursive: true })
+    const { exportPath, markdown } = writeLearningReport(projectId, dir)
+    logInfo('report:exported', { projectId, exportPath, bytes: markdown.length })
+    return ipcOk({ exportPath, bytes: markdown.length })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('report:export-failed', { projectId, message: msg })
+    return ipcErr('UNKNOWN', msg)
+  }
+})
+
+ipcMain.handle('insights:debtScan', async (_e, { projectId }: { projectId: string }): Promise<IpcResult<unknown>> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk(await scanProjectDebt(projectId))
+  } catch (err) {
+    return ipcErr('UNKNOWN', err instanceof Error ? err.message : String(err))
   }
 })
 

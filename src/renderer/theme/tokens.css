@@ -117,8 +117,19 @@
 }
 
 /* ── System-preference dark (no explicit theme set) ──── */
+/*
+ * Specificity note: the three :not() guards push this selector to (0,4,0) so it
+ * beats the preset blocks below (0,2,0). Without them a light preset such as
+ * parchment — the default — silently cancelled system dark mode, which made the
+ * app look like it had no dark theme at all.
+ *
+ * Guarded out:
+ *   [data-theme="light"]                  → user explicitly chose light
+ *   [data-theme-preset="midnight"]        → dark-by-nature palette owns its colors
+ *   [data-theme-preset="paper-dark"]      → dark-by-nature palette owns its colors
+ */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]):not([data-theme-preset="midnight"]):not([data-theme-preset="paper-dark"]) {
     --fg-bg: #0f172a;
     --fg-card: #1e293b;
     --fg-border: #334155;

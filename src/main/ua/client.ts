@@ -16,18 +16,39 @@ import { join, relative, extname, basename } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app } from 'electron'
 import { BINARY_EXTS, IGNORE_DIRS, getProjectIgnoreFilter, normalizeIgnoreFilter } from '../project-ignore'
+import { invalidateGraphCache } from './graph-reader'
+import { atomicWriteJson, isJsonReadable } from '../fs-atomic'
 
 let indexAbortController: AbortController | null = null
+let indexRunning = false
 
 export function beginIndex(): AbortSignal {
   indexAbortController?.abort()
   indexAbortController = new AbortController()
+  indexRunning = true
   return indexAbortController.signal
+}
+
+/** Mark the current index as finished (success, failure or cancellation). */
+export function endIndex(): void {
+  indexRunning = false
+}
+
+/**
+ * True while an index is actually executing in this process.
+ *
+ * The DB `status` column is not enough to decide whether indexing may start:
+ * a crash leaves it at 'indexing' forever (see resetStaleIndexingStatus), so the
+ * IPC handler checks this live flag instead.
+ */
+export function isIndexRunning(): boolean {
+  return indexRunning
 }
 
 export function cancelIndex(): boolean {
   if (!indexAbortController) return false
   indexAbortController.abort()
+  indexRunning = false
   return true
 }
 
@@ -169,20 +190,30 @@ export interface ScanResult {
   files: ScannedFile[]
   totalFiles: number
   scannedAt: string
+  /**
+   * Every indexable path currently on disk, regardless of mtime.
+   *
+   * Incremental scans only return *changed* files, so without this list a file
+   * deleted since the last index could never be detected and its nodes would
+   * stay in the graph forever.
+   */
+  presentPaths: string[]
 }
 
 export async function scanProject(rootPath: string, changedAfter?: string): Promise<ScanResult> {
   await loadCore()
   const files: ScannedFile[] = []
+  const presentPaths: string[] = []
   const uaFilter = createIgnoreFilter?.(rootPath)
   const ignoreFilter = normalizeIgnoreFilter(uaFilter ?? await getProjectIgnoreFilter(rootPath))
 
-  walk(rootPath, rootPath, files, ignoreFilter, changedAfter ? new Date(changedAfter) : undefined)
+  walk(rootPath, rootPath, files, presentPaths, ignoreFilter, changedAfter ? new Date(changedAfter) : undefined)
 
   return {
     files: files.sort((a, b) => a.path.localeCompare(b.path)),
     totalFiles: files.length,
     scannedAt: new Date().toISOString(),
+    presentPaths,
   }
 }
 
@@ -190,6 +221,7 @@ function walk(
   rootPath: string,
   currentDir: string,
   files: ScannedFile[],
+  presentPaths: string[],
   ignoreFilter: { ignores: (p: string) => boolean },
   since?: Date,
 ): void {
@@ -219,13 +251,17 @@ function walk(
     }
 
     if (st.isDirectory()) {
-      walk(rootPath, fullPath, files, ignoreFilter, since)
+      walk(rootPath, fullPath, files, presentPaths, ignoreFilter, since)
     } else if (st.isFile()) {
-      // Incremental: skip files older than `since`
-      if (since && st.mtime <= since) continue
-
       const ext = extname(entry).toLowerCase()
       if (BINARY_EXTS.has(ext)) continue
+
+      // Record presence for *every* indexable file: this is what lets an
+      // incremental index notice deletions.
+      presentPaths.push(relPath)
+
+      // Incremental: only re-parse files newer than `since`
+      if (since && st.mtime <= since) continue
 
       const language = detectLanguage(relPath)
       const category = classifyCategory(language, relPath)
@@ -542,25 +578,37 @@ export function mergeIncrementalGraph(
   rootPath: string,
   partialGraph: { nodes: any[]; edges: any[]; layers?: any[]; tour?: any[] },
   changedFiles: { path: string }[],
-): void {
+  presentPaths?: string[],
+): { removedNodes: number; deletedFiles: string[] } {
   const graphPath = join(rootPath, '.understand-anything', 'knowledge-graph.json')
-  if (!existsSync(graphPath)) return // no existing graph — partial is the full graph
+  if (!existsSync(graphPath)) return { removedNodes: 0, deletedFiles: [] } // no existing graph — partial is the full graph
 
   let existingGraph: any
   try {
     existingGraph = JSON.parse(readFileSync(graphPath, 'utf-8'))
   } catch {
-    return // corrupt — treat partial as full
+    return { removedNodes: 0, deletedFiles: [] } // corrupt — treat partial as full
   }
 
-  if (!existingGraph?.nodes) return
+  if (!existingGraph?.nodes) return { removedNodes: 0, deletedFiles: [] }
 
-  const changedPaths = new Set(changedFiles.map(f => f.path))
+  // Files that were indexed before but are gone from disk now. Without this,
+  // `git rm` / branch switches leave orphan nodes in the graph forever.
+  const deletedPaths = new Set<string>()
+  if (presentPaths) {
+    const present = new Set(presentPaths)
+    for (const node of existingGraph.nodes) {
+      const fp = node?.filePath
+      if (typeof fp === 'string' && fp && !present.has(fp)) deletedPaths.add(fp)
+    }
+  }
 
-  // Remove old nodes whose filePath matches a changed file
+  const stalePaths = new Set([...changedFiles.map(f => f.path), ...deletedPaths])
+
+  // Remove old nodes whose filePath is changed or deleted
   const removedIds = new Set<string>()
   const keptNodes = existingGraph.nodes.filter((n: any) => {
-    if (n.filePath && changedPaths.has(n.filePath)) {
+    if (n.filePath && stalePaths.has(n.filePath)) {
       removedIds.add(n.id)
       return false
     }
@@ -584,9 +632,21 @@ export function mergeIncrementalGraph(
   if (!partialGraph.tour?.length && existingGraph.tour?.length) {
     partialGraph.tour = existingGraph.tour
   }
+
+  // Drop deleted nodes from preserved layers so the overview does not point at
+  // ids that no longer exist.
+  if (deletedPaths.size > 0) {
+    for (const layer of partialGraph.layers ?? []) {
+      if (Array.isArray(layer?.nodeIds)) {
+        layer.nodeIds = layer.nodeIds.filter((id: string) => !removedIds.has(id))
+      }
+    }
+  }
+
+  return { removedNodes: removedIds.size, deletedFiles: [...deletedPaths] }
 }
 
-export async function indexProject(
+async function runIndexProject(
   rootPath: string,
   projectName: string,
   onPhase?: (phase: string) => void,
@@ -710,7 +770,14 @@ export async function indexProject(
     // the new partial graph into the existing one to preserve unchanged
     // nodes and edges.
     if (incremental) {
-      mergeIncrementalGraph(rootPath, graph, scanResult.files)
+      const merge = mergeIncrementalGraph(rootPath, graph, scanResult.files, scanResult.presentPaths)
+      if (merge.deletedFiles.length > 0) {
+        console.log(
+          `[ua/client] incremental index dropped ${merge.deletedFiles.length} deleted file(s): `
+          + merge.deletedFiles.slice(0, 5).join(', ')
+          + (merge.deletedFiles.length > 5 ? ' …' : ''),
+        )
+      }
     }
 
     // Phase 4: LLM enrichment (conditional on API key)
@@ -750,11 +817,33 @@ export async function indexProject(
 
     // Phase 5: Save
     onPhase?.('save')
+    const graphFilePath = join(rootPath, '.understand-anything', 'knowledge-graph.json')
     saveGraph(rootPath, graph)
+
+    // UA's saveGraph writes in place; if that write was interrupted the graph
+    // would stay corrupt and every later read would fail. The full graph is
+    // still in memory here, so verify and repair atomically.
+    if (!isJsonReadable(graphFilePath)) {
+      console.warn('[ua/client] graph file unreadable after save — rewriting atomically')
+      atomicWriteJson(graphFilePath, graph)
+      if (!isJsonReadable(graphFilePath)) {
+        return {
+          success: false,
+          graphPath: graphFilePath,
+          nodeCount: 0,
+          edgeCount: 0,
+          error: 'GRAPH_WRITE_FAILED',
+        }
+      }
+    }
+
+    // The graph file changed: drop any cached parse so the next read is fresh
+    // even if the write landed in the same millisecond with the same size.
+    invalidateGraphCache(rootPath)
 
     return {
       success: true,
-      graphPath: join(rootPath, '.understand-anything', 'knowledge-graph.json'),
+      graphPath: graphFilePath,
       nodeCount: graph.nodes.length,
       edgeCount: graph.edges.length,
       llmEnriched,
@@ -771,6 +860,30 @@ export async function indexProject(
       edgeCount: 0,
       error: msg,
     }
+  }
+}
+
+/**
+ * Index a project. Wraps runIndexProject so the in-process "is an index running"
+ * flag is cleared on every exit path (success, failure, cancellation, throw) —
+ * a leaked flag would block all future indexing until restart.
+ */
+export async function indexProject(
+  rootPath: string,
+  projectName: string,
+  onPhase?: (phase: string) => void,
+  onProgress?: (current: number, total: number) => void,
+  incremental?: boolean,
+  llmConfig?: LLMEnrichConfig,
+  signal?: AbortSignal,
+  language?: string,
+): Promise<IndexResult> {
+  try {
+    return await runIndexProject(
+      rootPath, projectName, onPhase, onProgress, incremental, llmConfig, signal, language,
+    )
+  } finally {
+    endIndex()
   }
 }
 

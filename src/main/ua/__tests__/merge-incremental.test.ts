@@ -88,8 +88,74 @@ describe('mergeIncrementalGraph', () => {
     expect(partial.tour).toEqual(existing.tour)
   })
 
-  it('does nothing when no existing graph file exists', () => {
-    const partial = {
+  it('drops nodes of files that no longer exist on disk', () => {
+    const existing = {
+      project: { analyzedAt: '2026-01-01T00:00:00Z' },
+      nodes: [
+        { id: 'file:kept.go', type: 'file', name: 'kept.go', filePath: 'kept.go' },
+        { id: 'fn:kept.go:run', type: 'function', name: 'run', filePath: 'kept.go' },
+        { id: 'file:gone.go', type: 'file', name: 'gone.go', filePath: 'gone.go' },
+        { id: 'fn:gone.go:dead', type: 'function', name: 'dead', filePath: 'gone.go' },
+      ],
+      edges: [
+        { source: 'file:kept.go', target: 'fn:kept.go:run', type: 'contains' },
+        { source: 'fn:kept.go:run', target: 'fn:gone.go:dead', type: 'call' },
+        { source: 'file:gone.go', target: 'fn:gone.go:dead', type: 'contains' },
+      ],
+      layers: [
+        { id: 'L1', name: 'Core', nodeIds: ['file:kept.go', 'file:gone.go', 'fn:gone.go:dead'] },
+      ],
+    }
+    writeExistingGraph(tmpDir, existing)
+
+    // Nothing changed, but gone.go was deleted → presentPaths omits it
+    const partial = { nodes: [], edges: [] }
+    const result = mergeIncrementalGraph(tmpDir, partial, [], ['kept.go'])
+
+    expect(result.deletedFiles).toEqual(['gone.go'])
+    expect(result.removedNodes).toBe(2)
+
+    const ids = partial.nodes.map((n: any) => n.id)
+    expect(ids).toEqual(['file:kept.go', 'fn:kept.go:run'])
+
+    // Edges touching the deleted nodes are gone
+    expect(partial.edges.map((e: any) => e.source)).not.toContain('file:gone.go')
+    expect(
+      partial.edges.find((e: any) => e.target === 'fn:gone.go:dead'),
+    ).toBeFalsy()
+
+    // Preserved layers no longer reference removed ids
+    expect(partial.layers[0].nodeIds).toEqual(['file:kept.go'])
+  })
+
+  it('keeps everything when every indexed file is still present', () => {
+    writeExistingGraph(tmpDir, {
+      project: { analyzedAt: '2026-01-01T00:00:00Z' },
+      nodes: [{ id: 'file:a.go', type: 'file', name: 'a.go', filePath: 'a.go' }],
+      edges: [],
+    })
+
+    const partial = { nodes: [], edges: [] }
+    const result = mergeIncrementalGraph(tmpDir, partial, [], ['a.go', 'brand-new.go'])
+    expect(result.deletedFiles).toEqual([])
+    expect(result.removedNodes).toBe(0)
+    expect(partial.nodes.map((n: any) => n.id)).toEqual(['file:a.go'])
+  })
+
+  it('skips deletion detection when no presence list is supplied (full index)', () => {
+    writeExistingGraph(tmpDir, {
+      project: { analyzedAt: '2026-01-01T00:00:00Z' },
+      nodes: [{ id: 'file:a.go', type: 'file', name: 'a.go', filePath: 'a.go' }],
+      edges: [],
+    })
+
+    const partial = { nodes: [], edges: [] }
+    const result = mergeIncrementalGraph(tmpDir, partial, [])
+    expect(result.deletedFiles).toEqual([])
+    expect(partial.nodes.map((n: any) => n.id)).toEqual(['file:a.go'])
+  })
+
+  it('does nothing when no existing graph file exists', () => {    const partial = {
       nodes: [{ id: 'file:x.go', type: 'file', name: 'x.go', filePath: 'x.go' }],
       edges: [],
     }

@@ -82,7 +82,150 @@ flowchart TD
 
 - [x] **p4-packaged-dashboard** · `pnpm dist` 产物含 dashboard；`prepare-pack` 校验 (2026-07-16；**2026-07-17 再验** `__uaStore` + UA commit)  
 - [x] **p4-graph-gui-min** · GUI 最小验收（Demo 可见图 + 点击开文件）— 2026-07-17 自动化签收  
-- [ ] **p4-manual-qa** · [`ux-visual-regression.md`](./ux-visual-regression.md) + [`p4-release-checklist.md`](./p4-release-checklist.md) 其余项（干净机安装抽检等）
+- [x] **p4-manual-qa** · [`ux-visual-regression.md`](./ux-visual-regression.md) + [`p4-release-checklist.md`](./p4-release-checklist.md) 其余项（干净机安装抽检等）
+
+---
+
+## 功能补强 · 第一批（2026-09-18）
+
+> 依据：[gap-analysis-and-feature-roadmap.md](./gap-analysis-and-feature-roadmap.md) A1 / A14 / A15。
+> 三项都改的是「已经建好但用户用不到」或「文档承诺与实际不符」的地方。
+
+- [x] **fg-paper-rag-wiring** · 修复论文 RAG 断链（A1）  
+  - 问题：`paper:index` / `paper:query` / `paper:indexStatus` 主进程已实现，但**渲染层零调用** → 向量索引从未建立，`query_paper` 与 chat 自动 RAG 恒空；且三者**未在 `env.d.ts` 声明**  
+  - 实现：[`TheoryView.tsx`](../src/renderer/views/Theory/TheoryView.tsx) 新增 RAG 区块（建立/重建索引、chunk 状态、命中提示）、论文库卡片 RAG 徽标、**下载 PDF 后自动建索引**、论文内语义检索；`env.d.ts` 补齐三个通道的返回类型  
+  - 验收：`pnpm typecheck` ✅ · i18n 三语各 +17 键（418 键对齐）
+
+- [x] **fg-semantic-search-real** · 语义搜索落地（A14）  
+  - 问题：`architecture.md:368` 承诺 `graph:search` 支持 `mode: semantic`，实际是本地子串匹配；且 `NodeSearchBar` 根本不用该 IPC，而是拉全图 `includes()` 过滤 —— 「假语义搜索」  
+  - 实现：[`src/main/ua/search.ts`](../src/main/ua/search.ts)（`ua-search.ts` 迁入 UA 层）新增 `searchNodesDetailed()`，返回**实际使用的后端**（UA SearchEngine / 子串降级）；`graph:search` 支持 `mode` + `limit`；`NodeSearchBar` 改为**服务端防抖搜索**（180ms + 过期响应丢弃）+ 语义/精确切换 + 后端徽标 + 命中分数；Agent 的 `searchGraphNodes` 复用同一实现并按分数排序  
+  - 验收：新增 [`search.test.ts`](../src/main/ua/__tests__/search.test.ts) 8 例；单测 22 文件 / **136 passed**
+
+- [x] **fg-demo-pulsegate** · 内置 Demo 重做（A15）  
+  - 问题：Demo 实为**纯 Go 3 文件 74 行 / 13 节点**，与 `onboarding-spec.md` 宣称的「Go + TS 混合 ~500 行」不符；答辩第一个画面过薄  
+  - 实现：重做为分层示例 **pulsegate**（事件接入网关）：`cmd/gateway` → `internal/{config,httpapi,service,worker,cache,store,domain}`，含 worker pool、有界队列背压、LRU cache-aside、优雅退出、JSON 日志中间件、router/handler 与 worker 的**真实 Go 测试**，并留一处显式技术债 TODO；**`go vet` / `go build` / `go test ./...` 全绿**，实跑 HTTP 接入→查询→统计闭环  
+  - 图谱：新增 [`scripts/regen-sample-graph.test.ts`](../scripts/regen-sample-graph.test.ts)（`pnpm regen:sample-graph`）用真实管线无 LLM 生成后补入人工摘要/分层/导览 → **104 nodes / 88 edges / 9 layers / 5 tour steps，layers 覆盖 104/104**  
+  - 验收：`pnpm qa:baseline` ✅ · `pnpm qa:graph` ✅（104/104 带 filePath）· 同步 `onboarding-spec.md` / `scenario-abc-test-record.md` / README
+
+### 第二批（2026-09-18）
+
+- [x] **fg-db-migrations** · SQLite 版本化迁移（补审计 P2 缺口，A3 的前置）
+  - 问题：`db/index.ts` 只有 `CREATE TABLE IF NOT EXISTS`，**无 `user_version`**；给已有库加列会直接失败（`CREATE TABLE IF NOT EXISTS` 对已存在的表是空操作）
+  - 实现：新增 [`src/main/db/migrations.ts`](../src/main/db/migrations.ts)（`SCHEMA_VERSION` + 声明式 `ADDED_COLUMNS` + 纯函数 `planMigrations()`/`migrationSql()`）；`migrate()` 读取 `PRAGMA user_version` 与 `table_info` 后按计划 `ALTER TABLE`，并写入版本号
+  - **为什么把计划抽成独立模块**：`better-sqlite3` 是按 Electron ABI 编译的原生模块，在 plain Node/vitest 下**无法加载**（NODE_MODULE_VERSION 130 vs 137）——若迁移逻辑写在 `db/index.ts` 里就永远测不了
+  - 验收：新增 [`migrations.test.ts`](../src/main/db/__tests__/migrations.test.ts) 5 例（v1→v2 加列 / 已有列不重复加 / 新库不动 / 版本已最新为 no-op / 规则自检）
+
+- [x] **fg-chat-citation** · 引用溯源增强（A3）
+  - 问题：`nodeRefs` **不落库**，重启后引用胶囊全部消失（`chat:history` 只回 `steps`）；回答是纯文本 `whitespace-pre-wrap`，代码块与列表糊成一片；引用点击只 `selectNode`，节点在当前视口外时看不出变化
+  - 实现：
+    - `chat_messages` 新增 `node_refs` 列；`chat:send` 落库 `result.nodeRefs`，`chat:history` 回填（含容错解析）
+    - [`ChatPanel.tsx`](../src/renderer/views/CodeMap/ChatPanel.tsx)：保留引用 + 「引用代码节点」分组标题 + **Markdown 渲染** + 复制回答 + 重新生成
+    - [`App.tsx`](../src/renderer/App.tsx) `handleNodeRef` 追加 `navigateToNode`（**注意**：`selectNode` 原本就有，见下方修正说明）
+    - 新增 [`src/renderer/lib/markdown.ts`](../src/renderer/lib/markdown.ts)：**零依赖** Markdown 子集渲染器（围栏代码块/标题/列表/引用/行内 code/粗斜体/链接），只产出 React 元素、**不使用 `dangerouslySetInnerHTML`**，LLM 输出的 HTML 会被转义
+  - 验收：新增 [`markdown.test.ts`](../src/renderer/lib/__tests__/markdown.test.ts) 14 例（含 `<script>`/`<img onerror>` 注入防护）
+
+- [x] **fg-dark-mode-fix** · 修正默认预设吞掉系统深色（A12）
+  - 问题：`:root:not([data-theme="light"])`（系统深色）与 `:root[data-theme-preset="parchment"]`（默认预设）**特异性同为 (0,2,0)**，预设块在后 → 系统深色永远被覆盖，看起来像「没有深色模式」
+  - 实现：系统深色选择器加三重 `:not()` 守卫（提升到 (0,4,0)）并排除 `midnight` / `paper-dark` 这类本身就是暗色的预设；[`useDashboardThemeSync.ts`](../src/renderer/hooks/useDashboardThemeSync.ts) 增加 `matchMedia` 监听，系统主题切换时同步 iframe 主题
+  - 验收：[`theme-tokens.test.ts`](../src/renderer/theme/__tests__/theme-tokens.test.ts) 新增特异性回归测试
+
+- [x] **fg-a11y-focus** · 无障碍与焦点可见性（A11）
+  - 问题：全渲染层仅 8 处 aria；`index.css` **没有任何 `:focus-visible` 规则**，而多数可点元素是原生 `<button>`（Tailwind preflight 去掉了默认 outline）→ **键盘焦点完全不可见**；`ui-spec §368` 承诺的「分隔条可键盘操作」也未实现
+  - 实现：[`index.css`](../src/renderer/index.css) 全局 `:focus-visible` 令牌化焦点环 + `:focus:not(:focus-visible)` 抑制鼠标态 + `prefers-reduced-motion` 降级；[`SplitPanel.tsx`](../src/renderer/views/CodeMap/SplitPanel.tsx) 分隔条改为 `role="separator"` + `tabIndex` + 方向键/Home/End/Enter（Shift 加速 10%）、图标按钮补 `aria-label`/`aria-pressed`、面板工具条加 `role="toolbar"`、文件页签加 `aria-current`
+  - 验收：新增 [`a11y-css.test.ts`](../src/renderer/theme/__tests__/a11y-css.test.ts) 3 例
+
+> **修正上一批结论（2026-09-18）**：我在差距分析里写过「引用点击只开文件、不 focusNode 到图谱」——**不准确**。`App.tsx:451` 的 `handleNodeRef` 一直在调 `dashboardSelectNode()`。真正缺的是把节点**带入视口**（`navigateToNode`），本次补上；差距分析文档已同步更正。
+
+### 第三批（2026-09-18）
+
+- [x] **fg-code-viewer** · 代码查看器增强（A4）
+  - 问题：从图谱/教练跳进代码后，看不出「这个节点在哪几行」；也没有文件内搜索与跳行（`graph:getSource`/`graph:getNode` 的行区间早就在，只是没人用）
+  - 实现：[`CodeViewer.tsx`](../src/renderer/views/CodeMap/CodeViewer.tsx) 重写——按 `focusedNodeId` 解析节点 `lineRange` 并**高亮 + 滚动到视口**（顶部显示「已高亮 xxx · 第 a–b 行」）、**文件内搜索**（匹配数 / 上下一个 / 清除，Enter 循环，Ctrl+F 聚焦）、**跳行**输入；行渲染改为 `useMemo`，键入搜索不再重跑全文件高亮
+  - 接线：`App.tsx` 的 `renderCode` 传入 `highlightNodeId={focusedNodeId}`
+  - 验收：新增 8 个 i18n 键 ×3 语；`pnpm typecheck` / `build` ✅
+
+- [x] **fg-find-call-path** · Agent 工具 `find_call_path`（A17）
+  - 背景：`architecture.md:450-460` 承诺过该工具，实际从未实现；「A 怎么调到 B」是读代码最常问的问题之一
+  - 实现：[`graph-reader.ts`](../src/main/ua/graph-reader.ts) 新增 `findPath()`（BFS + 一次性邻接表索引，无向遍历但保留边的存储方向，`maxDepth` 封顶并回报 `truncated`）；[`tools.ts`](../src/main/agent/tools.ts) 注册同名工具并返回带 `viaEdge` 的有序节点链
+  - 验收：新增 [`find-path.test.ts`](../src/main/ua/__tests__/find-path.test.ts) 9 例（直达/最短路/反向边/不同连通分量/端点缺失/深度上限/边与节点对齐/环）
+
+- [x] **fg-ocr-report-cleanup** · 清理 OCR 报告（A16 高价值项）
+  - **pipeline 分阶段容错**（OCR #2/#3/#11）：重写 [`pipeline.ts`](../src/main/understand/pipeline.ts)——各阶段独立 try/catch，**失败保留部分结果**（对应 `product-spec.md:199` 非功能需求）；新增 `stages: StageOutcome[]`（`completed`/`skipped`/`failed` + 错误），调用方可区分「跳过」与「失败」；隐式补建 architecture 时不再向上播报未请求的阶段；顺带消掉重复的 architecture 生成逻辑
+  - **LLM 去重**（OCR #6）：新增 [`llm-utils.ts`](../src/main/understand/llm-utils.ts)，`callLLM`/`extractJson` 从 3 份复制收敛为 1 份，且 `extractJson` 新增「从散文里捞 JSON」的兜底
+  - **其他**：`ipc/index.ts` 抽出 `llmOptions()`（OCR #4）并把 understand 三个 handler 的返回类型具体化（OCR #5）；`useIndexProgress.ts` 删死代码（OCR #7）；`KnowledgePanel`/`InterviewPanel` 的硬编码阶段名改用 `AnalysisStage` 类型约束（OCR #10）；`AppTitleBar` 的四层嵌套三元改为遍历 `LAYOUT_PRESETS` 注册表（OCR #1）
+  - 验收：新增 [`llm-utils.test.ts`](../src/main/understand/__tests__/llm-utils.test.ts) 11 例 + [`pipeline.test.ts`](../src/main/understand/__tests__/pipeline.test.ts) 6 例（阶段隔离与部分结果，DB 模块被 mock 以绕开原生模块）
+
+- [x] **fg-wire-dead-ipc** · 接线剩余死 IPC（A13）
+  - `paperRemoveHighlight`：`PdfReader` 高亮列表新增删除按钮（此前**高亮只能加不能删**）
+  - `onBridgeTourGenerated`：`BridgeView` 订阅该广播（此前事件发出但**无人订阅**），与 invoke 返回共用 `applyTourResult`
+  - `CostDialog`：估算从「文件数 × 500」改为**按源码字节数**（每文件摘要 15KB 上限）÷4，并移除硬编码的 ¥3/1M 金额——实际费用取决于用户配置的供应商与模型，显示一个编造的金额不如不显示
+
+- [x] **fg-build-alias-fix** · 修复 `@shared` 别名只在 tsconfig 里（构建期才暴露）
+  - 现象：`AppTitleBar.tsx` 用 `@shared/understand` **typecheck 通过但 `electron-vite build` 失败**（Rollup 无法解析）
+  - 修复：[`electron.vite.config.ts`](../electron.vite.config.ts) renderer alias 补 `@shared`，与 `tsconfig.json` paths 对齐
+
+### P0 缺陷修复（2026-09-18，审计 §2.1 八项）
+
+- [x] **p0-index-deletions** · 增量索引不再留下已删文件的节点
+  - 问题：`scanProject` 只返回 mtime 变新的文件，删除的文件永远不在其中 → `git rm` / 切分支后旧节点永久残留
+  - 实现：`scanProject` 新增 `presentPaths`（所有可索引文件的当前存在集合）；`mergeIncrementalGraph` 第 4 个参数接收它，算出 `deletedPaths = 图内 filePath − 磁盘现状`，连同 changed 一起清理节点与关联边，并从保留的 layers 中剔除已删 id；返回 `{ removedNodes, deletedFiles }` 供日志/界面使用
+  - 验收：[`merge-incremental.test.ts`](../src/main/ua/__tests__/merge-incremental.test.ts) 新增 3 例（删除清理 / 全部存在时不动 / 不传存在集合则跳过检测）
+
+- [x] **p0-read-no-write** · 打开项目不再改写用户的图谱文件
+  - 问题：`setDashboardGraph`（每次打开项目都调用）→ `ensureProjectGraphLayers` → `writeFileSync` 覆盖 `knowledge-graph.json`
+  - 实现：移除打开路径上的持久化；分层改为**内存补全**（`ensureLayersInGraphJson` 供 Dashboard、`loadGraph → ensureGraphLayersSync` 供壳层），持久化只发生在索引/维护脚本；`ensureProjectGraphLayers` 保留但注释说明「只能由有意写入的路径调用」
+
+- [x] **p0-cross-tour-merge** · 对照 Tour 不再覆盖架构 Tour
+  - 问题：`cross-tour.ts` 直接 `graphJson.tour = uaSteps`，生成一次论文对照 Tour 就冲掉索引期生成的架构 Tour
+  - 实现：`normalizeTours()` 兼容扁平 `TourStep[]` 与 `{id,name,steps}` 两种形态，合并时保留其它 Tour 并替换同名 `tour:paper-code-bridge`（重复生成不堆积）
+
+- [x] **p0-path-guard** · 路径校验收口
+  - 问题：`file:read`、`graph:getSource` 的 path 分支只做 `join(root, p)`，`../../` 可越界；`shell:openFile` 接受**任意绝对路径**（可启动本地可执行文件）
+  - 实现：新增 [`src/main/paths.ts`](../src/main/paths.ts)：`resolveProjectPath()`（拒绝绝对路径 / `..` / NUL / 越界）与 `isAllowedOpenPath()`（仅允许 appData、projectsRoot、已注册项目根内的真实文件）；四个 handler 全部接入
+  - 验收：新增 [`paths.test.ts`](../src/main/__tests__/paths.test.ts) 11 例（越界、绝对路径、NUL、允许根、相对路径拒绝等）
+
+- [x] **p0-stale-index-status** · 崩溃后 `status=indexing` 自愈
+  - 问题：索引只在进程内跑，崩溃后 `projects.status` 永远停在 `indexing`，`project:index` 的守卫会永久拒绝该项目
+  - 实现：启动时 `resetStaleIndexingStatus()` 归零并把 id 写日志；IPC 守卫改为以**进程内实时标志** `isIndexRunning()` 为准，遇到陈旧状态行则就地修正；`indexProject` 外包一层 `finally { endIndex() }` 保证标志在任何退出路径都清空
+  - 验收：`resetStaleIndexingStatus()` 在 app ready 阶段调用；`tsconfig`/单测/QA 全绿
+
+- [x] **p0-api-key-encrypted** · API Key 加密落盘
+  - 问题：`config.json` 明文保存 `apiKey`
+  - 实现：[`config.ts`](../src/main/config.ts) 用 Electron `safeStorage` 加密为 `llm.apiKeyEnc`，内存形态不变（`llm.apiKey`）；旧明文配置在下次保存时自动迁移；无系统钥匙串时回退明文并标记 `apiKeyPlaintext`；清空 Key 时同时删除两种形态（避免旧密文"复活"）
+
+- [x] **p0-atomic-writes** · 图谱与配置写入原子化
+  - 问题：`ensure-layers` / `cross-tour` / `diff` overlay / `config` 全部 `writeFileSync` 原地覆盖，中断即损坏
+  - 实现：新增 [`src/main/fs-atomic.ts`](../src/main/fs-atomic.ts)（临时文件 + rename、失败清理、`readJsonSafe`/`isJsonReadable`）；上述四处改用原子写；UA 的 `saveGraph`（上游、不能改）在写完后**校验 + 必要时用内存副本原子重写**，仍不可读则返回 `GRAPH_WRITE_FAILED`
+
+### A 档剩余功能（2026-09-18）
+
+- [x] **fg-panel-explore** · 新增「探索」面板（A2 + 路径查找）
+  - 图谱统计（节点/边/类型分布条形）、**邻居浏览**（深度 1/2 切换，接线此前无 UI 的 `graph:neighbors` / `graph:stats`）、**两点路径查找**（渲染端 BFS，与主进程 `findPath` 同规则）；邻居与路径节点都可「图谱定位 / 打开文件」
+  - 面板注册走共享注册表：`PanelTab` + `ALL_PANEL_TABS` + `LAYOUT_PRESETS`（新增 `explore-code` 预设）+ `SplitPanel` 的 labels/render，`migratePanelTabs` 自动为旧布局补页签
+
+- [x] **fg-content-search** · 全库内容搜索（A5）
+  - 新增 IPC `file:grep` + [`content-search.ts`](../src/main/content-search.ts)（直接遍历文件系统，避开 `file:tree` 的 depth 8 / 2000 节点上限；跳过二进制与 NUL 文件、1MB 以上文件，上限 200 命中 / 400 文件并回报 `truncated`）
+  - UI：[`ContentSearch.tsx`](../src/renderer/views/ContentSearch.tsx) 遮罩层，**Ctrl+Shift+F** 唤起，命中可点开并**跳到该行**（`jumpTarget` 用序号保证重复打开同一行也会滚动）
+
+- [x] **fg-learning-report** · 学习报告导出（A6）
+  - 新增 IPC `insights:exportReport` + [`insights.ts`](../src/main/insights.ts) `buildLearningReport()`：汇总规模概览、架构映射、知识卡片、面试题、论文桥接（Markdown 表格）→ 原子写入 `%APPDATA%/Fieldguide/exports/`
+  - 入口：设置 →「数据」按钮 + 命令面板「导出学习报告」
+
+- [x] **fg-debt-scan** · 技术债扫描（A7）
+  - 新增 IPC `insights:debtScan`：TODO/FIXME/HACK/XXX/BUG 标记（带行号）、超大文件（>400 行）、**高扇入节点**（被 ≥8 处依赖，变更风险），按权重排序
+  - UI：探索面板第二个分区，项可点开文件行或图谱定位
+
+- [x] **fg-shortcuts-help** · 快捷键总览（A8）
+  - [`ShortcutsDialog.tsx`](../src/renderer/views/ShortcutsDialog.tsx) 分组列出全局 / 视图 / 面板与分屏 / 代码查看 / 问答快捷键；入口：帮助菜单「键盘快捷键…」（`Ctrl+/`）+ 命令面板
+
+- [x] **fg-error-boundary** · 全局 ErrorBoundary（A9）
+  - [`ErrorBoundary.tsx`](../src/renderer/components/ErrorBoundary.tsx) 包住主内容区，出错时显示面板名、错误信息、可折叠堆栈、「重试」（重挂载）与「重新加载应用」；此前任一渲染错误会整壳白屏
+
+> **本轮新增规模**：P0 七项 + A 档六项；单测从 25 文件 / 161 例增至 **30 文件 / 209 例**；i18n 三语各 **510 键**对齐。
+
+
+
+
 
 ---
 
@@ -580,6 +723,7 @@ Fieldguide/
 | `pnpm test:unit` | `src/**/__tests__/**/*.test.ts`（含 live indexProject） |
 | `pnpm qa:graph` | Demo + Dashboard + HIS-Go + bridge |
 | `pnpm qa:his-go` | HIS-Go 图谱头less |
+| `pnpm regen:sample-graph` | 重新生成内置 Demo 预置图谱（无 LLM，补齐摘要/分层/导览） |
 | `pnpm qa:scenario` | 场景 A/B/C 模块检查 |
 | `pnpm dev` | electron-vite 开发（依赖 sibling UA workspace） |
 | `pnpm dist` | NSIS 安装包（需 `resources/icon.ico`） |

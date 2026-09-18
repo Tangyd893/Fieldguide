@@ -83,6 +83,39 @@ body.fg-is-resizing {
   border-width: 0;
 }
 
+/* ── Keyboard focus visibility ──────────────────────────
+ * Most interactive elements in this shell are plain <button>s (split-panel
+ * controls, file tabs, tree rows, list items) and Tailwind's preflight removes
+ * the UA outline, so keyboard users had no visible focus at all. This applies a
+ * token-aware ring to keyboard focus only; pointer clicks stay clean.
+ */
+:focus-visible {
+  outline: 2px solid var(--fg-accent);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+
+/* Radix/Tailwind components that already render their own ring keep it. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Reduced motion ─────────────────────────────────────
+ * Honour the OS setting: the shell uses 180ms theme transitions, a slide-up
+ * toast and bouncing "thinking" dots, none of which should animate for users
+ * who asked for less motion.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ── Input field theming (uses semantic tokens) ──────── */
 .fg-input,
 input.fg-input,

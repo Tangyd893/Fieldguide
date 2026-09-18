@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { useWorkspaceLayout } from '@/hooks/useWorkspaceLayout'
+import { LAYOUT_PRESETS } from '@shared/understand'
 
 type MenuId = 'file' | 'edit' | 'view' | 'help'
 
@@ -161,25 +162,18 @@ export default function AppTitleBar({
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowPresets(false)} />
                 <div className="absolute top-full right-0 mt-1 z-50 min-w-[180px] rounded-lg border border-[var(--fg-border)] bg-[var(--fg-card)] shadow-[var(--fg-dialog-shadow)] py-1">
-                  {(
-                    [
-                      'default',
-                      'overview-graph',
-                      'knowledge-code',
-                      'interview-chat',
-                      'tour-code',
-                    ] as const
-                  ).map((id) => (
+                  {/* Driven by the shared registry so a new preset needs no edit here. */}
+                  {LAYOUT_PRESETS.map((preset) => (
                     <button
-                      key={id}
+                      key={preset.id}
                       type="button"
                       className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--fg-tree-hover)] text-[var(--fg-text-primary)]"
                       onClick={() => {
-                        applyPreset(id)
+                        applyPreset(preset.id)
                         setShowPresets(false)
                       }}
                     >
-                      {t(`split.preset.${id === 'overview-graph' ? 'overviewGraph' : id === 'knowledge-code' ? 'knowledgeCode' : id === 'interview-chat' ? 'interviewChat' : id === 'tour-code' ? 'tourCode' : 'default'}`)}
+                      {t(preset.labelKey)}
                     </button>
                   ))}
                 </div>

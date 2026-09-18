@@ -3,7 +3,7 @@
  * 支持文本选择、持久化高亮、桥接概念。
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { BookOpen, Link2, Highlighter } from 'lucide-react'
+import { BookOpen, Link2, Highlighter, Trash2 } from 'lucide-react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/src/Page/AnnotationLayer.css'
 import 'react-pdf/src/Page/TextLayer.css'
@@ -38,6 +38,7 @@ export default function PdfReader({ pdfPath, paperId, projectId, t, onClose, onS
   const [selectionPos, setSelectionPos] = useState<{ x: number; y: number } | null>(null)
   const [highlights, setHighlights] = useState<Highlight[]>([])
   const [highlightMsg, setHighlightMsg] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -95,6 +96,27 @@ export default function PdfReader({ pdfPath, paperId, projectId, t, onClose, onS
     }
   }
 
+  /** Delete a saved highlight (previously the IPC existed with no entry point). */
+  async function removeHighlight(id: string) {
+    setRemovingId(id)
+    try {
+      const r = await window.fieldguide.paperRemoveHighlight(id)
+      if (r.ok) {
+        setHighlights(prev => prev.filter(h => h.id !== id))
+        setHighlightMsg(t('pdf.highlightRemoved'))
+        setTimeout(() => setHighlightMsg(null), 2000)
+      } else {
+        setHighlightMsg(r.error?.message ?? t('pdf.removeFailed'))
+        setTimeout(() => setHighlightMsg(null), 3000)
+      }
+    } catch (err) {
+      setHighlightMsg(String(err))
+      setTimeout(() => setHighlightMsg(null), 3000)
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
   const pageHighlights = highlights.filter(h => h.page === pageNumber)
 
   return (
@@ -144,12 +166,21 @@ export default function PdfReader({ pdfPath, paperId, projectId, t, onClose, onS
           ) : (
             <ul className="space-y-1">
               {highlights.map(h => (
-                <li key={h.id}>
+                <li key={h.id} className="group flex items-center gap-1">
                   <button
                     onClick={() => setPageNumber(h.page)}
-                    className="w-full text-left text-[10px] px-1.5 py-1 rounded hover:bg-[var(--fg-tree-hover)] text-[var(--fg-text-secondary)]"
+                    className="flex-1 min-w-0 text-left text-[10px] px-1.5 py-1 rounded hover:bg-[var(--fg-tree-hover)] text-[var(--fg-text-secondary)]"
                   >
                     <span className="text-[var(--fg-text-tertiary)]">p{h.page}</span> {h.text.slice(0, 40)}{h.text.length > 40 ? '…' : ''}
+                  </button>
+                  <button
+                    onClick={() => removeHighlight(h.id)}
+                    disabled={removingId === h.id}
+                    aria-label={t('pdf.removeHighlight')}
+                    title={t('pdf.removeHighlight')}
+                    className="shrink-0 px-1 py-1 rounded text-[10px] text-[var(--fg-text-tertiary)] opacity-0 group-hover:opacity-100 hover:text-[var(--fg-status-error)] disabled:opacity-40 focus-visible:opacity-100"
+                  >
+                    <Trash2 size={11} />
                   </button>
                 </li>
               ))}

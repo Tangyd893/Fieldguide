@@ -82,14 +82,60 @@ function graphPath(projectRoot: string): string {
   return join(projectRoot, '.understand-anything', 'knowledge-graph.json')
 }
 
+/**
+ * Parse cache keyed by graph file identity (mtime + size).
+ *
+ * Every graph IPC channel, the coach agent and search all call loadGraph();
+ * without this, each call re-read and re-parsed the whole JSON — noticeable on
+ * large graphs (HIS-Go is 3656 nodes) and painful now that node search hits the
+ * main process on every keystroke. Writes bump mtime, so a stale entry can never
+ * be served after a re-index.
+ */
+const GRAPH_CACHE_MAX = 4
+const graphCache = new Map<string, { stamp: string; graph: KnowledgeGraph }>()
+
+function graphStamp(path: string): string | null {
+  try {
+    const st = statSync(path)
+    return `${st.mtimeMs}:${st.size}`
+  } catch {
+    return null
+  }
+}
+
+/** Drop a cached graph — call after writing the graph file in-process. */
+export function invalidateGraphCache(projectRoot?: string): void {
+  if (!projectRoot) {
+    graphCache.clear()
+    return
+  }
+  graphCache.delete(graphPath(projectRoot))
+}
+
 /** Load the full knowledge graph for a project. */
 export function loadGraph(projectRoot: string): KnowledgeGraph | null {
   const p = graphPath(projectRoot)
   if (!existsSync(p)) return null
+
+  const stamp = graphStamp(p)
+  if (stamp) {
+    const cached = graphCache.get(p)
+    if (cached && cached.stamp === stamp) return cached.graph
+  }
+
   try {
     const graph = JSON.parse(readFileSync(p, 'utf-8')) as KnowledgeGraph
     // Structure-only indexes may lack layers — UA Dashboard needs them
     ensureGraphLayersSync(graph)
+    if (stamp) {
+      // Refresh the stamp: ensureGraphLayersSync may have rewritten the file.
+      const after = graphStamp(p) ?? stamp
+      if (graphCache.size >= GRAPH_CACHE_MAX) {
+        const oldest = graphCache.keys().next().value
+        if (oldest !== undefined) graphCache.delete(oldest)
+      }
+      graphCache.set(p, { stamp: after, graph })
+    }
     return graph
   } catch {
     return null
@@ -134,9 +180,93 @@ export function getNeighbors(
   return { nodes: resultNodes, edges: resultEdges }
 }
 
-/** Text search across node labels, names, and metadata. */
-export function searchNodes(
+/** Result of a shortest-path query between two graph nodes. */
+export interface GraphPath {
+  found: boolean
+  /** Node ids in order from `fromId` to `toId`, inclusive. */
+  nodeIds: string[]
+  /** Edges traversed, aligned with nodeIds[i] → nodeIds[i + 1]. */
+  edges: GraphEdge[]
+  hops: number
+  /** Populated when the search hit its depth cap without reaching the target. */
+  truncated?: boolean
+}
+
+/**
+ * Find the shortest undirected path between two nodes (BFS).
+ *
+ * Answers "how does A reach B?", the question a reader asks right after finding
+ * an entry point. Edges are treated as undirected because the graph mixes
+ * `import`, `call` and `contains` and a reader wants the connection, not the
+ * direction; `edges[i].source` still shows the stored direction.
+ *
+ * `maxDepth` bounds the work on large graphs (HIS-Go has 3656 nodes).
+ */
+export function findPath(
   graph: KnowledgeGraph,
+  fromId: string,
+  toId: string,
+  maxDepth = 8,
+): GraphPath {
+  if (fromId === toId) {
+    return { found: true, nodeIds: [fromId], edges: [], hops: 0 }
+  }
+
+  // Adjacency index built once per query: scanning every edge per hop is O(E·depth).
+  const adjacency = new Map<string, Array<{ next: string; edge: GraphEdge }>>()
+  for (const edge of graph.edges) {
+    if (!adjacency.has(edge.source)) adjacency.set(edge.source, [])
+    if (!adjacency.has(edge.target)) adjacency.set(edge.target, [])
+    adjacency.get(edge.source)!.push({ next: edge.target, edge })
+    adjacency.get(edge.target)!.push({ next: edge.source, edge })
+  }
+
+  if (!adjacency.has(fromId) || !adjacency.has(toId)) {
+    return { found: false, nodeIds: [], edges: [], hops: 0 }
+  }
+
+  const cameFrom = new Map<string, { prev: string; edge: GraphEdge }>()
+  const visited = new Set<string>([fromId])
+  let frontier: string[] = [fromId]
+  let depth = 0
+  let truncated = false
+
+  while (frontier.length > 0) {
+    if (depth >= maxDepth) {
+      truncated = true
+      break
+    }
+    const next: string[] = []
+    for (const current of frontier) {
+      for (const { next: neighbour, edge } of adjacency.get(current) ?? []) {
+        if (visited.has(neighbour)) continue
+        visited.add(neighbour)
+        cameFrom.set(neighbour, { prev: current, edge })
+        if (neighbour === toId) {
+          // Walk back to the start.
+          const nodeIds = [toId]
+          const edges: GraphEdge[] = []
+          let cursor = toId
+          while (cursor !== fromId) {
+            const step = cameFrom.get(cursor)!
+            edges.unshift(step.edge)
+            nodeIds.unshift(step.prev)
+            cursor = step.prev
+          }
+          return { found: true, nodeIds, edges, hops: nodeIds.length - 1 }
+        }
+        next.push(neighbour)
+      }
+    }
+    frontier = next
+    depth++
+  }
+
+  return { found: false, nodeIds: [], edges: [], hops: 0, truncated }
+}
+
+/** Text search across node labels, names, and metadata. */
+export function searchNodes(  graph: KnowledgeGraph,
   query: string,
   maxResults = 20,
 ): GraphNode[] {

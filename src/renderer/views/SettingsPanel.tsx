@@ -63,6 +63,7 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
   const [logContent, setLogContent] = useState('')
   const [logLoading, setLogLoading] = useState(false)
   const [dataMsg, setDataMsg] = useState<string | null>(null)
+  const [exportingReport, setExportingReport] = useState(false)
 
   const getProvider = useCallback(
     (id: string) => providers.find((p) => p.id === id) ?? providers[providers.length - 1] ?? LLM_PROVIDERS[LLM_PROVIDERS.length - 1],
@@ -651,6 +652,30 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                       }}
                     >
                       {t('settings.exportGraph')}
+                    </Button>
+                  )}
+                  {selectedProjectId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={exportingReport}
+                      onClick={async () => {
+                        setExportingReport(true)
+                        try {
+                          const result = await window.fieldguide.insightsExportReport(selectedProjectId)
+                          if (result.ok && result.data) {
+                            setDataMsg(t('insights.exported'))
+                            await window.fieldguide.openFile(result.data.exportPath)
+                          } else {
+                            setDataMsg(result.error?.message ?? t('insights.exportFailed'))
+                          }
+                          setTimeout(() => setDataMsg(null), 4000)
+                        } finally {
+                          setExportingReport(false)
+                        }
+                      }}
+                    >
+                      {exportingReport ? t('insights.exporting') : t('insights.exportReport')}
                     </Button>
                   )}
                 </div>

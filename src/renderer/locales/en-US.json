@@ -35,7 +35,9 @@
     "tourUnavailable": "Tour is not available",
     "overviewUnavailable": "Architecture overview is not available",
     "knowledgeUnavailable": "Knowledge panel is not available",
-    "interviewUnavailable": "Interview panel is not available"
+    "interviewUnavailable": "Interview panel is not available",
+    "explore": "Explore",
+    "exploreUnavailable": "Explore panel unavailable"
   },
   "project": {
     "emptyTitle": "Add your first project",
@@ -94,7 +96,23 @@
     "clickToOpen": "Click a file in the tree to open",
     "lines": "{{count}} lines",
     "readError": "Read error",
-    "nodeSearchPlaceholder": "Search functions, classes…"
+    "nodeSearchPlaceholder": "Search functions, classes… (e.g. handler, service, main)",
+    "noMatch": "No matches",
+    "searchMode": "Search mode",
+    "searchModeSemantic": "Semantic",
+    "searchModeText": "Exact",
+    "searchModeSemanticHint": "Semantic search: ranked locally by the UA SearchEngine, matches meaning and summaries",
+    "searchModeTextHint": "Exact search: substring match on name / summary",
+    "searchBackendUa": "UA semantic engine",
+    "searchBackendSubstring": "Substring fallback",
+    "searchInFile": "Find in file (Ctrl+F)",
+    "noMatchInFile": "no match",
+    "matchCount": "{{current}}/{{total}}",
+    "prevMatch": "Previous match",
+    "nextMatch": "Next match",
+    "clearSearch": "Clear search",
+    "jumpToLine": "Go to line",
+    "highlightedRange": "Highlighting {{label}} · lines {{start}}–{{end}}"
   },
   "fileTree": {
     "openFile": "Open file",
@@ -179,7 +197,12 @@
     "stepThought": "Thought",
     "stepAction": "Tool",
     "stepObservation": "Observation",
-    "stepAnswer": "Answer"
+    "stepAnswer": "Answer",
+    "citations": "Cited code nodes",
+    "copyAnswer": "Copy answer",
+    "copied": "Copied",
+    "regenerate": "Regenerate",
+    "regenerateHint": "Discard the last answer and ask again"
   },
   "commandPalette": {
     "placeholder": "Search commands, files, or nodes…",
@@ -209,7 +232,12 @@
       "knowledgeCode": "Knowledge | Code",
       "interviewChat": "Interview | Chat",
       "tourCode": "Tour | Code"
-    }
+    },
+    "controls": "Split controls",
+    "maximizePanel": "Maximize panel",
+    "closePanel": "Close panel",
+    "closeFile": "Close file",
+    "exploreCode": "Explore | Code"
   },
   "theory": {
     "title": "Theory",
@@ -233,7 +261,24 @@
     "notesPlaceholder": "Record your thoughts, code connections…",
     "notesAutoSave": "Notes auto-saved to this paper",
     "saveNotes": "Save Notes",
-    "deletePaper": "Delete this paper"
+    "deletePaper": "Delete this paper",
+    "ragTitle": "Paper vector index (local RAG)",
+    "ragStatusReady": "Indexed: {{count}} chunks — retrievable below and by the AI coach",
+    "ragStatusEmpty": "Not indexed yet — build the index so the AI can cite this paper",
+    "ragIndex": "Build index",
+    "ragReindex": "Rebuild index",
+    "ragIndexing": "Indexing…",
+    "ragIndexed": "Indexed: {{count}} chunks",
+    "ragIndexFailed": "Indexing failed",
+    "ragMissingEmbed": "Configure an embedding model in Settings → Model before paper RAG can work",
+    "ragNeedPdf": "Download the PDF first",
+    "ragSearchPlaceholder": "Search inside this paper (semantic)…",
+    "ragSearchBtn": "Search",
+    "ragNoHits": "No relevant passages found in this paper",
+    "ragNotIndexed": "Not indexed yet — click “Build index” first",
+    "ragBadge": "RAG {{count}}",
+    "ragReadyHint": "Vector index built — the AI coach can cite this paper",
+    "ragChunk": "Chunk {{index}}"
   },
   "bridge": {
     "title": "Concept Bridge",
@@ -308,7 +353,10 @@
     "cancelSelection": "Clear selection",
     "closeReader": "Close reader",
     "loading": "Loading PDF…",
-    "loadFailed": "Failed to load PDF"
+    "loadFailed": "Failed to load PDF",
+    "removeHighlight": "Delete highlight",
+    "highlightRemoved": "Highlight deleted",
+    "removeFailed": "Delete failed"
   },
   "cost": {
     "title": "Index \"{{name}}\"",
@@ -317,10 +365,11 @@
     "sourceFiles": "Source files",
     "structNodes": "Structural nodes (existing)",
     "llmHint": "LLM analysis will generate summaries, architecture layers, and guided tours for code nodes.",
-    "estTokens": "Est. ~{{tokens}} tokens (~¥{{cost}})",
+    "estTokens": "Estimated ~{{tokens}} tokens",
     "fullIndex": "Full Index (with LLM analysis)",
     "staticOnly": "Static Only (skip summaries & tours)",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "estDisclaimer": "Estimated from source bytes (each file summary is capped at 15KB). Cost is not shown because it depends on the provider and model you configured."
   },
   "status": {
     "ready": "Ready",
@@ -457,5 +506,80 @@
     "enterLibrary": "Enter Library",
     "prev": "← Previous",
     "next": "Next →"
+  },
+  "searchContent": {
+    "title": "Search in files",
+    "placeholder": "Search file contents… (Ctrl+Shift+F)",
+    "hint": "Type at least 2 characters",
+    "searching": "Searching…",
+    "noMatch": "No matches",
+    "caseSensitive": "Match case",
+    "failed": "Search failed",
+    "summary": "{{matches}} matches in {{files}} files ({{scanned}} scanned)",
+    "truncated": "Results truncated — narrow your query"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "groupGlobal": "Global",
+    "groupView": "View",
+    "groupPanels": "Panels & split",
+    "groupCode": "Code viewer",
+    "groupChat": "Chat",
+    "commandPalette": "Command palette",
+    "contentSearch": "Search in files",
+    "openProject": "Open project",
+    "reload": "Reload",
+    "devtools": "Developer tools",
+    "quit": "Quit",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomReset": "Reset zoom",
+    "zoomWheel": "Shell zoom",
+    "panelTabs": "Switch panel tab",
+    "separatorResize": "Resize split (focus the separator first)",
+    "separatorResizeFast": "Resize split (large step)",
+    "separatorMinMax": "Split to minimum / maximum",
+    "separatorReset": "Restore even split",
+    "closeTab": "Close file tab",
+    "findInFile": "Find in file",
+    "nextPrevMatch": "Next / previous match",
+    "clearFind": "Clear search",
+    "goToLine": "Jump to the typed line",
+    "send": "Send message",
+    "newline": "Newline without sending"
+  },
+  "insights": {
+    "title": "Insights",
+    "explore": "Graph explorer",
+    "debt": "Tech debt",
+    "stats": "Graph stats",
+    "nodes": "Nodes",
+    "edges": "Edges",
+    "types": "Type breakdown",
+    "neighbors": "Neighbors",
+    "neighborsHint": "Select a node in the graph first, or search above",
+    "depth": "Depth",
+    "openFile": "Open file",
+    "focusGraph": "Focus in graph",
+    "path": "Path finder",
+    "pathFrom": "From (node id)",
+    "pathTo": "To (node id)",
+    "pathFind": "Find path",
+    "pathFound": "{{hops}} hops",
+    "pathNotFound": "No path exists between these nodes",
+    "pathTruncated": "Not found within {{depth}} hops — the path may be longer",
+    "pathUseFocus": "Use current focus",
+    "scan": "Scan",
+    "scanning": "Scanning…",
+    "noDebt": "No notable debt markers found",
+    "todo": "Unfinished markers",
+    "largeFile": "Oversized files",
+    "highFanIn": "High fan-in nodes",
+    "filesScanned": "{{count}} files scanned",
+    "exportReport": "Export learning report",
+    "exporting": "Exporting…",
+    "exported": "Report exported",
+    "exportFailed": "Export failed",
+    "scanFailed": "Scan failed"
   }
 }

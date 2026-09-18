@@ -13,6 +13,7 @@ interface Props {
   renderOverview?: () => ReactNode
   renderKnowledge?: () => ReactNode
   renderInterview?: () => ReactNode
+  renderExplore?: () => ReactNode
   t: (key: string) => string
   layout: ReturnType<typeof useWorkspaceLayout>
   /** When true, layout buttons live in the title bar instead. */
@@ -27,6 +28,7 @@ export default function SplitPanel({
   renderOverview,
   renderKnowledge,
   renderInterview,
+  renderExplore,
   t,
   layout: ctrl,
   hideChromeControls,
@@ -74,6 +76,7 @@ export default function SplitPanel({
     tour: t('panels.tour'),
     knowledge: t('panels.knowledge'),
     interview: t('panels.interview'),
+    explore: t('panels.explore'),
   }
 
   function renderContent(panelIndex: number) {
@@ -90,6 +93,8 @@ export default function SplitPanel({
         return renderKnowledge?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.knowledgeUnavailable')}</div>
       case 'interview':
         return renderInterview?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.interviewUnavailable')}</div>
+      case 'explore':
+        return renderExplore?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.exploreUnavailable')}</div>
     }
   }
 
@@ -103,8 +108,35 @@ export default function SplitPanel({
 
   const divider = hasTwo ? (
     <div
+      role="separator"
+      aria-orientation={isVertical ? 'horizontal' : 'vertical'}
+      aria-label={t('split.resizeHint')}
+      aria-valuenow={Math.round(splitPos)}
+      aria-valuemin={20}
+      aria-valuemax={80}
+      tabIndex={0}
       onMouseDown={onMouseDown}
       onDoubleClick={restorePanels}
+      onKeyDown={(e) => {
+        // ui-spec §368: the separator must be operable without a pointer.
+        const step = e.shiftKey ? 10 : 2
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault()
+          setPos(Math.max(20, splitPos - step))
+        } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault()
+          setPos(Math.min(80, splitPos + step))
+        } else if (e.key === 'Home') {
+          e.preventDefault()
+          setPos(20)
+        } else if (e.key === 'End') {
+          e.preventDefault()
+          setPos(80)
+        } else if (e.key === 'Enter') {
+          e.preventDefault()
+          restorePanels()
+        }
+      }}
       title={t('split.resizeHint')}
       className={cn(
         'group shrink-0 z-20 flex items-center justify-center transition-colors duration-150',
@@ -125,12 +157,12 @@ export default function SplitPanel({
   return (
     <div ref={containerRef} className={cn('h-full w-full flex relative', isVertical ? 'flex-col' : 'flex-row')}>
       {!hideChromeControls && (
-        <div className="absolute top-0 right-0 flex items-center gap-0.5 px-2 py-1 z-20">
-          <Button variant="ghost" size="icon-sm" onClick={() => setNumPanels(1)} title={t('split.singlePanel')} className="text-[10px]">▣</Button>
-          <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('horizontal') }} title={t('split.horizontal')} className="text-[10px]">◫</Button>
-          <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('vertical') }} title={t('split.vertical')} className="text-[10px]">◰</Button>
+        <div className="absolute top-0 right-0 flex items-center gap-0.5 px-2 py-1 z-20" role="toolbar" aria-label={t('split.controls')}>
+          <Button variant="ghost" size="icon-sm" onClick={() => setNumPanels(1)} title={t('split.singlePanel')} aria-label={t('split.singlePanel')} aria-pressed={!hasTwo} className="text-[10px]">▣</Button>
+          <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('horizontal') }} title={t('split.horizontal')} aria-label={t('split.horizontal')} aria-pressed={hasTwo && !isVertical} className="text-[10px]">◫</Button>
+          <Button variant="ghost" size="icon-sm" onClick={() => { setNumPanels(2); setSplitDirection('vertical') }} title={t('split.vertical')} aria-label={t('split.vertical')} aria-pressed={hasTwo && isVertical} className="text-[10px]">◰</Button>
           {hasTwo && (
-            <Button variant="ghost" size="icon-sm" onClick={swapPanels} title={t('split.swap')} className="text-[10px]">⇄</Button>
+            <Button variant="ghost" size="icon-sm" onClick={swapPanels} title={t('split.swap')} aria-label={t('split.swap')} className="text-[10px]">⇄</Button>
           )}
         </div>
       )}
@@ -141,6 +173,7 @@ export default function SplitPanel({
           isActive={activePanelIndex === 0}
           style={panelStyle(0)}
           tabLabels={TAB_LABELS}
+          t={t}
           hasTwo={hasTwo}
           renderContent={() => renderContent(0)}
           onActivate={() => setActivePanel(0)}
@@ -160,6 +193,7 @@ export default function SplitPanel({
           isActive={activePanelIndex === 1}
           style={panelStyle(1)}
           tabLabels={TAB_LABELS}
+          t={t}
           hasTwo={hasTwo}
           renderContent={() => renderContent(1)}
           onActivate={() => setActivePanel(1)}
@@ -175,7 +209,7 @@ export default function SplitPanel({
 }
 
 function PanelChrome({
-  panel, isActive, style, tabLabels, hasTwo, renderContent,
+  panel, isActive, style, tabLabels, hasTwo, renderContent, t,
   onActivate, onTabChange, onMaximize, onClosePanel, onSwitchFile, onCloseFile,
 }: {
   panel: ReturnType<typeof useWorkspaceLayout>['layout']['panels'][number]
@@ -184,6 +218,7 @@ function PanelChrome({
   tabLabels: Record<PanelTab, string>
   hasTwo: boolean
   renderContent: () => ReactNode
+  t: (key: string, opts?: Record<string, unknown>) => string
   onActivate: () => void
   onTabChange: (tab: PanelTab) => void
   onMaximize: () => void
@@ -213,8 +248,8 @@ function PanelChrome({
         <div className="flex items-center gap-0.5 px-1">
           {hasTwo && (
             <>
-              <Button variant="ghost" size="icon-sm" onClick={onMaximize} title="最大化" className="text-xs">□</Button>
-              <Button variant="ghost" size="icon-sm" onClick={onClosePanel} title="关闭面板" className="text-xs hover:text-[var(--fg-status-error)]">×</Button>
+              <Button variant="ghost" size="icon-sm" onClick={onMaximize} title={t('split.maximizePanel')} aria-label={t('split.maximizePanel')} className="text-xs">□</Button>
+              <Button variant="ghost" size="icon-sm" onClick={onClosePanel} title={t('split.closePanel')} aria-label={t('split.closePanel')} className="text-xs hover:text-[var(--fg-status-error)]">×</Button>
             </>
           )}
         </div>
@@ -235,6 +270,8 @@ function PanelChrome({
                     onCloseFile(f.id)
                   }
                 }}
+                aria-current={isFileActive}
+                title={f.path}
                 className={cn(
                   'group flex items-center gap-1 px-3 py-1 text-[11px] whitespace-nowrap shrink-0 transition-colors duration-150 border-b-2 -mb-px',
                   isFileActive
@@ -244,6 +281,10 @@ function PanelChrome({
               >
                 <span className="max-w-[120px] truncate">{name}</span>
                 <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={t('split.closeFile')}
+                  title={t('split.closeFile')}
                   onClick={(e) => { e.stopPropagation(); onCloseFile(f.id) }}
                   className="ml-0.5 opacity-0 group-hover:opacity-100 hover:text-[var(--fg-status-error)] text-[10px] leading-none"
                 >×</span>

@@ -125,11 +125,14 @@ npx electron-builder --win --publish never --config.directories.output=dist-buil
 - 🗺️ **知识图谱** —— 交互式代码地图、架构分层、引导 Tour、节点 ↔ 源码联动。没有 LLM Key 也能看结构图（[设计](docs/product-spec.md)）。
 - 🧑‍🏫 **问答教练** —— 注入项目身份、layers、Tour、当前焦点和图谱检索结果；工具可查邻居、层、Tour 步骤；回答里能引用论文段落。图上点到哪，它就围着哪讲。
 - 📚 **理论与桥接** —— arXiv 搜索、PDF 导入与阅读、论文 RAG；论文段落 ↔ 代码节点的概念桥接，AI 推荐 + 一键生成「论文概念 → 代码实现」对照 Tour。
-- 🧩 **分屏工作台** —— VS Code 风格布局：左文件树 + 右可分隔面板（总览 / 图谱 / 代码 / 问答 / 导览 / 知识 / 面试七种），布局可持久化（[界面规格](docs/ui-spec.md)）。
+- 🧩 **分屏工作台** —— VS Code 风格布局：左文件树 + 右可分隔面板（总览 / 图谱 / 代码 / 问答 / 导览 / 知识 / 面试 / 探索八种），布局可持久化（[界面规格](docs/ui-spec.md)）。
+- 🔍 **全库内容搜索** —— `Ctrl+Shift+F` 搜文件内容（跳过二进制与超大文件），命中可直接跳到对应行；代码面板内 `Ctrl+F` 搜索当前文件。
+- 🧠 **洞察面板** —— 图谱统计与类型分布、邻居浏览（1/2 跳）、**两点路径查找**（「A 怎么调到 B」）、**技术债扫描**（TODO/FIXME、超大文件、高扇入节点）。
+- 📄 **学习报告导出** —— 一键把架构映射、知识卡片、面试题与论文桥接汇总成 Markdown。
 - 🚀 **增量索引** —— 指纹合并，改一个文件不会把整张图重画；索引过程非阻塞，状态栏有进度。
 - 🎨 **主题与外观** —— 5 套主题预设（parchment / forest / slate / midnight / paper-dark）、50%–200% 缩放、UI 与代码字体分开。
 - 🌐 **三语界面** —— 简体中文 / 繁體中文 / English (US)，UI 和系统菜单即时切换。
-- 💾 **本地优先** —— 应用数据在 `%APPDATA%/Fieldguide/`，图谱权威源在项目目录就地生成，不复制源码、默认不出本机。
+- 💾 **本地优先** —— 应用数据在 `%APPDATA%/Fieldguide/`，图谱权威源在项目目录就地生成，不复制源码、默认不出本机。API Key 经系统钥匙串（`safeStorage`）加密后落盘；打开或浏览项目**不会改写**项目里的图谱文件。
 - 📦 **Windows 安装包** —— NSIS 安装包与免安装版可构建。
 
 macOS / Linux 暂时不做，我只有 Windows 开发机，先把自己平台的体验做扎实。
@@ -196,7 +199,7 @@ Fieldguide/
     preload/                  contextBridge 暴露的安全 API
     renderer/                 React UI（项目库 / 代码地图 / 理论 / 桥接 / 设置）
     shared/                   三端共用的类型与 IPC schema
-  resources/                  图标、内置 sample-project（Demo，~13 节点自带图谱）
+  resources/                  图标、内置 sample-project（Demo `pulsegate`，104 节点 / 9 分层 / 预置图谱）
   scripts/                    bootstrap / QA / 打包脚本
   tests/                      Vitest 单测 + fixture
   picture/                    运行截图

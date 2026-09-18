@@ -39,8 +39,17 @@ const api = {
     ipcRenderer.invoke('graph:getNode', { projectId, nodeId }),
   graphNeighbors: (projectId: string, nodeId: string, depth?: number): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('graph:neighbors', { projectId, nodeId, depth }),
-  graphSearch: (projectId: string, query: string): Promise<IpcResult<unknown>> =>
-    ipcRenderer.invoke('graph:search', { projectId, query }),
+  graphSearch: (
+    projectId: string,
+    query: string,
+    opts?: { mode?: 'text' | 'semantic'; limit?: number },
+  ): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('graph:search', {
+      projectId,
+      query,
+      mode: opts?.mode ?? 'text',
+      limit: opts?.limit,
+    }),
   graphGetSource: (projectId: string, opts: { nodeId?: string; path?: string; lineStart?: number; lineEnd?: number }): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('graph:getSource', { projectId, ...opts }),
   graphStats: (projectId: string): Promise<IpcResult<unknown>> =>
@@ -68,6 +77,24 @@ const api = {
     ipcRenderer.invoke('file:tree', { projectId }),
   fileRead: (projectId: string, filePath: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('file:read', { projectId, filePath }),
+  /** Find in files (substring, bounded). */
+  fileGrep: (
+    projectId: string,
+    query: string,
+    opts?: { caseSensitive?: boolean; limit?: number },
+  ): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('file:grep', {
+      projectId,
+      query,
+      caseSensitive: opts?.caseSensitive,
+      limit: opts?.limit,
+    }),
+
+  // Insights
+  insightsExportReport: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('insights:exportReport', { projectId }),
+  insightsDebtScan: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('insights:debtScan', { projectId }),
 
   // Shell
   openInExplorer: (projectId: string, filePath: string): Promise<IpcResult<null>> =>
@@ -156,6 +183,13 @@ const api = {
     ipcRenderer.on('menu:about', handler)
     return () => {
       ipcRenderer.removeListener('menu:about', handler)
+    }
+  },
+  onMenuShortcuts: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('menu:shortcuts', handler)
+    return () => {
+      ipcRenderer.removeListener('menu:shortcuts', handler)
     }
   },
   onMenuZoomIn: (cb: () => void) => {

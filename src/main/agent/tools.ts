@@ -7,13 +7,15 @@ import {
   getNode,
   getNeighbors,
   getNodeSource,
+  findPath,
+  type GraphNode,
   type KnowledgeGraph,
   type TourStep,
 } from '../ua/graph-reader'
 import { queryPaper } from '../vector'
 import { buildCrossSourceContext } from '../ua/cross-tour'
 import { flattenTourSteps, toSearchableNodes } from './context-packer'
-import { searchNodesFuzzy } from './ua-search'
+import { searchNodesDetailed } from '../ua/search'
 import type { AgentContext } from './types'
 
 export const AGENT_TOOLS = [
@@ -103,6 +105,22 @@ export const AGENT_TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'find_call_path',
+      description: 'Find how one code node reaches another (shortest path over imports/calls/contains). Returns the ordered node chain with the edge type between each pair.',
+      parameters: {
+        type: 'object',
+        properties: {
+          from_node_id: { type: 'string', description: 'Starting node id (e.g. an HTTP entry point)' },
+          to_node_id: { type: 'string', description: 'Target node id' },
+          max_depth: { type: 'number', description: 'Maximum hops to search (default 8, max 12)' },
+        },
+        required: ['from_node_id', 'to_node_id'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'list_concept_links',
       description: 'List paper paragraph ↔ code node bridges for the current project.',
       parameters: {
@@ -113,14 +131,19 @@ export const AGENT_TOOLS = [
   },
 ]
 
-async function searchGraphNodes(graph: KnowledgeGraph, query: string, limit: number) {
-  const searchable = toSearchableNodes(graph.nodes)
-  const results = await searchNodesFuzzy(searchable, query, limit)
-  if (results.length > 0) {
-    const byId = new Map(graph.nodes.map((n) => [n.id, n]))
-    return results.map((r) => byId.get(r.nodeId)).filter(Boolean)
-  }
-  // Fallback already inside searchNodesFuzzy; keep empty → substring as last resort
+/**
+ * Rank graph nodes for a query. Uses the shared UA search (semantic when the UA
+ * engine loads, substring otherwise) and keeps the engine's score order; falls
+ * back to raw label/summary substring only when nothing matched.
+ */
+async function searchGraphNodes(graph: KnowledgeGraph, query: string, limit: number): Promise<GraphNode[]> {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]))
+  const { hits } = await searchNodesDetailed(toSearchableNodes(graph.nodes), query, limit)
+  const ordered = hits
+    .map((h) => byId.get(h.nodeId))
+    .filter((n): n is GraphNode => Boolean(n))
+  if (ordered.length > 0) return ordered
+
   const q = query.toLowerCase()
   return graph.nodes
     .filter((n) => {
@@ -243,6 +266,50 @@ export async function executeTool(
         lineStart: source.lineStart,
         lineEnd: source.lineEnd,
         content: source.content.slice(0, 3000),
+      })
+    }
+
+    case 'find_call_path': {
+      const fromId = String(args.from_node_id ?? '')
+      const toId = String(args.to_node_id ?? '')
+      const maxDepth = Math.min(Math.max(Number(args.max_depth) || 8, 1), 12)
+      if (!fromId || !toId) {
+        return JSON.stringify({ error: 'from_node_id and to_node_id are required' })
+      }
+      const graph = loadGraph(project.root_path)
+      if (!graph) return JSON.stringify({ error: 'Graph not indexed yet' })
+
+      if (!getNode(graph, fromId)) return JSON.stringify({ error: `Node ${fromId} not found` })
+      if (!getNode(graph, toId)) return JSON.stringify({ error: `Node ${toId} not found` })
+
+      const path = findPath(graph, fromId, toId, maxDepth)
+      if (!path.found) {
+        return JSON.stringify({
+          found: false,
+          reason: path.truncated
+            ? `No path within ${maxDepth} hops — the connection may be longer; retry with a larger max_depth.`
+            : 'No path exists between these nodes in the graph.',
+          from: fromId,
+          to: toId,
+        })
+      }
+
+      const byId = new Map(graph.nodes.map((n) => [n.id, n]))
+      return JSON.stringify({
+        found: true,
+        hops: path.hops,
+        steps: path.nodeIds.map((id, i) => {
+          const node = byId.get(id)
+          const edge = i > 0 ? path.edges[i - 1] : undefined
+          return {
+            id,
+            label: node?.label || node?.name || id,
+            type: node?.type,
+            filePath: node?.filePath,
+            lineRange: node?.lineRange,
+            viaEdge: edge ? { type: edge.type, direction: edge.source === id ? 'incoming' : 'outgoing' } : undefined,
+          }
+        }),
       })
     }
 

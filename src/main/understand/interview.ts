@@ -2,7 +2,7 @@
  * Interview Simulation — questions from architecture + knowledge cards.
  */
 import type { ArchitectureSummary, InterviewQuestion, KnowledgeNode } from '../../shared/understand'
-import { joinLlmUrl } from '../../shared/llm-url'
+import { callLLM as sharedCallLLM, extractJson as sharedExtractJson } from './llm-utils'
 import type { LLMConfig } from './architecture'
 
 function uid(): string {
@@ -70,41 +70,16 @@ export function buildHeuristicQuestions(
 }
 
 function extractJson(text: string): unknown {
-  const trimmed = text.trim()
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const raw = fence ? fence[1].trim() : trimmed
-  return JSON.parse(raw)
+  return sharedExtractJson(text)
 }
 
-async function callLLM(prompt: string, config: LLMConfig, language?: string): Promise<string> {
-  const url = joinLlmUrl(config.baseUrl, '/v1/chat/completions')
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.chatModel,
-      messages: [
-        {
-          role: 'system',
-          content: language === 'en'
-            ? 'You write project-specific interview questions. JSON only.'
-            : '你编写基于项目的面试题。只输出 JSON。',
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.4,
-      max_tokens: 4096,
-    }),
-    signal: AbortSignal.timeout(120_000),
+function callLLM(prompt: string, config: LLMConfig, language?: string): Promise<string> {
+  return sharedCallLLM(prompt, config, language, {
+    system: language === 'en'
+      ? 'You write project-specific interview questions. JSON only.'
+      : '你编写基于项目的面试题。只输出 JSON。',
+    temperature: 0.4,
   })
-  if (!resp.ok) throw new Error(`LLM error ${resp.status}`)
-  const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> }
-  const content = data.choices?.[0]?.message?.content
-  if (!content) throw new Error('empty LLM response')
-  return content
 }
 
 export async function generateInterviewQuestions(

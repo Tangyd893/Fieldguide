@@ -35,7 +35,9 @@
     "tourUnavailable": "導覽不可用",
     "overviewUnavailable": "架構總覽不可用",
     "knowledgeUnavailable": "知識面板不可用",
-    "interviewUnavailable": "面試面板不可用"
+    "interviewUnavailable": "面試面板不可用",
+    "explore": "探索",
+    "exploreUnavailable": "探索面板不可用"
   },
   "project": {
     "emptyTitle": "加入你的第一個專案",
@@ -94,7 +96,23 @@
     "clickToOpen": "點擊左側檔案樹開啟檔案",
     "lines": "{{count}} 行",
     "readError": "讀取失敗",
-    "nodeSearchPlaceholder": "搜尋函式、類別…"
+    "nodeSearchPlaceholder": "搜尋函式、類別… (如: handler, service, main)",
+    "noMatch": "無符合結果",
+    "searchMode": "搜尋模式",
+    "searchModeSemantic": "語意",
+    "searchModeText": "精確",
+    "searchModeSemanticHint": "語意搜尋：由 UA SearchEngine 在本機排序，可用詞義與摘要比對",
+    "searchModeTextHint": "精確搜尋：依名稱／摘要子字串比對",
+    "searchBackendUa": "UA 語意引擎",
+    "searchBackendSubstring": "子字串降級",
+    "searchInFile": "檔案內搜尋 (Ctrl+F)",
+    "noMatchInFile": "無符合",
+    "matchCount": "{{current}}/{{total}}",
+    "prevMatch": "上一個符合",
+    "nextMatch": "下一個符合",
+    "clearSearch": "清除搜尋",
+    "jumpToLine": "跳行",
+    "highlightedRange": "已標示 {{label}} · 第 {{start}}–{{end}} 行"
   },
   "fileTree": {
     "openFile": "開啟檔案",
@@ -179,7 +197,12 @@
     "stepThought": "思考",
     "stepAction": "工具呼叫",
     "stepObservation": "觀察",
-    "stepAnswer": "回答"
+    "stepAnswer": "回答",
+    "citations": "引用程式碼節點",
+    "copyAnswer": "複製回答",
+    "copied": "已複製",
+    "regenerate": "重新生成",
+    "regenerateHint": "丟棄上一則回答並重新提問"
   },
   "commandPalette": {
     "placeholder": "搜尋命令、檔案或節點…",
@@ -209,7 +232,12 @@
       "knowledgeCode": "知識 | 程式碼",
       "interviewChat": "面試 | 問答",
       "tourCode": "導覽 | 程式碼"
-    }
+    },
+    "controls": "分割控制",
+    "maximizePanel": "最大化面板",
+    "closePanel": "關閉面板",
+    "closeFile": "關閉檔案",
+    "exploreCode": "探索 | 程式碼"
   },
   "theory": {
     "title": "理論學習",
@@ -233,7 +261,24 @@
     "notesPlaceholder": "記錄你的想法、與程式碼的關聯…",
     "notesAutoSave": "筆記自動儲存到此論文",
     "saveNotes": "儲存筆記",
-    "deletePaper": "刪除此論文"
+    "deletePaper": "刪除此論文",
+    "ragTitle": "論文向量索引（本機 RAG）",
+    "ragStatusReady": "已建立索引：{{count}} 個文字區塊，可在下方或與 AI 教練對話時檢索",
+    "ragStatusEmpty": "尚未建立索引 — 建立後 AI 才能引用本文內容",
+    "ragIndex": "建立索引",
+    "ragReindex": "重建索引",
+    "ragIndexing": "索引中…",
+    "ragIndexed": "索引完成：{{count}} 個文字區塊",
+    "ragIndexFailed": "索引失敗",
+    "ragMissingEmbed": "請先在「設定 → 模型」中設定嵌入模型（Embedding），論文 RAG 才能運作",
+    "ragNeedPdf": "請先下載 PDF",
+    "ragSearchPlaceholder": "在本文中檢索（語意）…",
+    "ragSearchBtn": "檢索",
+    "ragNoHits": "本文未檢索到相關段落",
+    "ragNotIndexed": "尚未建立索引，請先按「建立索引」",
+    "ragBadge": "RAG {{count}} 塊",
+    "ragReadyHint": "已建立向量索引，AI 教練可直接引用本文",
+    "ragChunk": "第 {{index}} 塊"
   },
   "bridge": {
     "title": "概念橋接",
@@ -308,7 +353,10 @@
     "cancelSelection": "取消選取",
     "closeReader": "關閉閱讀器",
     "loading": "載入 PDF…",
-    "loadFailed": "PDF 載入失敗"
+    "loadFailed": "PDF 載入失敗",
+    "removeHighlight": "刪除標示",
+    "highlightRemoved": "標示已刪除",
+    "removeFailed": "刪除失敗"
   },
   "cost": {
     "title": "索引「{{name}}」",
@@ -317,10 +365,11 @@
     "sourceFiles": "原始檔",
     "structNodes": "結構節點（已有）",
     "llmHint": "LLM 分析將為程式碼節點產生摘要、架構分層和引導 Tour。",
-    "estTokens": "預估消耗 ~{{tokens}} tokens（約 ¥{{cost}}）",
+    "estTokens": "預估消耗 ~{{tokens}} tokens",
     "fullIndex": "完整索引（含 LLM 分析）",
     "staticOnly": "僅靜態索引（跳過摘要與 Tour）",
-    "cancel": "取消"
+    "cancel": "取消",
+    "estDisclaimer": "依原始碼位元組數估算（每檔摘要最多取 15KB）；實際費用取決於你在設定中選擇的供應商與模型，因此不顯示金額。"
   },
   "status": {
     "ready": "就緒",
@@ -457,5 +506,80 @@
     "enterLibrary": "進入專案庫",
     "prev": "← 上一步",
     "next": "下一步 →"
+  },
+  "searchContent": {
+    "title": "全庫內容搜尋",
+    "placeholder": "搜尋檔案內容… (Ctrl+Shift+F)",
+    "hint": "輸入至少 2 個字元開始搜尋",
+    "searching": "搜尋中…",
+    "noMatch": "沒有符合的內容",
+    "caseSensitive": "區分大小寫",
+    "failed": "搜尋失敗",
+    "summary": "{{matches}} 處符合 · {{files}} 個檔案（已掃描 {{scanned}}）",
+    "truncated": "結果已截斷，請縮小關鍵字"
+  },
+  "shortcuts": {
+    "title": "鍵盤快速鍵",
+    "groupGlobal": "全域",
+    "groupView": "檢視",
+    "groupPanels": "面板與分割",
+    "groupCode": "程式碼檢視",
+    "groupChat": "問答",
+    "commandPalette": "命令面板",
+    "contentSearch": "全庫內容搜尋",
+    "openProject": "開啟專案",
+    "reload": "重新載入",
+    "devtools": "開發者工具",
+    "quit": "結束",
+    "zoomIn": "放大介面",
+    "zoomOut": "縮小介面",
+    "zoomReset": "重設縮放",
+    "zoomWheel": "介面縮放",
+    "panelTabs": "面板頁籤切換",
+    "separatorResize": "調整分割比例（聚焦分隔條後）",
+    "separatorResizeFast": "調整分割比例（大步）",
+    "separatorMinMax": "分割比例到最小 / 最大",
+    "separatorReset": "恢復平均",
+    "closeTab": "關閉檔案頁籤",
+    "findInFile": "檔案內搜尋",
+    "nextPrevMatch": "下一個 / 上一個符合",
+    "clearFind": "清除搜尋",
+    "goToLine": "跳至輸入的行號",
+    "send": "傳送訊息",
+    "newline": "換行不傳送"
+  },
+  "insights": {
+    "title": "洞察",
+    "explore": "圖譜探索",
+    "debt": "技術債",
+    "stats": "圖譜統計",
+    "nodes": "節點",
+    "edges": "邊",
+    "types": "類型分布",
+    "neighbors": "鄰居",
+    "neighborsHint": "先在圖譜中選取一個節點，或從上方搜尋",
+    "depth": "深度",
+    "openFile": "開啟檔案",
+    "focusGraph": "圖譜定位",
+    "path": "路徑查找",
+    "pathFrom": "從（節點 id）",
+    "pathTo": "到（節點 id）",
+    "pathFind": "查找路徑",
+    "pathFound": "{{hops}} 跳",
+    "pathNotFound": "兩個節點之間沒有路徑",
+    "pathTruncated": "在 {{depth}} 跳內未找到，可能更長",
+    "pathUseFocus": "用目前焦點",
+    "scan": "掃描",
+    "scanning": "掃描中…",
+    "noDebt": "未發現明顯的技術債標記",
+    "todo": "未完成標記",
+    "largeFile": "超大檔案",
+    "highFanIn": "高扇入節點",
+    "filesScanned": "已掃描 {{count}} 個檔案",
+    "exportReport": "匯出學習報告",
+    "exporting": "匯出中…",
+    "exported": "報告已匯出",
+    "exportFailed": "匯出失敗",
+    "scanFailed": "掃描失敗"
   }
 }

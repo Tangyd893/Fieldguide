@@ -34,6 +34,30 @@ export default function BridgeView({ t, projectId }: Props) {
   useEffect(() => { loadPapers() }, [])
   useEffect(() => { if (projectId) loadAllLinks() }, [projectId])
 
+  /**
+   * Subscribe to the bridge:tourGenerated broadcast as well as the invoke reply.
+   * The main process emits it after writing the Tour into the graph, so a result
+   * arriving this way (e.g. from a run started elsewhere) still surfaces.
+   */
+  useEffect(() => {
+    if (!projectId) return
+    const off = window.fieldguide.onBridgeTourGenerated((data) => {
+      setGeneratingTour(false)
+      applyTourResult(data)
+    })
+    return off
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, t])
+
+  function applyTourResult(raw: unknown) {
+    const d = (raw ?? {}) as { stepCount?: number; summary?: string; noLinks?: boolean; message?: string }
+    if (d.noLinks) {
+      setTourResult({ stepCount: 0, summary: d.message ?? t('bridge.noLinksFound') })
+    } else {
+      setTourResult({ stepCount: d.stepCount ?? 0, summary: d.summary ?? t('bridge.tourGenerated') })
+    }
+  }
+
   async function loadPapers() {
     try {
       const r = await window.fieldguide.paperList()
@@ -56,12 +80,7 @@ export default function BridgeView({ t, projectId }: Props) {
     try {
       const r = await window.fieldguide.bridgeGenerateTour(projectId)
       if (r.ok && r.data) {
-        const d = r.data as { stepCount?: number; summary?: string; noLinks?: boolean; message?: string }
-        if (d.noLinks) {
-          setTourResult({ stepCount: 0, summary: d.message ?? t('bridge.noLinksFound') })
-        } else {
-          setTourResult({ stepCount: d.stepCount ?? 0, summary: d.summary ?? t('bridge.tourGenerated') })
-        }
+        applyTourResult(r.data)
       } else {
         setTourResult({ stepCount: 0, summary: r.error?.message ?? t('bridge.generateFailed') })
       }

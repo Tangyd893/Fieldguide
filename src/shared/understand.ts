@@ -12,6 +12,7 @@ export type PanelTab =
   | 'overview'
   | 'knowledge'
   | 'interview'
+  | 'explore'
 
 export const ALL_PANEL_TABS: PanelTab[] = [
   'overview',
@@ -21,6 +22,7 @@ export const ALL_PANEL_TABS: PanelTab[] = [
   'tour',
   'knowledge',
   'interview',
+  'explore',
 ]
 
 /** Product analysis stages (distinct from UA index phases) */
@@ -93,6 +95,7 @@ export type LayoutPresetId =
   | 'knowledge-code'
   | 'interview-chat'
   | 'tour-code'
+  | 'explore-code'
 
 export interface LayoutPresetDef {
   id: LayoutPresetId
@@ -108,6 +111,7 @@ export const LAYOUT_PRESETS: LayoutPresetDef[] = [
   { id: 'knowledge-code', labelKey: 'split.preset.knowledgeCode', left: 'knowledge', right: 'code' },
   { id: 'interview-chat', labelKey: 'split.preset.interviewChat', left: 'interview', right: 'chat' },
   { id: 'tour-code', labelKey: 'split.preset.tourCode', left: 'tour', right: 'code' },
+  { id: 'explore-code', labelKey: 'split.preset.exploreCode', left: 'explore', right: 'code' },
 ]
 
 /** Normalize saved panel tabs to the full V1 catalog (canonical order). */

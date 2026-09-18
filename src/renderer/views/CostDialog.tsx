@@ -18,6 +18,7 @@ interface Props {
 export default function CostDialog({ open, t, projectId, projectName, onCancel, onContinue, onSkipLLM }: Props) {
   const [fileCount, setFileCount] = useState<number | null>(null)
   const [nodeCount, setNodeCount] = useState<number | null>(null)
+  const [totalBytes, setTotalBytes] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -43,24 +44,42 @@ export default function CostDialog({ open, t, projectId, projectName, onCancel, 
     try {
       const treeResult = await window.fieldguide.fileTree(projectId)
       if (treeResult.ok && treeResult.data) {
-        const countFiles = (entries: unknown[]): number => {
-          let n = 0
+        let files = 0
+        let bytes = 0
+        const walk = (entries: unknown[]) => {
           for (const e of entries) {
             const entry = e as Record<string, unknown>
-            if (entry.isDirectory && Array.isArray(entry.children)) n += countFiles(entry.children as unknown[])
-            else if (!entry.isDirectory) n++
+            if (entry.isDirectory && Array.isArray(entry.children)) walk(entry.children as unknown[])
+            else if (!entry.isDirectory) {
+              files++
+              bytes += Number(entry.size) || 0
+            }
           }
-          return n
         }
-        setFileCount(countFiles(treeResult.data as unknown[]))
+        walk(treeResult.data as unknown[])
+        setFileCount(files)
+        setTotalBytes(bytes > 0 ? bytes : null)
       }
     } catch { /* ignore */ }
     setLoading(false)
   }
 
+  /**
+   * Token estimate.
+   *
+   * The old version guessed `files × 500` regardless of file size and printed a
+   * hardcoded ¥3/1M cost. This derives tokens from the actual byte count of the
+   * sources (≈4 chars/token for code+ASCII, and the summariser truncates each
+   * file at 15KB), so the number tracks the project instead of the file count.
+   * The price is intentionally NOT shown: it depends on the provider and model
+   * the user configured, and inventing one is worse than omitting it.
+   */
+  const PER_FILE_CHAR_CAP = 15_000
+  const estimatedChars = totalBytes !== null && fileCount !== null
+    ? Math.min(totalBytes, fileCount * PER_FILE_CHAR_CAP)
+    : null
+  const estLLMTokens = estimatedChars !== null ? Math.ceil(estimatedChars / 4) : null
   const estStructureTokens = fileCount ? fileCount * 200 : null
-  const estLLMTokens = fileCount ? fileCount * 500 : null
-  const estCost = estLLMTokens ? (estLLMTokens / 1_000_000 * 3).toFixed(2) : null
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel() }}>
@@ -92,11 +111,14 @@ export default function CostDialog({ open, t, projectId, projectName, onCancel, 
 
             <div className="bg-[var(--fg-status-warning-bg)] border border-[var(--fg-status-warning)] rounded-lg p-3 mb-4">
               <p className="text-sm text-[var(--fg-status-warning)]">{t('cost.llmHint')}</p>
-              {estCost && estLLMTokens && (
+              {estLLMTokens !== null && (
                 <p className="text-xs text-[var(--fg-status-warning)] mt-2">
-                  {t('cost.estTokens', { tokens: estLLMTokens.toLocaleString(), cost: estCost })}
+                  {t('cost.estTokens', { tokens: estLLMTokens.toLocaleString() })}
                 </p>
               )}
+              <p className="text-[10px] text-[var(--fg-status-warning)] mt-1 opacity-80">
+                {t('cost.estDisclaimer')}
+              </p>
             </div>
           </>
         )}

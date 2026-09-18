@@ -23,7 +23,10 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
       alias: {
-        '@': resolve('src/renderer')
+        '@': resolve('src/renderer'),
+        // Kept in sync with tsconfig.json paths — without this the import
+        // typechecks but Rollup cannot resolve it at build time.
+        '@shared': resolve('src/shared'),
       }
     }
   }

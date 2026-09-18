@@ -41,6 +41,66 @@ interface GraphMeta {
   hasDomain: boolean
 }
 
+/** Payload of `graph:search` — backend reports which matcher actually ran. */
+interface GraphSearchResult {
+  mode: 'text' | 'semantic'
+  backend: 'ua' | 'substring'
+  results: Array<{
+    id: string
+    label?: string
+    name?: string
+    type?: string
+    filePath?: string
+    lineRange?: [number, number]
+    matchScore?: number | null
+    metadata?: { summary?: string }
+    summary?: string
+  }>
+}
+
+/** Payload of `paper:indexStatus`. */
+interface PaperIndexStatus {
+  paperId: string
+  chunkCount: number
+  totalStats: { totalPapers: number; totalChunks: number }
+}
+
+/** Payload of `file:grep`. */
+interface ContentSearchResult {
+  query: string
+  matches: Array<{ path: string; line: number; text: string }>
+  filesScanned: number
+  filesWithMatches: number
+  truncated: boolean
+}
+
+/** Payload of `insights:debtScan`. */
+interface DebtScanResult {
+  items: Array<{
+    kind: 'todo' | 'large-file' | 'high-fan-in' | 'no-summary'
+    detail: string
+    path?: string
+    line?: number
+    nodeId?: string
+    weight: number
+  }>
+  counts: Record<'todo' | 'large-file' | 'high-fan-in' | 'no-summary', number>
+  filesScanned: number
+}
+
+/** One RAG hit from `paper:query`. */interface PaperChunkHit {
+  score: number
+  chunk: {
+    id: string
+    paper_id: string
+    chunk_index: number
+    text: string
+    token_count: number
+    char_start: number
+    char_end: number
+  }
+}
+
 interface FieldguideAPI {
   // Config
   configGet(): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: { message: string } }>
@@ -73,7 +133,7 @@ interface FieldguideAPI {
   graphGet(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   graphGetNode(projectId: string, nodeId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   graphNeighbors(projectId: string, nodeId: string, depth?: number): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
-  graphSearch(projectId: string, query: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+  graphSearch(projectId: string, query: string, opts?: { mode?: 'text' | 'semantic'; limit?: number }): Promise<{ ok: boolean; data?: GraphSearchResult; error?: { message: string } }>
   graphGetSource(projectId: string, opts: { nodeId?: string; path?: string; lineStart?: number; lineEnd?: number }): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   graphStats(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   graphMeta(projectId: string): Promise<{ ok: boolean; data?: GraphMeta; error?: { message: string } }>
@@ -87,6 +147,11 @@ interface FieldguideAPI {
   // File tree & code
   fileTree(projectId: string): Promise<{ ok: boolean; data?: FileEntry[]; error?: { message: string } }>
   fileRead(projectId: string, filePath: string): Promise<{ ok: boolean; data?: { path: string; content: string; size: number }; error?: { message: string } }>
+  fileGrep(projectId: string, query: string, opts?: { caseSensitive?: boolean; limit?: number }): Promise<{ ok: boolean; data?: ContentSearchResult; error?: { message: string } }>
+
+  // Insights
+  insightsExportReport(projectId: string): Promise<{ ok: boolean; data?: { exportPath: string; bytes: number }; error?: { message: string } }>
+  insightsDebtScan(projectId: string): Promise<{ ok: boolean; data?: DebtScanResult; error?: { message: string } }>
 
   // Shell
   openInExplorer(projectId: string, filePath: string): Promise<{ ok: boolean; error?: { message: string } }>
@@ -109,6 +174,9 @@ interface FieldguideAPI {
   paperRemove(id: string): Promise<{ ok: boolean; error?: { message: string } }>
   paperSearch(query: string): Promise<{ ok: boolean; data?: PaperRow[]; error?: { message: string } }>
   paperDownloadPdf(id: string): Promise<{ ok: boolean; data?: { pdf_path: string }; error?: { message: string } }>
+  paperIndex(id: string): Promise<{ ok: boolean; data?: { paperId: string; chunkCount: number; skipped?: boolean }; error?: { message: string; code?: string } }>
+  paperQuery(query: string, paperId?: string, topK?: number): Promise<{ ok: boolean; data?: PaperChunkHit[]; error?: { message: string; code?: string } }>
+  paperIndexStatus(id: string): Promise<{ ok: boolean; data?: PaperIndexStatus; error?: { message: string } }>
   paperHighlights(paperId: string): Promise<{ ok: boolean; data?: unknown[]; error?: { message: string } }>
   paperAddHighlight(paperId: string, page: number, text: string, color?: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   paperRemoveHighlight(id: string): Promise<{ ok: boolean; error?: { message: string } }>
@@ -124,6 +192,7 @@ interface FieldguideAPI {
   onMenuOpenProjectsFolder(cb: () => void): () => void
   onMenuOpenProject(cb: () => void): () => void
   onMenuAbout(cb: () => void): () => void
+  onMenuShortcuts(cb: () => void): () => void
   onMenuZoomIn(cb: () => void): () => void
   onMenuZoomOut(cb: () => void): () => void
   onMenuZoomReset(cb: () => void): () => void

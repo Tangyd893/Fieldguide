@@ -10,6 +10,7 @@ import SplitPanel from './views/CodeMap/SplitPanel'
 import OverviewPanel from './views/CodeMap/OverviewPanel'
 import KnowledgePanel from './views/CodeMap/KnowledgePanel'
 import InterviewPanel from './views/CodeMap/InterviewPanel'
+import InsightsPanel from './views/CodeMap/InsightsPanel'
 import GraphPanel from './views/CodeMap/GraphPanel'
 import { type DashboardMessage, dashboardSelectNode } from './views/CodeMap/GraphPanel'
 import CodeViewer from './views/CodeMap/CodeViewer'
@@ -23,15 +24,18 @@ import CostDialog from './views/CostDialog'
 import AboutDialog from './views/AboutDialog'
 import TheoryView from './views/Theory/TheoryView'
 import BridgeView from './views/Bridge/BridgeView'
+import ContentSearch from './views/ContentSearch'
+import ShortcutsDialog from './views/ShortcutsDialog'
 import ActivityBar, { defaultActivityIcons, type ShellModule } from './components/ActivityBar'
 import AppTitleBar from './components/AppTitleBar'
+import ErrorBoundary from './components/ErrorBoundary'
 import { beginResizeDrag } from './lib/resize-drag'
 import { useToast, ToastContainer, showToast } from './views/Toast'
 import { useWorkspaceLayout } from './hooks/useWorkspaceLayout'
 import { useIndexProgress, progressPercent } from './hooks/useIndexProgress'
 import { useDashboardThemeSync } from './hooks/useDashboardThemeSync'
 import { syncDashboardTheme } from './lib/dashboard-theme'
-import { postToDashboard, dashboardViewportZoomIn, dashboardViewportZoomOut, dashboardViewportZoomReset } from './lib/dashboard-bridge'
+import { postToDashboard, dashboardViewportZoomIn, dashboardViewportZoomOut, dashboardViewportZoomReset, dashboardNavigateToNode } from './lib/dashboard-bridge'
 import {
   applyAppearance,
   applyShellZoom,
@@ -95,13 +99,20 @@ export default function App() {
   const activeTabRef = useRef<Tab>(activeTab)
   activeTabRef.current = activeTab
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  // Refs let the global key handler read current values without re-subscribing.
+  const selectedProjectRef = useRef<Project | null>(selectedProject)
+  selectedProjectRef.current = selectedProject
   const [projects, setProjects] = useState<Project[]>([])
   const workspaceLayout = useWorkspaceLayout(selectedProject?.id)
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false)
   const [fileTreeWidth, setFileTreeWidth] = useState(260)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
+  const [showContentSearch, setShowContentSearch] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [showCostDialog, setShowCostDialog] = useState(false)
+  /** One-shot "scroll the code pane to this line" request (content search hits). */
+  const [jumpTarget, setJumpTarget] = useState<{ line: number; seq: number } | null>(null)
   const [showAbout, setShowAbout] = useState(false)
   const [showProjectMenu, setShowProjectMenu] = useState(false)
   const [customChrome, setCustomChrome] = useState(false)
@@ -157,6 +168,7 @@ export default function App() {
     })
     const unsubOpenProject = window.fieldguide.onMenuOpenProject?.(() => { void openLocalProject() })
     const unsubAbout = window.fieldguide.onMenuAbout?.(() => setShowAbout(true))
+    const unsubShortcuts = window.fieldguide.onMenuShortcuts?.(() => setShowShortcuts(true))
     const unsubZoomIn = window.fieldguide.onMenuZoomIn?.(() => {
       if (activeTabRef.current === 'codemap') {
         dashboardViewportZoomIn()
@@ -185,6 +197,7 @@ export default function App() {
       unsubFolder?.()
       unsubOpenProject?.()
       unsubAbout?.()
+      unsubShortcuts?.()
       unsubZoomIn?.()
       unsubZoomOut?.()
       unsubZoomReset?.()
@@ -278,6 +291,12 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         setShowPalette((v) => !v)
+        return
+      }
+      // Ctrl+Shift+F — find in files (Ctrl+F is handled by the code pane itself)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        if (selectedProjectRef.current) setShowContentSearch((v) => !v)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -424,7 +443,22 @@ export default function App() {
       { id: 'reindex', label: t('commandPalette.reindex', { name: selectedProject.name }), action: handleReIndex },
       { id: 'codemap', label: t('commandPalette.codemap'), shortcut: 'Tab', action: () => setActiveTab('codemap') },
       { id: 'openFolder', label: t('commandPalette.openFolder'), action: () => window.fieldguide.openInExplorer(selectedProject.id, '.') },
+      { id: 'searchContent', label: t('shortcuts.contentSearch'), shortcut: 'Ctrl+Shift+F', action: () => setShowContentSearch(true) },
+      {
+        id: 'exportReport',
+        label: t('insights.exportReport'),
+        action: async () => {
+          const r = await window.fieldguide.insightsExportReport(selectedProject.id)
+          if (r.ok && r.data) {
+            showToast('success', t('insights.exported'))
+            await window.fieldguide.openFile(r.data.exportPath)
+          } else {
+            showToast('error', r.error?.message ?? t('insights.exportFailed'))
+          }
+        },
+      },
     ] : []),
+    { id: 'shortcuts', label: t('shortcuts.title'), shortcut: 'Ctrl+/', action: () => setShowShortcuts(true) },
     { id: 'settings', label: t('commandPalette.settings'), action: () => setActiveTab('settings') },
     { id: 'zoomIn', label: t('commandPalette.zoomIn'), action: () => {
       if (activeTabRef.current === 'codemap') dashboardViewportZoomIn()
@@ -450,7 +484,10 @@ export default function App() {
 
   function handleNodeRef(nodeId: string) {
     if (!selectedProject) return
+    // Select in the graph *and* bring it into view: selecting a node that sits
+    // outside the current viewport looks like nothing happened.
     dashboardSelectNode(nodeId)
+    dashboardNavigateToNode(nodeId)
     window.fieldguide.graphGet(selectedProject.id).then((r) => {
       if (r.ok && r.data) {
         const g = r.data as { nodes?: Array<{ id: string; filePath?: string }> }
@@ -589,6 +626,8 @@ export default function App() {
           )}
 
           <main className="flex-1 overflow-hidden min-w-0">
+            {/* A blown-up panel must not take the whole shell down with it. */}
+            <ErrorBoundary label={activeTab ? t(`tabs.${activeTab}`) : undefined}>
             {activeTab === 'library' && (
               <ProjectLibrary
                 selected={selectedProject}
@@ -624,6 +663,8 @@ export default function App() {
                     onNodeRefClick={handleNodeRef}
                     dashboardTourStep={dashboardTourStep}
                     focusedNodeId={focusedNodeId}
+                    jumpTarget={jumpTarget}
+                    jumpToLine={(line) => setJumpTarget((prev) => ({ line, seq: (prev?.seq ?? 0) + 1 }))}
                   />
                 </div>
               </div>
@@ -638,6 +679,7 @@ export default function App() {
                 onAppearanceLive={setAppearance}
               />
             )}
+            </ErrorBoundary>
           </main>
         </div>
       </div>
@@ -713,6 +755,22 @@ export default function App() {
 
       <AboutDialog open={showAbout} t={t} onClose={() => setShowAbout(false)} />
 
+      <ShortcutsDialog open={showShortcuts} t={t} onClose={() => setShowShortcuts(false)} />
+
+      {showContentSearch && selectedProject && (
+        <ContentSearch
+          t={t}
+          projectId={selectedProject.id}
+          onClose={() => setShowContentSearch(false)}
+          onOpenHit={(path, line) => {
+            workspaceLayout.openFile(path)
+            setActiveTab('codemap')
+            // seq makes each request distinct so re-opening the same line still scrolls
+            setJumpTarget((prev) => ({ line, seq: (prev?.seq ?? 0) + 1 }))
+          }}
+        />
+      )}
+
       <CostDialog
         open={showCostDialog && !!selectedProject}
         t={t}
@@ -744,6 +802,8 @@ function CodeMapLayout({
   onNodeRefClick,
   dashboardTourStep,
   focusedNodeId,
+  jumpTarget,
+  jumpToLine,
 }: {
   project: Project | null
   workspaceLayout: ReturnType<typeof useWorkspaceLayout>
@@ -752,6 +812,8 @@ function CodeMapLayout({
   onNodeRefClick?: (nodeId: string) => void
   dashboardTourStep?: number | null
   focusedNodeId?: string | null
+  jumpTarget?: { line: number; seq: number } | null
+  jumpToLine?: (line: number) => void
 }) {
   if (!project) {
     return (
@@ -763,7 +825,15 @@ function CodeMapLayout({
   return (
     <SplitPanel
       renderGraph={() => <GraphPanel t={t} projectRoot={project.root_path} projectId={project.id} onDashboardMessage={onDashboardMessage} />}
-      renderCode={(path) => <CodeViewer projectId={project.id} filePath={path} t={t} />}
+      renderCode={(path) => (
+        <CodeViewer
+          projectId={project.id}
+          filePath={path}
+          highlightNodeId={focusedNodeId}
+          jumpTarget={jumpTarget}
+          t={t}
+        />
+      )}
       renderChat={() => (
         <ChatPanel
           projectId={project.id}
@@ -778,6 +848,18 @@ function CodeMapLayout({
       renderOverview={() => <OverviewPanel projectId={project.id} t={t} />}
       renderKnowledge={() => <KnowledgePanel projectId={project.id} t={t} />}
       renderInterview={() => <InterviewPanel projectId={project.id} t={t} />}
+      renderExplore={() => (
+        <InsightsPanel
+          projectId={project.id}
+          focusedNodeId={focusedNodeId}
+          t={t}
+          onOpenNode={(nodeId) => onNodeRefClick?.(nodeId)}
+          onOpenFile={(path, line) => {
+            workspaceLayout.openFile(path)
+            if (line) jumpToLine?.(line)
+          }}
+        />
+      )}
       layout={workspaceLayout}
       t={t}
       hideChromeControls

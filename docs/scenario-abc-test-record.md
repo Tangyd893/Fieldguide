@@ -14,12 +14,13 @@
 | 2026-07-17 | `pnpm qa:graph` | ✅ 通过 | 增补：resources/packaged `__uaStore`、core 可解析 |
 | 2026-07-17 | `vitest …/dashboard-bridge-script.test.ts` | ✅ 7 passed | 含 **runtime**：selectedNodeId→`nodeSelected`；shell `selectNode`→`getState()` |
 | 2026-07-17 | `node scripts/prepare-pack.mjs` | ✅ 通过 | Dashboard OK；UA commit `54754a6`；core materialize |
+| 2026-09-18 | `pnpm regen:sample-graph` → `pnpm qa:baseline` → `pnpm qa:graph` | ✅ 通过 | Demo 重做为 `pulsegate`：**104 nodes / 88 edges / 9 layers / 5 tour steps**，104/104 带 filePath；layers 覆盖 104/104 |
 
 ### 图谱路径自动验收明细（2026-07-17）
 
 | 检查项 | 结果 |
 |--------|------|
-| Demo `resources/sample-project` 图谱节点 > 0 | ✅ 13 nodes，13 可点击 filePath |
+| Demo `resources/sample-project` 图谱节点 > 0 | ✅ **104 nodes / 88 edges**（2026-09-18 重做），104 可点击 filePath；9 个分层覆盖全部节点 |
 | UA Dashboard dist（打包或 sibling） | ✅ `resources/dashboard` + `dist/win-unpacked/resources/dashboard` |
 | 构建产物暴露 `window.__uaStore` | ✅ resources + packaged asset JS |
 | 壳层 `tourStepChanged` / `nodeSelected→openFile` | ✅ 源码接线存在 |
@@ -82,7 +83,7 @@ Tour 体验：
 
 在 `pnpm dev` 或 `dist/win-unpacked/Fieldguide.exe`：
 
-- [x] 内置 Demo → 代码地图可见节点 — **2026-07-17**：Demo 13 nodes + Dashboard dist（`qa:graph`）
+- [x] 内置 Demo → 代码地图可见节点 — **2026-07-17**：Demo 13 nodes + Dashboard dist（`qa:graph`）；**2026-09-18**：Demo 重做为 pulsegate，104 nodes / 9 layers / 5 步 Tour（`qa:graph`）
 - [x] 点击节点 → 左侧/代码面板打开文件 — **2026-07-17**：`__uaStore` 在 resources/packaged 产物中；vitest runtime 发出 `nodeSelected`；`App.tsx` `nodeSelected→openFile`
 - [x]（可选）HIS-Go 打开后节点可点 — **2026-07-17**：3656/3656 带 filePath（`qa:graph` / `qa:his-go`）；diff GUI 高亮仍待人工
 

@@ -2,7 +2,7 @@
  * Knowledge Extraction — tech concepts from architecture + graph → in-app cards.
  */
 import type { ArchitectureSummary, KnowledgeNode } from '../../shared/understand'
-import { joinLlmUrl } from '../../shared/llm-url'
+import { callLLM as sharedCallLLM, extractJson as sharedExtractJson } from './llm-utils'
 import type { GraphLike, LLMConfig } from './architecture'
 
 function uid(): string {
@@ -45,41 +45,16 @@ export function buildHeuristicKnowledge(
 }
 
 function extractJson(text: string): unknown {
-  const trimmed = text.trim()
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const raw = fence ? fence[1].trim() : trimmed
-  return JSON.parse(raw)
+  return sharedExtractJson(text)
 }
 
-async function callLLM(prompt: string, config: LLMConfig, language?: string): Promise<string> {
-  const url = joinLlmUrl(config.baseUrl, '/v1/chat/completions')
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.chatModel,
-      messages: [
-        {
-          role: 'system',
-          content: language === 'en'
-            ? 'You extract technical knowledge cards from software projects. JSON only.'
-            : '你从软件项目中抽取技术知识卡片。只输出 JSON。',
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.35,
-      max_tokens: 4096,
-    }),
-    signal: AbortSignal.timeout(120_000),
+function callLLM(prompt: string, config: LLMConfig, language?: string): Promise<string> {
+  return sharedCallLLM(prompt, config, language, {
+    system: language === 'en'
+      ? 'You extract technical knowledge cards from software projects. JSON only.'
+      : '你从软件项目中抽取技术知识卡片。只输出 JSON。',
+    temperature: 0.35,
   })
-  if (!resp.ok) throw new Error(`LLM error ${resp.status}`)
-  const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> }
-  const content = data.choices?.[0]?.message?.content
-  if (!content) throw new Error('empty LLM response')
-  return content
 }
 
 export async function generateKnowledgeNodes(
