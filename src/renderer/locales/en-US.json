@@ -37,7 +37,13 @@
     "knowledgeUnavailable": "Knowledge panel is not available",
     "interviewUnavailable": "Interview panel is not available",
     "explore": "Explore",
-    "exploreUnavailable": "Explore panel unavailable"
+    "exploreUnavailable": "Explore panel unavailable",
+    "progress": "Progress",
+    "notes": "Notes",
+    "tutor": "Tutor",
+    "progressUnavailable": "Progress panel unavailable",
+    "notesUnavailable": "Notes panel unavailable",
+    "tutorUnavailable": "Tutor panel unavailable"
   },
   "project": {
     "emptyTitle": "Add your first project",
@@ -112,7 +118,8 @@
     "nextMatch": "Next match",
     "clearSearch": "Clear search",
     "jumpToLine": "Go to line",
-    "highlightedRange": "Highlighting {{label}} · lines {{start}}–{{end}}"
+    "highlightedRange": "Highlighting {{label}} · lines {{start}}–{{end}}",
+    "selectLine": "Select line {{line}} (focus in graph)"
   },
   "fileTree": {
     "openFile": "Open file",
@@ -237,7 +244,9 @@
     "maximizePanel": "Maximize panel",
     "closePanel": "Close panel",
     "closeFile": "Close file",
-    "exploreCode": "Explore | Code"
+    "exploreCode": "Explore | Code",
+    "notesCode": "Notes | Code",
+    "progressReview": "Progress | Code"
   },
   "theory": {
     "title": "Theory",
@@ -278,7 +287,13 @@
     "ragNotIndexed": "Not indexed yet — click “Build index” first",
     "ragBadge": "RAG {{count}}",
     "ragReadyHint": "Vector index built — the AI coach can cite this paper",
-    "ragChunk": "Chunk {{index}}"
+    "ragChunk": "Chunk {{index}}",
+    "askCoach": "Ask the coach about this paper",
+    "askCoachHint": "The same learning coach, scoped to this paper: paper RAG plus the project graph.",
+    "askCoachPlaceholder": "e.g. how is the paper's chunking strategy implemented in this repo?",
+    "askCoachSend": "Ask",
+    "askCoachAsking": "Thinking…",
+    "askCoachNeedProject": "Pick a project in the library first so the coach has code context."
   },
   "bridge": {
     "title": "Concept Bridge",
@@ -580,6 +595,119 @@
     "exporting": "Exporting…",
     "exported": "Report exported",
     "exportFailed": "Export failed",
-    "scanFailed": "Scan failed"
+    "scanFailed": "Scan failed",
+    "tab": {
+      "explore": "Explore",
+      "debt": "Debt",
+      "evolution": "Evolution",
+      "clusters": "Clusters"
+    },
+    "evolution": "Architecture evolution",
+    "notARepo": "This project is not a git repository, so history cannot be analysed.",
+    "evolutionSummary": "{{commits}} commits scanned, oldest {{since}}",
+    "hotspots": "Most frequently changed files",
+    "commits": "{{count}} commits",
+    "lastChanged": "last {{date}}",
+    "nodeCount": "{{count}} nodes",
+    "clusters": "Module clusters (by dependency)",
+    "clusterSummary": "{{count}} clusters · cohesion {{cohesion}}%",
+    "clusterSize": "{{count}} nodes",
+    "audit": "AI code review",
+    "runAudit": "Review code",
+    "auditing": "Reviewing…",
+    "auditHint": "Reviews the most load-bearing files (heuristic when no LLM is configured).",
+    "auditDone": "{{source}}: {{count}} findings across {{files}} files",
+    "auditFailed": "Review failed",
+    "noFindings": "No review findings yet."
+  },
+  "notes": {
+    "search": "Search notes…",
+    "count": "{{count}}",
+    "refresh": "Refresh",
+    "empty": "No notes yet",
+    "emptyHint": "Use the + next to a line in the code panel; notes collect here.",
+    "noMatch": "No matching notes",
+    "fileLevel": "file",
+    "save": "Save",
+    "delete": "Delete note",
+    "addAtLine": "Add a note on line {{line}}",
+    "draftPlaceholder": "What did you understand, or where is the doubt?",
+    "saving": "Saving…",
+    "saveHint": "Ctrl+Enter to save · Esc to cancel"
+  },
+  "progress": {
+    "tabProgress": "Progress",
+    "tabReview": "Review",
+    "mastered": "mastered",
+    "coverage": "{{nodes}} graph nodes in total",
+    "masteredCount": "{{count}} mastered",
+    "readingCount": "{{count}} in progress",
+    "coreUnread": "Core nodes still unread ({{count}})",
+    "allCoreRead": "Every core node has been read.",
+    "fanIn": "depended on {{count}} times",
+    "markMastered": "Mark as mastered",
+    "currentFocus": "Current focus",
+    "status": {
+      "unseen": "Unread",
+      "reading": "Reading",
+      "mastered": "Mastered"
+    },
+    "dueNow": "{{count}} cards due now",
+    "reviewStats": "{{total}} cards · {{today}} today · {{streak}}-day streak",
+    "retention": "{{percent}}% recalled today",
+    "generateCards": "Generate cards",
+    "generating": "Generating…",
+    "cardsGenerated": "{{added}} new cards ({{total}} total)",
+    "noCards": "No cards yet — generate knowledge cards or interview questions first, then come back.",
+    "allReviewed": "Today's reviews are done.",
+    "cardQuestion": "Question",
+    "showAnswer": "Show answer",
+    "answerHidden": "Answer hidden (recall it first)",
+    "remaining": "{{count}} left",
+    "regenerate": "Rebuild cards",
+    "comeBackLater": "Cards reappear when they are due.",
+    "ratingForgot": "Forgot",
+    "ratingHard": "Hard",
+    "ratingGood": "Good",
+    "ratingEasy": "Easy",
+    "source": {
+      "knowledge": "Knowledge",
+      "question": "Interview",
+      "note": "Note"
+    }
+  },
+  "tutor": {
+    "tabTutor": "Tutor",
+    "tabPath": "Learning path",
+    "context": "Question scope (follows your focus)",
+    "noFocus": "No node selected — will ask about the project",
+    "ask": "Ask me a question",
+    "askAnother": "Another question",
+    "asking": "Generating…",
+    "question": "Question",
+    "sourceLlm": "LLM",
+    "sourceHeuristic": "Offline heuristic",
+    "answerPlaceholder": "Answer in your own words, then let the tutor grade it…",
+    "evaluate": "Submit for grading",
+    "evaluating": "Grading…",
+    "showPoints": "Show expected points",
+    "hidePoints": "Hide points",
+    "missed": "Points you missed",
+    "score": "Score {{score}}/5",
+    "verdict": {
+      "weak": "Needs work",
+      "ok": "Reasonable",
+      "strong": "Clearly explained"
+    },
+    "hint": "The tutor asks about your current focus — pick a node in the graph first.",
+    "failed": "Generation failed",
+    "goalHint": "Describe a goal (role, feature to change, gap to close) to get an ordered reading plan.",
+    "goalPlaceholder": "e.g. prepare for a backend interview",
+    "generatePath": "Generate path",
+    "generatingPath": "Generating…",
+    "clearPaths": "Clear",
+    "noPaths": "No learning path yet.",
+    "pathFailed": "Generation failed",
+    "groupGlobal": "Global"
   }
 }

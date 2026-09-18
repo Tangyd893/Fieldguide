@@ -8,9 +8,10 @@
  * and expose in-paper semantic lookup.
  */
 import { useState, useEffect } from 'react'
-import { Library, Search, BookOpen, Download, StickyNote, Sparkles, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Library, Search, BookOpen, Download, StickyNote, Sparkles, RefreshCw, CheckCircle2, AlertTriangle, MessagesSquare } from 'lucide-react'
 import ConceptBridge from './ConceptBridge'
 import PdfReader from './PdfReader'
+import { renderMarkdown } from '@/lib/markdown'
 
 interface PaperRow {
   id: string; arxiv_id: string; title: string; authors: string
@@ -65,6 +66,12 @@ export default function TheoryView({ t, projectId }: Props) {
   const [ragQuery, setRagQuery] = useState('')
   const [ragHits, setRagHits] = useState<RagHit[]>([])
   const [ragSearching, setRagSearching] = useState(false)
+
+  // B9: paper-scoped coach conversation
+  const [coachQuestion, setCoachQuestion] = useState('')
+  const [coachAnswer, setCoachAnswer] = useState('')
+  const [coachAsking, setCoachAsking] = useState(false)
+  const [coachError, setCoachError] = useState<string | null>(null)
 
   useEffect(() => { loadPapers() }, [])
 
@@ -220,8 +227,32 @@ export default function TheoryView({ t, projectId }: Props) {
     }
   }
 
-  async function runRagSearch() {
-    if (!selectedPaper || !ragQuery.trim()) return
+  /** B9: ask the coach about this paper (a second entry point to the same agent). */
+  async function askCoach() {
+    const question = coachQuestion.trim()
+    if (!projectId || !selectedPaper || !question) return
+    setCoachAsking(true)
+    setCoachError(null)
+    try {
+      const r = await window.fieldguide.chatSend(
+        projectId,
+        [{
+          role: 'user',
+          content: `关于论文《${selectedPaper.title}》(arXiv:${selectedPaper.arxiv_id})：${question}\n\n`
+            + '请结合本项目代码回答；论文摘要在论文库里，必要时用 query_paper 检索原文。',
+        }],
+        { focusedNodeId: null, tourStepIndex: null },
+      )
+      if (r.ok && r.data) setCoachAnswer((r.data as { content: string }).content)
+      else setCoachError(r.error?.message ?? t('chat.requestFailed'))
+    } catch (err) {
+      setCoachError(String(err))
+    } finally {
+      setCoachAsking(false)
+    }
+  }
+
+  async function runRagSearch() {    if (!selectedPaper || !ragQuery.trim()) return
     setRagSearching(true)
     try {
       const r = await window.fieldguide.paperQuery(ragQuery.trim(), selectedPaper.id, 5)
@@ -518,6 +549,47 @@ export default function TheoryView({ t, projectId }: Props) {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+
+            {/* B9: second coach entry point — scoped to this paper */}
+            <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg p-5">
+              <h3 className="text-sm font-semibold text-[var(--fg-text-primary)] inline-flex items-center gap-1.5">
+                <MessagesSquare size={14} />{t('theory.askCoach')}
+              </h3>
+              <p className="text-xs text-[var(--fg-text-tertiary)] mt-1">{t('theory.askCoachHint')}</p>
+
+              {!projectId ? (
+                <p className="text-xs text-[var(--fg-text-tertiary)] mt-3">{t('theory.askCoachNeedProject')}</p>
+              ) : (
+                <>
+                  <div className="flex gap-2 mt-3">
+                    <input
+                      type="text"
+                      value={coachQuestion}
+                      onChange={(e) => setCoachQuestion(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') void askCoach() }}
+                      placeholder={t('theory.askCoachPlaceholder')}
+                      aria-label={t('theory.askCoachPlaceholder')}
+                      className="flex-1 px-3 py-1.5 border border-[var(--fg-border)] rounded-lg text-xs fg-input focus:outline-none focus:ring-2 focus:ring-[var(--fg-accent)]"
+                    />
+                    <button
+                      onClick={() => void askCoach()}
+                      disabled={coachAsking || !coachQuestion.trim()}
+                      className="px-3 py-1.5 bg-[var(--fg-accent)] text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-40 shrink-0"
+                    >
+                      {coachAsking ? t('theory.askCoachAsking') : t('theory.askCoachSend')}
+                    </button>
+                  </div>
+
+                  {coachError && <p className="text-xs text-[var(--fg-status-error)] mt-2">{coachError}</p>}
+
+                  {coachAnswer && (
+                    <div className="mt-3 rounded border border-[var(--fg-border)] p-3 text-xs text-[var(--fg-text-secondary)]">
+                      {renderMarkdown(coachAnswer)}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

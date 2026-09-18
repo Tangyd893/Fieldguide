@@ -14,6 +14,9 @@ interface Props {
   renderKnowledge?: () => ReactNode
   renderInterview?: () => ReactNode
   renderExplore?: () => ReactNode
+  renderProgress?: () => ReactNode
+  renderNotes?: () => ReactNode
+  renderTutor?: () => ReactNode
   t: (key: string) => string
   layout: ReturnType<typeof useWorkspaceLayout>
   /** When true, layout buttons live in the title bar instead. */
@@ -29,6 +32,9 @@ export default function SplitPanel({
   renderKnowledge,
   renderInterview,
   renderExplore,
+  renderProgress,
+  renderNotes,
+  renderTutor,
   t,
   layout: ctrl,
   hideChromeControls,
@@ -77,6 +83,9 @@ export default function SplitPanel({
     knowledge: t('panels.knowledge'),
     interview: t('panels.interview'),
     explore: t('panels.explore'),
+    progress: t('panels.progress'),
+    notes: t('panels.notes'),
+    tutor: t('panels.tutor'),
   }
 
   function renderContent(panelIndex: number) {
@@ -95,6 +104,12 @@ export default function SplitPanel({
         return renderInterview?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.interviewUnavailable')}</div>
       case 'explore':
         return renderExplore?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.exploreUnavailable')}</div>
+      case 'progress':
+        return renderProgress?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.progressUnavailable')}</div>
+      case 'notes':
+        return renderNotes?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.notesUnavailable')}</div>
+      case 'tutor':
+        return renderTutor?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.tutorUnavailable')}</div>
     }
   }
 

@@ -156,6 +156,92 @@ function migrate(db: Database.Database): void {
       created_at TEXT NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id)
     );
+
+    -- v3: learning state -----------------------------------------------------
+
+    -- B1: per-node reading progress, so the workbench can answer
+    -- "what have I actually learned here?".
+    CREATE TABLE IF NOT EXISTS learn_progress (
+      project_id TEXT NOT NULL,
+      node_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'unseen',
+      confidence INTEGER NOT NULL DEFAULT 0,
+      review_count INTEGER NOT NULL DEFAULT 0,
+      last_seen_at TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (project_id, node_id),
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
+
+    -- B2: notes pinned to a node and/or a line range of a file.
+    CREATE TABLE IF NOT EXISTS code_notes (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      node_id TEXT DEFAULT '',
+      file_path TEXT NOT NULL,
+      line_start INTEGER,
+      line_end INTEGER,
+      body TEXT NOT NULL,
+      tags TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
+
+    -- B3: spaced-repetition cards + their review history.
+    CREATE TABLE IF NOT EXISTS review_cards (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      front TEXT NOT NULL,
+      back TEXT NOT NULL,
+      node_ids TEXT NOT NULL DEFAULT '[]',
+      due_at TEXT NOT NULL,
+      interval_days REAL NOT NULL DEFAULT 0,
+      ease REAL NOT NULL DEFAULT 2.5,
+      reps INTEGER NOT NULL DEFAULT 0,
+      lapses INTEGER NOT NULL DEFAULT 0,
+      last_reviewed_at TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS review_logs (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      interval_days REAL NOT NULL DEFAULT 0,
+      reviewed_at TEXT NOT NULL,
+      FOREIGN KEY (card_id) REFERENCES review_cards(id)
+    );
+
+    -- B5: LLM code/architecture review findings.
+    CREATE TABLE IF NOT EXISTS review_findings (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'info',
+      kind TEXT NOT NULL DEFAULT 'debt',
+      title TEXT NOT NULL,
+      detail TEXT NOT NULL DEFAULT '',
+      file_path TEXT DEFAULT '',
+      line INTEGER,
+      node_id TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
+
+    -- B6: generated learning paths for a target goal.
+    CREATE TABLE IF NOT EXISTS learning_paths (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      goal TEXT NOT NULL,
+      steps_json TEXT NOT NULL DEFAULT '[]',
+      source TEXT NOT NULL DEFAULT 'heuristic',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
   `)
 
   // ── Additive migrations ──
@@ -178,6 +264,14 @@ function migrate(db: Database.Database): void {
       ON knowledge_nodes(project_id);
     CREATE INDEX IF NOT EXISTS idx_interview_questions_project
       ON interview_questions(project_id);
+    CREATE INDEX IF NOT EXISTS idx_learn_progress_project
+      ON learn_progress(project_id, status);
+    CREATE INDEX IF NOT EXISTS idx_code_notes_project
+      ON code_notes(project_id, file_path);
+    CREATE INDEX IF NOT EXISTS idx_review_cards_due
+      ON review_cards(project_id, due_at);
+    CREATE INDEX IF NOT EXISTS idx_review_findings_project
+      ON review_findings(project_id, severity);
   `)
 
   if (from !== SCHEMA_VERSION) {
@@ -562,6 +656,365 @@ function safeJsonArray(raw: string): string[] {
   } catch {
     return []
   }
+}
+
+/* ──────────── B1: learning progress ──────────── */
+
+export type LearnStatus = 'unseen' | 'reading' | 'mastered'
+
+export interface LearnProgressRow {
+  project_id: string
+  node_id: string
+  status: LearnStatus
+  confidence: number
+  review_count: number
+  last_seen_at: string | null
+  updated_at: string
+}
+
+export function listLearnProgress(projectId: string): LearnProgressRow[] {
+  return getDb().prepare(
+    'SELECT * FROM learn_progress WHERE project_id = ?',
+  ).all(projectId) as LearnProgressRow[]
+}
+
+/** Upsert one node's progress; returns the stored row. */
+export function setLearnProgress(
+  projectId: string,
+  nodeId: string,
+  status: LearnStatus,
+  confidence?: number,
+): LearnProgressRow {
+  const db = getDb()
+  const now = new Date().toISOString()
+  const existing = db.prepare(
+    'SELECT * FROM learn_progress WHERE project_id = ? AND node_id = ?',
+  ).get(projectId, nodeId) as LearnProgressRow | undefined
+
+  const isReview = status !== 'unseen'
+  const nextConfidence = confidence ?? existing?.confidence ?? (status === 'mastered' ? 5 : status === 'reading' ? 2 : 0)
+  const reviewCount = (existing?.review_count ?? 0) + (isReview ? 1 : 0)
+
+  db.prepare(`
+    INSERT INTO learn_progress (project_id, node_id, status, confidence, review_count, last_seen_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(project_id, node_id) DO UPDATE SET
+      status = excluded.status,
+      confidence = excluded.confidence,
+      review_count = excluded.review_count,
+      last_seen_at = excluded.last_seen_at,
+      updated_at = excluded.updated_at
+  `).run(projectId, nodeId, status, nextConfidence, reviewCount, isReview ? now : existing?.last_seen_at ?? null, now)
+
+  return db.prepare(
+    'SELECT * FROM learn_progress WHERE project_id = ? AND node_id = ?',
+  ).get(projectId, nodeId) as LearnProgressRow
+}
+
+export function clearLearnProgress(projectId: string): void {
+  getDb().prepare('DELETE FROM learn_progress WHERE project_id = ?').run(projectId)
+}
+
+/* ──────────── B2: code notes ──────────── */
+
+export interface CodeNoteRow {
+  id: string
+  project_id: string
+  node_id: string
+  file_path: string
+  line_start: number | null
+  line_end: number | null
+  body: string
+  tags: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CodeNoteInput {
+  project_id: string
+  node_id?: string
+  file_path: string
+  line_start?: number | null
+  line_end?: number | null
+  body: string
+  tags?: string
+}
+
+export function listCodeNotes(projectId: string, filter?: { filePath?: string; nodeId?: string }): CodeNoteRow[] {
+  const clauses = ['project_id = ?']
+  const params: Array<string> = [projectId]
+  if (filter?.filePath) { clauses.push('file_path = ?'); params.push(filter.filePath) }
+  if (filter?.nodeId) { clauses.push('node_id = ?'); params.push(filter.nodeId) }
+  return getDb().prepare(
+    `SELECT * FROM code_notes WHERE ${clauses.join(' AND ')} ORDER BY file_path ASC, line_start ASC, created_at ASC`,
+  ).all(...params) as CodeNoteRow[]
+}
+
+export function insertCodeNote(note: CodeNoteInput): CodeNoteRow {
+  const db = getDb()
+  const id = `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  const now = new Date().toISOString()
+  db.prepare(`
+    INSERT INTO code_notes
+      (id, project_id, node_id, file_path, line_start, line_end, body, tags, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, note.project_id, note.node_id ?? '', note.file_path,
+    note.line_start ?? null, note.line_end ?? null, note.body, note.tags ?? '', now, now,
+  )
+  return db.prepare('SELECT * FROM code_notes WHERE id = ?').get(id) as CodeNoteRow
+}
+
+export function updateCodeNote(id: string, patch: { body?: string; tags?: string }): CodeNoteRow | undefined {
+  const db = getDb()
+  const existing = db.prepare('SELECT * FROM code_notes WHERE id = ?').get(id) as CodeNoteRow | undefined
+  if (!existing) return undefined
+  db.prepare('UPDATE code_notes SET body = ?, tags = ?, updated_at = ? WHERE id = ?')
+    .run(patch.body ?? existing.body, patch.tags ?? existing.tags, new Date().toISOString(), id)
+  return db.prepare('SELECT * FROM code_notes WHERE id = ?').get(id) as CodeNoteRow
+}
+
+export function removeCodeNote(id: string): void {
+  getDb().prepare('DELETE FROM code_notes WHERE id = ?').run(id)
+}
+
+/* ──────────── B3: review cards ──────────── */
+
+export interface ReviewCardRow {
+  id: string
+  project_id: string
+  source_type: 'knowledge' | 'question' | 'note'
+  source_id: string
+  front: string
+  back: string
+  node_ids: string
+  due_at: string
+  interval_days: number
+  ease: number
+  reps: number
+  lapses: number
+  last_reviewed_at: string | null
+  created_at: string
+}
+
+export interface ReviewCardInput {
+  project_id: string
+  source_type: ReviewCardRow['source_type']
+  source_id: string
+  front: string
+  back: string
+  node_ids?: string[]
+}
+
+export function listReviewCards(projectId: string): ReviewCardRow[] {
+  return getDb().prepare(
+    'SELECT * FROM review_cards WHERE project_id = ? ORDER BY due_at ASC',
+  ).all(projectId) as ReviewCardRow[]
+}
+
+export function countReviewCards(projectId: string): number {
+  const row = getDb().prepare(
+    'SELECT COUNT(*) AS n FROM review_cards WHERE project_id = ?',
+  ).get(projectId) as { n: number }
+  return row?.n ?? 0
+}
+
+/**
+ * Insert cards that do not exist yet (matched by source_type + source_id).
+ * Returns the number of new cards, so callers can report "already generated".
+ */
+export function insertReviewCardsIfMissing(cards: ReviewCardInput[]): number {
+  const db = getDb()
+  const now = new Date().toISOString()
+  const exists = db.prepare(
+    'SELECT 1 FROM review_cards WHERE project_id = ? AND source_type = ? AND source_id = ?',
+  )
+  const insert = db.prepare(`
+    INSERT INTO review_cards
+      (id, project_id, source_type, source_id, front, back, node_ids, due_at, interval_days, ease, reps, lapses, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 2.5, 0, 0, ?)
+  `)
+
+  let added = 0
+  const tx = db.transaction(() => {
+    for (const card of cards) {
+      if (exists.get(card.project_id, card.source_type, card.source_id)) continue
+      insert.run(
+        `card-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        card.project_id, card.source_type, card.source_id,
+        card.front, card.back, JSON.stringify(card.node_ids ?? []),
+        now, now,
+      )
+      added += 1
+    }
+  })
+  tx()
+  return added
+}
+
+export function getReviewCard(id: string): ReviewCardRow | undefined {
+  return getDb().prepare('SELECT * FROM review_cards WHERE id = ?').get(id) as ReviewCardRow | undefined
+}
+
+export function updateReviewCardSchedule(
+  id: string,
+  patch: { due_at: string; interval_days: number; ease: number; reps: number; lapses: number; last_reviewed_at: string },
+): void {
+  getDb().prepare(`
+    UPDATE review_cards
+    SET due_at = ?, interval_days = ?, ease = ?, reps = ?, lapses = ?, last_reviewed_at = ?
+    WHERE id = ?
+  `).run(patch.due_at, patch.interval_days, patch.ease, patch.reps, patch.lapses, patch.last_reviewed_at, id)
+}
+
+export function insertReviewLog(cardId: string, projectId: string, rating: number, intervalDays: number): void {
+  getDb().prepare(`
+    INSERT INTO review_logs (id, card_id, project_id, rating, interval_days, reviewed_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    cardId, projectId, rating, intervalDays, new Date().toISOString(),
+  )
+}
+
+export interface ReviewLogRow {
+  id: string
+  card_id: string
+  project_id: string
+  rating: number
+  interval_days: number
+  reviewed_at: string
+}
+
+export function listReviewLogs(projectId: string, limit = 500): ReviewLogRow[] {
+  return getDb().prepare(
+    'SELECT * FROM review_logs WHERE project_id = ? ORDER BY reviewed_at DESC LIMIT ?',
+  ).all(projectId, limit) as ReviewLogRow[]
+}
+
+export function removeReviewCardsForProject(projectId: string): void {
+  const db = getDb()
+  db.prepare('DELETE FROM review_logs WHERE project_id = ?').run(projectId)
+  db.prepare('DELETE FROM review_cards WHERE project_id = ?').run(projectId)
+}
+
+/* ──────────── B5: review findings ──────────── */
+
+export interface ReviewFindingRow {
+  id: string
+  project_id: string
+  severity: 'high' | 'medium' | 'low' | 'info'
+  kind: 'bug' | 'architecture' | 'debt' | 'performance' | 'security'
+  title: string
+  detail: string
+  file_path: string
+  line: number | null
+  node_id: string
+  created_at: string
+}
+
+export interface ReviewFindingInput {
+  severity: ReviewFindingRow['severity']
+  kind: ReviewFindingRow['kind']
+  title: string
+  detail?: string
+  file_path?: string
+  line?: number | null
+  node_id?: string
+}
+
+export function listReviewFindings(projectId: string): ReviewFindingRow[] {
+  return getDb().prepare(
+    'SELECT * FROM review_findings WHERE project_id = ? ORDER BY created_at DESC',
+  ).all(projectId) as ReviewFindingRow[]
+}
+
+/** Replace the stored findings for a project (a re-run supersedes the old set). */
+export function replaceReviewFindings(projectId: string, findings: ReviewFindingInput[]): ReviewFindingRow[] {
+  const db = getDb()
+  const now = new Date().toISOString()
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM review_findings WHERE project_id = ?').run(projectId)
+    const insert = db.prepare(`
+      INSERT INTO review_findings
+        (id, project_id, severity, kind, title, detail, file_path, line, node_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    for (const f of findings) {
+      insert.run(
+        `find-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        projectId, f.severity, f.kind, f.title, f.detail ?? '',
+        f.file_path ?? '', f.line ?? null, f.node_id ?? '', now,
+      )
+    }
+  })
+  tx()
+  return listReviewFindings(projectId)
+}
+
+export function removeReviewFindings(projectId: string): void {
+  getDb().prepare('DELETE FROM review_findings WHERE project_id = ?').run(projectId)
+}
+
+/* ──────────── B6: learning paths ──────────── */
+
+export interface LearningStep {
+  order: number
+  title: string
+  why?: string
+  nodeIds?: string[]
+  files?: string[]
+}
+
+export interface LearningPathRow {
+  id: string
+  project_id: string
+  goal: string
+  steps_json: string
+  source: string
+  created_at: string
+}
+
+export function listLearningPaths(projectId: string): Array<Omit<LearningPathRow, 'steps_json'> & { steps: LearningStep[] }> {
+  const rows = getDb().prepare(
+    'SELECT * FROM learning_paths WHERE project_id = ? ORDER BY created_at DESC',
+  ).all(projectId) as LearningPathRow[]
+  return rows.map((r) => ({
+    id: r.id,
+    project_id: r.project_id,
+    goal: r.goal,
+    source: r.source,
+    created_at: r.created_at,
+    steps: parseSteps(r.steps_json),
+  }))
+}
+
+function parseSteps(raw: string): LearningStep[] {
+  try {
+    const v = JSON.parse(raw || '[]')
+    return Array.isArray(v) ? (v as LearningStep[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function insertLearningPath(
+  projectId: string,
+  goal: string,
+  steps: LearningStep[],
+  source: 'heuristic' | 'llm',
+): void {
+  getDb().prepare(`
+    INSERT INTO learning_paths (id, project_id, goal, steps_json, source, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    `path-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    projectId, goal, JSON.stringify(steps), source, new Date().toISOString(),
+  )
+}
+
+export function removeLearningPaths(projectId: string): void {
+  getDb().prepare('DELETE FROM learning_paths WHERE project_id = ?').run(projectId)
 }
 
 export function closeDb(): void {

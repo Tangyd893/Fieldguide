@@ -8,7 +8,7 @@
  */
 
 /** Bump when the schema changes and add the matching entry to ADDED_COLUMNS. */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 /**
  * Columns introduced after the initial schema, keyed by table.

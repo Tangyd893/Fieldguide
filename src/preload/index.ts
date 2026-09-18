@@ -95,6 +95,80 @@ const api = {
     ipcRenderer.invoke('insights:exportReport', { projectId }),
   insightsDebtScan: (projectId: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('insights:debtScan', { projectId }),
+  insightsEvolution: (projectId: string, maxCommits?: number): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('insights:evolution', { projectId, maxCommits }),
+  insightsCommunities: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('insights:communities', { projectId }),
+  graphNodeAtLine: (projectId: string, path: string, line?: number): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('graph:nodeAtLine', { projectId, path, line }),
+
+  // B1 learning progress
+  progressList: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('progress:list', { projectId }),
+  progressSet: (
+    projectId: string,
+    nodeId: string,
+    status: 'unseen' | 'reading' | 'mastered',
+    confidence?: number,
+  ): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('progress:set', { projectId, nodeId, status, confidence }),
+  progressClear: (projectId: string): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('progress:clear', { projectId }),
+
+  // B2 code notes
+  notesList: (projectId: string, filter?: { filePath?: string; nodeId?: string }): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('notes:list', { projectId, filePath: filter?.filePath, nodeId: filter?.nodeId }),
+  notesAdd: (note: {
+    project_id: string
+    node_id?: string
+    file_path: string
+    line_start?: number | null
+    line_end?: number | null
+    body: string
+    tags?: string
+  }): Promise<IpcResult<unknown>> => ipcRenderer.invoke('notes:add', note),
+  notesUpdate: (id: string, patch: { body?: string; tags?: string }): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('notes:update', { id, patch }),
+  notesRemove: (id: string): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('notes:remove', { id }),
+
+  // B3 spaced repetition
+  reviewGenerate: (projectId: string, reset?: boolean): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('review:generate', { projectId, reset }),
+  reviewList: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('review:list', { projectId }),
+  reviewGrade: (cardId: string, rating: 0 | 1 | 2 | 3): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('review:grade', { cardId, rating }),
+
+  // B4 tutor
+  tutorQuestion: (
+    projectId: string,
+    opts?: { focusedNodeId?: string | null; filePath?: string | null },
+  ): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('tutor:question', {
+      projectId,
+      focusedNodeId: opts?.focusedNodeId ?? null,
+      filePath: opts?.filePath ?? null,
+    }),
+  tutorEvaluate: (
+    projectId: string,
+    payload: { question: string; answer: string; hints?: string[]; focusedNodeId?: string | null },
+  ): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('tutor:evaluate', { projectId, ...payload }),
+
+  // B5 code review
+  reviewAudit: (projectId: string, opts?: { paths?: string[]; maxFiles?: number }): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('review:audit', { projectId, paths: opts?.paths, maxFiles: opts?.maxFiles }),
+  reviewFindings: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('review:findings', { projectId }),
+
+  // B6 learning path
+  pathGenerate: (projectId: string, goal: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('path:generate', { projectId, goal }),
+  pathList: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('path:list', { projectId }),
+  pathClear: (projectId: string): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('path:clear', { projectId }),
 
   // Shell
   openInExplorer: (projectId: string, filePath: string): Promise<IpcResult<null>> =>

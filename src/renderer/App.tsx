@@ -11,6 +11,9 @@ import OverviewPanel from './views/CodeMap/OverviewPanel'
 import KnowledgePanel from './views/CodeMap/KnowledgePanel'
 import InterviewPanel from './views/CodeMap/InterviewPanel'
 import InsightsPanel from './views/CodeMap/InsightsPanel'
+import ProgressPanel from './views/CodeMap/ProgressPanel'
+import NotesPanel from './views/CodeMap/NotesPanel'
+import TutorPanel from './views/CodeMap/TutorPanel'
 import GraphPanel from './views/CodeMap/GraphPanel'
 import { type DashboardMessage, dashboardSelectNode } from './views/CodeMap/GraphPanel'
 import CodeViewer from './views/CodeMap/CodeViewer'
@@ -113,6 +116,8 @@ export default function App() {
   const [showCostDialog, setShowCostDialog] = useState(false)
   /** One-shot "scroll the code pane to this line" request (content search hits). */
   const [jumpTarget, setJumpTarget] = useState<{ line: number; seq: number } | null>(null)
+  /** Bumped when a code note is added so the notes panel reloads. */
+  const [notesRefreshToken, setNotesRefreshToken] = useState(0)
   const [showAbout, setShowAbout] = useState(false)
   const [showProjectMenu, setShowProjectMenu] = useState(false)
   const [customChrome, setCustomChrome] = useState(false)
@@ -497,8 +502,24 @@ export default function App() {
     })
   }
 
-  function handleDashboardMessage(msg: DashboardMessage) {
-    switch (msg.type) {
+  /**
+   * B9: clicking a code line selects the graph node that covers it.
+   *
+   * This is the reverse of the existing graph → code direction, so the two panes
+   * stay in sync whichever one the reader starts from.
+   */
+  function handleLineSelect(path: string, line: number) {
+    const project = selectedProjectRef.current
+    if (!project) return
+    window.fieldguide.graphNodeAtLine(project.id, path, line).then((r) => {
+      if (!r.ok || !r.data?.node) return
+      setFocusedNodeId(r.data.node.id)
+      dashboardSelectNode(r.data.node.id)
+      postToDashboard({ type: 'focusNode', nodeId: r.data.node.id })
+    }).catch(() => { /* ignore */ })
+  }
+
+  function handleDashboardMessage(msg: DashboardMessage) {    switch (msg.type) {
       case 'nodeSelected': {
         if (msg.nodeId) setFocusedNodeId(msg.nodeId)
         const pathFromMsg = msg.filePath
@@ -665,6 +686,9 @@ export default function App() {
                     focusedNodeId={focusedNodeId}
                     jumpTarget={jumpTarget}
                     jumpToLine={(line) => setJumpTarget((prev) => ({ line, seq: (prev?.seq ?? 0) + 1 }))}
+                    notesRefreshToken={notesRefreshToken}
+                    onNoteSaved={() => setNotesRefreshToken((n) => n + 1)}
+                    onLineSelect={handleLineSelect}
                   />
                 </div>
               </div>
@@ -804,6 +828,9 @@ function CodeMapLayout({
   focusedNodeId,
   jumpTarget,
   jumpToLine,
+  notesRefreshToken,
+  onLineSelect,
+  onNoteSaved,
 }: {
   project: Project | null
   workspaceLayout: ReturnType<typeof useWorkspaceLayout>
@@ -814,6 +841,10 @@ function CodeMapLayout({
   focusedNodeId?: string | null
   jumpTarget?: { line: number; seq: number } | null
   jumpToLine?: (line: number) => void
+  notesRefreshToken?: number
+  /** B9: code → graph direction. */
+  onLineSelect?: (path: string, line: number) => void
+  onNoteSaved?: () => void
 }) {
   if (!project) {
     return (
@@ -831,6 +862,8 @@ function CodeMapLayout({
           filePath={path}
           highlightNodeId={focusedNodeId}
           jumpTarget={jumpTarget}
+          onLineSelect={(line) => { if (path) onLineSelect?.(path, line) }}
+          onNoteSaved={() => onNoteSaved?.()}
           t={t}
         />
       )}
@@ -858,6 +891,43 @@ function CodeMapLayout({
             workspaceLayout.openFile(path)
             if (line) jumpToLine?.(line)
           }}
+        />
+      )}
+      renderProgress={() => (
+        <ProgressPanel
+          projectId={project.id}
+          focusedNodeId={focusedNodeId}
+          t={t}
+          onOpenNode={(nodeId) => onNodeRefClick?.(nodeId)}
+          onOpenFile={(path, line) => {
+            workspaceLayout.openFile(path)
+            if (line) jumpToLine?.(line)
+          }}
+        />
+      )}
+      renderNotes={() => (
+        <NotesPanel
+          projectId={project.id}
+          t={t}
+          refreshToken={notesRefreshToken}
+          onOpenFile={(path, line) => {
+            workspaceLayout.openFile(path)
+            if (line) jumpToLine?.(line)
+          }}
+          onOpenNode={(nodeId) => onNodeRefClick?.(nodeId)}
+        />
+      )}
+      renderTutor={() => (
+        <TutorPanel
+          projectId={project.id}
+          focusedNodeId={focusedNodeId}
+          activeFilePath={workspaceLayout.layout.panels[workspaceLayout.layout.activePanelIndex]?.filePath ?? null}
+          t={t}
+          onOpenFile={(path, line) => {
+            workspaceLayout.openFile(path)
+            if (line) jumpToLine?.(line)
+          }}
+          onOpenNode={(nodeId) => onNodeRefClick?.(nodeId)}
         />
       )}
       layout={workspaceLayout}

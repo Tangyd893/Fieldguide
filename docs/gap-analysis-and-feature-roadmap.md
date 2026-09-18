@@ -1,6 +1,6 @@
 # Fieldguide 差距分析 & 功能点扩展路线图
 
-> 版本：v2.0（**P0 八项全部修复** + A 档全部落地；剩余为 B/C 档大型模块） | 基线 commit：`e9fb5e6`（README 重写 + understanding workbench）
+> 版本：v2.1（**P0 八项 + A 档全部 + B 档九项全部落地**；剩余为 C 档论文实验与工程门禁） | 基线 commit：`e9fb5e6`（README 重写 + understanding workbench）
 > 审计方式：全量阅读 `src/**`（含 main / preload / renderer / shared）、`docs/**`；实跑 `tsc` 三份 tsconfig + `vitest`；grep 交叉验证文档承诺与代码实现
 >
 > **实测基线**：`pnpm typecheck` ✅（renderer / node / vitest 三份全过）· `pnpm test:unit` ✅ 21 文件 · **128 passed / 2 skipped**
@@ -85,7 +85,7 @@
 | 项 | 结果 |
 |----|------|
 | `tsc` × 3 份 tsconfig | ✅ 全过（0 error） |
-| `vitest` | ✅ 30 文件 / **209 passed / 2 skipped**（含 live `indexProject`、search/markdown/迁移计划/阶段隔离/LLM 工具/CSS 回归） |
+| `vitest` | ✅ 32 文件 / **234 passed / 2 skipped**（含 live `indexProject`、search/markdown/迁移计划/阶段隔离/LLM 工具/CSS 回归） |
 | 冒烟脚本 | `qa:graph`（Demo **104 节点** + Dashboard + HIS-Go 3656 节点 + `__uaStore` 桥接）、`qa:his-go`、`qa:scenario`、`regen:sample-graph` 齐备 |
 | ❌ lint / format | **完全没有**：无 `.eslintrc*` / `eslint.config.*` / `.prettierrc*` / `.editorconfig`，`package.json` 无 `lint` 脚本 |
 | ❌ E2E | 无 Playwright / Spectron；Electron 真实交互（点节点开文件等）靠 node 脚本 + 人工 |

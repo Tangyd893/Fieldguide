@@ -37,7 +37,13 @@
     "knowledgeUnavailable": "知識面板不可用",
     "interviewUnavailable": "面試面板不可用",
     "explore": "探索",
-    "exploreUnavailable": "探索面板不可用"
+    "exploreUnavailable": "探索面板不可用",
+    "progress": "進度",
+    "notes": "筆記",
+    "tutor": "導師",
+    "progressUnavailable": "進度面板不可用",
+    "notesUnavailable": "筆記面板不可用",
+    "tutorUnavailable": "導師面板不可用"
   },
   "project": {
     "emptyTitle": "加入你的第一個專案",
@@ -112,7 +118,8 @@
     "nextMatch": "下一個符合",
     "clearSearch": "清除搜尋",
     "jumpToLine": "跳行",
-    "highlightedRange": "已標示 {{label}} · 第 {{start}}–{{end}} 行"
+    "highlightedRange": "已標示 {{label}} · 第 {{start}}–{{end}} 行",
+    "selectLine": "選取第 {{line}} 行（定位圖譜）"
   },
   "fileTree": {
     "openFile": "開啟檔案",
@@ -237,7 +244,9 @@
     "maximizePanel": "最大化面板",
     "closePanel": "關閉面板",
     "closeFile": "關閉檔案",
-    "exploreCode": "探索 | 程式碼"
+    "exploreCode": "探索 | 程式碼",
+    "notesCode": "筆記 | 程式碼",
+    "progressReview": "進度 | 程式碼"
   },
   "theory": {
     "title": "理論學習",
@@ -278,7 +287,13 @@
     "ragNotIndexed": "尚未建立索引，請先按「建立索引」",
     "ragBadge": "RAG {{count}} 塊",
     "ragReadyHint": "已建立向量索引，AI 教練可直接引用本文",
-    "ragChunk": "第 {{index}} 塊"
+    "ragChunk": "第 {{index}} 塊",
+    "askCoach": "問教練（關於本文）",
+    "askCoachHint": "同一個學習教練，但上下文限定在這篇論文：論文 RAG + 圖譜一起回答。",
+    "askCoachPlaceholder": "例如：論文裡的 chunk 策略在專案程式碼裡怎麼實作的？",
+    "askCoachSend": "提問",
+    "askCoachAsking": "思考中…",
+    "askCoachNeedProject": "先在專案庫中選取一個專案，教練才有程式碼上下文。"
   },
   "bridge": {
     "title": "概念橋接",
@@ -580,6 +595,119 @@
     "exporting": "匯出中…",
     "exported": "報告已匯出",
     "exportFailed": "匯出失敗",
-    "scanFailed": "掃描失敗"
+    "scanFailed": "掃描失敗",
+    "tab": {
+      "explore": "探索",
+      "debt": "技術債",
+      "evolution": "演化",
+      "clusters": "模組叢集"
+    },
+    "evolution": "架構演化時間軸",
+    "notARepo": "這個專案不是 Git 倉庫，無法分析歷史。",
+    "evolutionSummary": "掃描 {{commits}} 個提交，最早 {{since}}",
+    "hotspots": "改動最頻繁的檔案",
+    "commits": "{{count}} 次提交",
+    "lastChanged": "最近 {{date}}",
+    "nodeCount": "{{count}} 節點",
+    "clusters": "模組叢集（依依賴聚類）",
+    "clusterSummary": "{{count}} 個模組叢集 · 內聚度 {{cohesion}}%",
+    "clusterSize": "{{count}} 個節點",
+    "audit": "AI 程式碼審查",
+    "runAudit": "分析程式碼",
+    "auditing": "分析中…",
+    "auditHint": "對依賴最重的檔案做一次審查（未設定 LLM 時用啟發式）。",
+    "auditDone": "{{source}}：{{count}} 條結論（{{files}} 個檔案）",
+    "auditFailed": "分析失敗",
+    "noFindings": "還沒有審查結論。"
+  },
+  "notes": {
+    "search": "搜尋筆記…",
+    "count": "{{count}} 則",
+    "refresh": "重新整理",
+    "empty": "還沒有筆記",
+    "emptyHint": "在程式碼面板點行號右側的 + 加入註解，這裡會彙總。",
+    "noMatch": "沒有符合的筆記",
+    "fileLevel": "檔案層級",
+    "save": "儲存",
+    "delete": "刪除筆記",
+    "addAtLine": "在第 {{line}} 行新增筆記",
+    "draftPlaceholder": "寫下你的理解、疑問或與論文的關聯…",
+    "saving": "儲存中…",
+    "saveHint": "Ctrl+Enter 儲存 · Esc 取消"
+  },
+  "progress": {
+    "tabProgress": "進度",
+    "tabReview": "複習",
+    "mastered": "已掌握",
+    "coverage": "共 {{nodes}} 個圖譜節點",
+    "masteredCount": "已掌握 {{count}} 個",
+    "readingCount": "在讀 {{count}} 個",
+    "coreUnread": "待讀核心節點（{{count}}）",
+    "allCoreRead": "核心節點都讀過了。",
+    "fanIn": "被依賴 {{count}} 次",
+    "markMastered": "標記為已掌握",
+    "currentFocus": "目前焦點",
+    "status": {
+      "unseen": "未讀",
+      "reading": "在讀",
+      "mastered": "已掌握"
+    },
+    "dueNow": "現在應複習 {{count}} 張",
+    "reviewStats": "卡片 {{total}} 張 · 今日 {{today}} 次 · 連續 {{streak}} 天",
+    "retention": "今日記住率 {{percent}}%",
+    "generateCards": "產生卡片",
+    "generating": "產生中…",
+    "cardsGenerated": "新增 {{added}} 張卡片（共 {{total}} 張）",
+    "noCards": "還沒有卡片——先在「知識」或「面試」面板產生內容，再回來產生卡片。",
+    "allReviewed": "今天的複習都完成了。",
+    "cardQuestion": "問題",
+    "showAnswer": "顯示答案",
+    "answerHidden": "答案已隱藏（先自己回想一遍）",
+    "remaining": "還剩 {{count}} 張",
+    "regenerate": "重建卡片",
+    "comeBackLater": "下次到期時會自動出現。",
+    "ratingForgot": "忘了",
+    "ratingHard": "有點難",
+    "ratingGood": "記得",
+    "ratingEasy": "很簡單",
+    "source": {
+      "knowledge": "知識卡",
+      "question": "面試題",
+      "note": "筆記"
+    }
+  },
+  "tutor": {
+    "tabTutor": "導師提問",
+    "tabPath": "學習路徑",
+    "context": "提問範圍（跟隨目前焦點）",
+    "noFocus": "未選取節點——會問專案整體",
+    "ask": "讓導師提問",
+    "askAnother": "換一個問題",
+    "asking": "產生中…",
+    "question": "問題",
+    "sourceLlm": "LLM 產生",
+    "sourceHeuristic": "離線啟發式",
+    "answerPlaceholder": "用自己的話回答，然後讓導師評分…",
+    "evaluate": "提交並評分",
+    "evaluating": "評分中…",
+    "showPoints": "看評分要點",
+    "hidePoints": "收起要點",
+    "missed": "遺漏的要點",
+    "score": "得分 {{score}}/5",
+    "verdict": {
+      "weak": "還需補強",
+      "ok": "大致到位",
+      "strong": "講清楚了"
+    },
+    "hint": "導師會圍繞目前節點提問；先在圖譜裡選一個節點效果最好。",
+    "failed": "產生失敗",
+    "goalHint": "寫下你的目標（職缺、要改的功能、想補的知識點），產生一條閱讀路線。",
+    "goalPlaceholder": "例如：準備後端面試 / 想改認證模組",
+    "generatePath": "產生學習路徑",
+    "generatingPath": "產生中…",
+    "clearPaths": "清空",
+    "noPaths": "還沒有學習路徑。",
+    "pathFailed": "產生失敗",
+    "groupGlobal": "全域"
   }
 }

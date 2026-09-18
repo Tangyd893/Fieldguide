@@ -223,6 +223,60 @@ flowchart TD
 
 > **本轮新增规模**：P0 七项 + A 档六项；单测从 25 文件 / 161 例增至 **30 文件 / 209 例**；i18n 三语各 **510 键**对齐。
 
+### B 档功能（2026-09-18，审计 §3 B1–B9 全部落地）
+
+> 共同模式：能离线跑的一律给启发式兜底（未配置 LLM 时仍可用），配置了 LLM 才升级为模型产出——与索引/理解流水线保持一致。
+
+- [x] **fg-learn-progress** · 学习进度与掌握度（B1）
+  - 数据：`learn_progress(project_id, node_id, status, confidence, review_count, last_seen_at, updated_at)`（数据库升到 **schema v3**）
+  - IPC：`progress:list` / `progress:set` / `progress:clear`
+  - UI：新面板「进度」——**覆盖率环形图**、已掌握/在读计数、**待读核心节点**（按扇入排序，一键标记已掌握）、当前焦点三态快捷标记
+  - 说明：图谱节点着色需要 UA Dashboard 支持进度 overlay（上游无此能力），因此进度体现在壳层面板与计数上，**不做假的着色**
+
+- [x] **fg-code-notes** · 代码笔记与批注（B2）
+  - 数据：`code_notes(project_id, node_id, file_path, line_start, line_end, body, tags, …)`
+  - IPC：`notes:list` / `notes:add` / `notes:update` / `notes:remove`（写入前经 `resolveProjectPath` 校验）
+  - UI：[`CodeViewer`](../src/renderer/views/CodeMap/CodeViewer.tsx) 行尾 **+ 添加批注**、已有笔记打点、草稿框（Ctrl+Enter 保存 / Esc 取消）；新面板「笔记」按文件分组、可编辑删除、一键跳到对应行
+
+- [x] **fg-srs-review** · 间隔重复复习（B3）
+  - 数据：`review_cards` + `review_logs`
+  - 纯逻辑：[`src/main/srs.ts`](../src/main/srs.ts)（SM-2 lite：interval/ease/reps/lapses、四档评分、到期判断、今日记住率与连续天数）
+  - 卡片来源：[`review-cards.ts`](../src/main/review-cards.ts) 从知识卡 + 面试题 + 长笔记生成（按 source 去重，可重建）
+  - UI：「进度」面板第二分区——到期队列、显示答案、四档评分（**忘了 = 10 分钟后重现**）
+
+- [x] **fg-tutor** · AI 导师主动提问（B4）
+  - [`coach-plus.ts`](../src/main/coach-plus.ts) `generateTutorQuestion()`：基于焦点节点 + 邻居 + 分层 + 知识卡出题（LLM；未配置或失败时用启发式提问）
+  - `evaluateTutorAnswer()`：用自己的话作答 → 0–5 分、判定（需补强/基本到位/讲清楚了）、遗漏要点与改进建议
+  - UI：新面板「导师」——提问、作答、评分、可展开的评分要点、节点跳转
+
+- [x] **fg-ai-review** · AI 代码审查 / 技术债报告（B5）
+  - 数据：`review_findings`；IPC：`review:audit` / `review:findings`
+  - 目标文件按**扇入加权**自动挑选；LLM 产出 bug / 架构 / 债务 / 性能 / 安全分类结论；无 Key 时复用技术债扫描作为启发式结论
+  - UI：「洞察 → 技术债」分区下半部，严重度色块 + 可跳文件行或图谱节点
+
+- [x] **fg-learning-path** · 学习路径生成（B6）
+  - 数据：`learning_paths`；IPC：`path:generate` / `path:list` / `path:clear`
+  - 输入目标（岗位 / 要改的模块 / 要补的知识）→ 有序步骤（标题 + 为什么 + 文件 + 节点）；启发式兜底按 入口 → 主流程 → 高扇入文件 → 知识卡 排序
+  - UI：「导师」面板第二分区，步骤可直接开文件或定位图谱节点
+
+- [x] **fg-evolution** · 架构演化时间轴（B7）
+  - [`evolution.ts`](../src/main/evolution.ts)：`simple-git`（此前仅用于 clone）扫最近 N 个提交 → 月度活跃度柱状图 + **改动最频繁文件**（含节点数与最近变更日期）；非 git 目录优雅降级
+  - UI：「洞察 → 演化」分区，热点文件可点开
+
+- [x] **fg-communities** · 图谱社区检测（B8）
+  - [`communities.ts`](../src/main/communities.ts)：Louvain 局部移动 + 贪心社区合并（**自研，不依赖 UA 的传递依赖 graphology**），输出模块簇、主导目录、权重与**内聚度**
+  - 备注：先试标签传播，被测试抓到「单桥节点把两个簇吞成一个」；换成模块度增益后消失。单跑局部移动会停在成对结构，故补合并阶段
+  - UI：「洞察 → 模块簇」分区
+
+- [x] **fg-two-way-link** · 面板双向联动 + 第二个教练入口（B9）
+  - 反向联动：新增 IPC `graph:nodeAtLine`（文件 + 行 → 覆盖该行的最紧节点），`CodeViewer` 点击任意行即选中/聚焦图谱节点（此前只有图谱 → 代码单向）
+  - 第二入口：论文详情页「问教练（关于本文）」——同一个 Agent，上下文限定论文 RAG + 图谱，回答以 Markdown 呈现
+
+> **本批新增规模**：B1–B9 九项；数据库到 **schema v3**（新增 6 张表 + 4 个索引）；新面板 3 个（进度 / 笔记 / 导师）+ 洞察面板扩到 4 个分区；单测增至 **32 文件 / 234 例**；i18n 三语各 **619 键**对齐。
+>
+> **测试抓到的两个真 bug**（均已修复并加回归测试）：① SRS 反复评「很简单」会让间隔指数增长到 1.2 亿天，`Date.toISOString()` 抛异常直接打挂调度器 → 加 3 年上限；② 模块度计算里 `twoM`/`m` 混用导致统计口径错误 → 修正并补单测。
+
+
 
 
 

@@ -54,7 +54,7 @@ interface DebtResult {
   filesScanned: number
 }
 
-type Section = 'explore' | 'debt'
+type Section = 'explore' | 'debt' | 'evolution' | 'clusters'
 
 export default function InsightsPanel({ projectId, focusedNodeId, t, onOpenNode, onOpenFile }: Props) {
   const [section, setSection] = useState<Section>('explore')
@@ -72,6 +72,19 @@ export default function InsightsPanel({ projectId, focusedNodeId, t, onOpenNode,
   const [debt, setDebt] = useState<DebtResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [debtError, setDebtError] = useState<string | null>(null)
+
+  // B5: AI review findings
+  const [findings, setFindings] = useState<ReviewFinding[]>([])
+  const [auditing, setAuditing] = useState(false)
+  const [auditMsg, setAuditMsg] = useState<string | null>(null)
+
+  // B7: evolution timeline
+  const [evolution, setEvolution] = useState<EvolutionResult | null>(null)
+  const [loadingEvolution, setLoadingEvolution] = useState(false)
+
+  // B8: communities
+  const [clusterResult, setClusterResult] = useState<CommunityResult | null>(null)
+  const [loadingClusters, setLoadingClusters] = useState(false)
 
   useEffect(() => {
     if (!projectId) return
@@ -132,6 +145,59 @@ export default function InsightsPanel({ projectId, focusedNodeId, t, onOpenNode,
     }
   }
 
+  /** B5: LLM (or heuristic) review of the most load-bearing files. */
+  async function runAudit() {
+    setAuditing(true)
+    setAuditMsg(null)
+    try {
+      const r = await window.fieldguide.reviewAudit(projectId, { maxFiles: 6 })
+      if (r.ok && r.data) {
+        setFindings(r.data.findings)
+        setAuditMsg(t('insights.auditDone', {
+          count: r.data.findings.length,
+          files: r.data.filesReviewed.length,
+          source: t(r.data.source === 'llm' ? 'tutor.sourceLlm' : 'tutor.sourceHeuristic'),
+        }))
+      } else {
+        setAuditMsg(r.error?.message ?? t('insights.auditFailed'))
+      }
+    } catch (err) {
+      setAuditMsg(String(err))
+    } finally {
+      setAuditing(false)
+    }
+  }
+
+  async function loadFindings() {
+    try {
+      const r = await window.fieldguide.reviewFindings(projectId)
+      if (r.ok && r.data) setFindings(r.data)
+    } catch { /* ignore */ }
+  }
+
+  /** B7: git history × graph. */
+  const loadEvolution = useCallback(async () => {
+    setLoadingEvolution(true)
+    try {
+      const r = await window.fieldguide.insightsEvolution(projectId, 300)
+      if (r.ok && r.data) setEvolution(r.data as EvolutionResult)
+    } catch { /* ignore */ }
+    finally { setLoadingEvolution(false) }
+  }, [projectId])
+
+  /** B8: modularity communities. */
+  const loadClusters = useCallback(async () => {
+    setLoadingClusters(true)
+    try {
+      const r = await window.fieldguide.insightsCommunities(projectId)
+      if (r.ok && r.data) setClusterResult(r.data as CommunityResult)
+    } catch { /* ignore */ }
+    finally { setLoadingClusters(false) }
+  }, [projectId])
+
+  // Load stored findings with the panel; timeline/clusters run on demand.
+  useEffect(() => { void loadFindings() }, [projectId])
+
   function focusNode(id: string) {
     postToDashboard({ type: 'focusNode', nodeId: id })
     onOpenNode?.(id)
@@ -141,21 +207,25 @@ export default function InsightsPanel({ projectId, focusedNodeId, t, onOpenNode,
 
   return (
     <div className="h-full flex flex-col text-xs">
-      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--fg-border)] shrink-0">
-        {(['explore', 'debt'] as Section[]).map((s) => (
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--fg-border)] shrink-0 overflow-x-auto">
+        {(['explore', 'debt', 'evolution', 'clusters'] as Section[]).map((s) => (
           <button
             key={s}
             type="button"
             aria-pressed={section === s}
-            onClick={() => setSection(s)}
+            onClick={() => {
+              setSection(s)
+              if (s === 'evolution' && !evolution) void loadEvolution()
+              if (s === 'clusters' && !clusterResult) void loadClusters()
+            }}
             className={cn(
-              'px-2.5 py-1 rounded text-[11px] font-medium transition-colors',
+              'px-2.5 py-1 rounded text-[11px] font-medium transition-colors shrink-0',
               section === s
                 ? 'bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)]'
                 : 'text-[var(--fg-text-tertiary)] hover:bg-[var(--fg-tree-hover)]',
             )}
           >
-            {t(s === 'explore' ? 'insights.explore' : 'insights.debt')}
+            {t(`insights.tab.${s}`)}
           </button>
         ))}
       </div>
@@ -388,6 +458,190 @@ export default function InsightsPanel({ projectId, focusedNodeId, t, onOpenNode,
                       </span>
                       <span className="block text-[10px] text-[var(--fg-text-secondary)] truncate mt-0.5">{item.detail}</span>
                     </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* B5: AI code/architecture review on top of the heuristic scan */}
+            <div className="mt-4 pt-3 border-t border-[var(--fg-border)]">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-[11px] font-medium text-[var(--fg-text-secondary)]">{t('insights.audit')}</h4>
+                <Button size="sm" variant="ghost" disabled={auditing} onClick={runAudit}>
+                  {auditing
+                    ? <><RefreshCw size={11} className="animate-spin" />{t('insights.auditing')}</>
+                    : t('insights.runAudit')}
+                </Button>
+              </div>
+
+              <p className="text-[10px] text-[var(--fg-text-tertiary)] mb-2">{t('insights.auditHint')}</p>
+              {auditMsg && <p className="text-[10px] text-[var(--fg-text-secondary)] mb-2">{auditMsg}</p>}
+
+              {findings.length === 0 ? (
+                <p className="text-[10px] text-[var(--fg-text-tertiary)]">{t('insights.noFindings')}</p>
+              ) : (
+                <div className="space-y-1">
+                  {findings.map((finding) => (
+                    <button
+                      key={finding.id}
+                      onClick={() => {
+                        if (finding.file_path && onOpenFile) onOpenFile(finding.file_path, finding.line ?? undefined)
+                        else if (finding.node_id) focusNode(finding.node_id)
+                      }}
+                      className="w-full text-left px-1.5 py-1 rounded hover:bg-[var(--fg-tree-hover)]"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className={cn(
+                            'shrink-0 px-1 rounded text-[9px] uppercase',
+                            finding.severity === 'high'
+                              ? 'bg-[var(--fg-status-error-bg)] text-[var(--fg-status-error)]'
+                              : finding.severity === 'medium'
+                                ? 'bg-[var(--fg-status-warning-bg)] text-[var(--fg-status-warning)]'
+                                : 'bg-[var(--fg-tree-hover)] text-[var(--fg-text-tertiary)]',
+                          )}
+                        >
+                          {finding.severity}
+                        </span>
+                        <span className="text-[10px] text-[var(--fg-text-tertiary)] shrink-0">{finding.kind}</span>
+                        <span className="text-[11px] text-[var(--fg-text-primary)] truncate flex-1">{finding.title}</span>
+                      </span>
+                      {finding.detail && (
+                        <span className="block text-[10px] text-[var(--fg-text-secondary)] mt-0.5 line-clamp-2">{finding.detail}</span>
+                      )}
+                      {finding.file_path && (
+                        <span className="block font-mono text-[10px] text-[var(--fg-accent-text)] truncate">
+                          {finding.file_path}{finding.line ? `:${finding.line}` : ''}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+        {section === 'evolution' && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-[11px] font-medium text-[var(--fg-text-secondary)]">{t('insights.evolution')}</h4>
+              <Button size="sm" variant="ghost" disabled={loadingEvolution} onClick={loadEvolution}>
+                {loadingEvolution
+                  ? <><RefreshCw size={11} className="animate-spin" />{t('insights.scanning')}</>
+                  : t('insights.scan')}
+              </Button>
+            </div>
+
+            {loadingEvolution && !evolution && <p className="text-[var(--fg-text-tertiary)]">{t('codeMap.loading')}</p>}
+
+            {evolution && !evolution.isRepo && (
+              <p className="text-[var(--fg-text-tertiary)]">{t('insights.notARepo')}</p>
+            )}
+
+            {evolution?.isRepo && (
+              <>
+                <p className="text-[10px] text-[var(--fg-text-tertiary)] mb-2">
+                  {t('insights.evolutionSummary', {
+                    commits: evolution.commitsScanned,
+                    since: evolution.since ? evolution.since.slice(0, 10) : '—',
+                  })}
+                </p>
+
+                {evolution.buckets.length > 0 && (
+                  <div className="flex items-end gap-0.5 h-16 mb-3" role="img" aria-label={t('insights.evolution')}>
+                    {evolution.buckets.map((bucket) => {
+                      const max = Math.max(...evolution.buckets.map((b) => b.commits), 1)
+                      return (
+                        <div
+                          key={bucket.month}
+                          title={`${bucket.month}: ${bucket.commits}`}
+                          className="flex-1 bg-[var(--fg-accent)]/70 rounded-t min-h-[2px]"
+                          style={{ height: `${Math.max(4, (bucket.commits / max) * 100)}%` }}
+                        />
+                      )
+                    })}
+                  </div>
+                )}
+
+                <p className="text-[10px] text-[var(--fg-text-tertiary)] mb-1">{t('insights.hotspots')}</p>
+                <div className="space-y-0.5">
+                  {evolution.hotspots.map((spot) => (
+                    <button
+                      key={spot.path}
+                      onClick={() => onOpenFile?.(spot.path)}
+                      className="w-full text-left px-1.5 py-1 rounded hover:bg-[var(--fg-tree-hover)]"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-[var(--fg-accent-text)] truncate flex-1">{spot.path}</span>
+                        <span className="text-[10px] text-[var(--fg-text-tertiary)] tabular-nums shrink-0">
+                          {t('insights.commits', { count: spot.commits })}
+                        </span>
+                      </span>
+                      <span className="text-[10px] text-[var(--fg-text-tertiary)]">
+                        {t('insights.lastChanged', { date: spot.lastChanged.slice(0, 10) })}
+                        {spot.nodeCount > 0 ? ` · ${t('insights.nodeCount', { count: spot.nodeCount })}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        {section === 'clusters' && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-[11px] font-medium text-[var(--fg-text-secondary)]">{t('insights.clusters')}</h4>
+              <Button size="sm" variant="ghost" disabled={loadingClusters} onClick={loadClusters}>
+                {loadingClusters
+                  ? <><RefreshCw size={11} className="animate-spin" />{t('insights.scanning')}</>
+                  : t('insights.scan')}
+              </Button>
+            </div>
+
+            {loadingClusters && !clusterResult && <p className="text-[var(--fg-text-tertiary)]">{t('codeMap.loading')}</p>}
+
+            {clusterResult && (
+              <>
+                <p className="text-[10px] text-[var(--fg-text-tertiary)] mb-2">
+                  {t('insights.clusterSummary', {
+                    count: clusterResult.communities.length,
+                    cohesion: Math.round(clusterResult.cohesion * 100),
+                  })}
+                </p>
+                <div className="space-y-2">
+                  {clusterResult.communities.map((community) => (
+                    <div key={community.id} className="rounded border border-[var(--fg-border)] p-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-[11px] text-[var(--fg-accent-text)] truncate flex-1" title={community.dominantPath}>
+                          {community.dominantPath}
+                        </span>
+                        <span className="text-[10px] text-[var(--fg-text-tertiary)] tabular-nums shrink-0">
+                          {t('insights.clusterSize', { count: community.nodeIds.length })}
+                        </span>
+                      </div>
+                      <div className="h-1 rounded bg-[var(--fg-tree-hover)] overflow-hidden mb-1.5">
+                        <div className="h-full bg-[var(--fg-accent)]" style={{ width: `${Math.round(community.weight * 100)}%` }} />
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {community.nodeIds.slice(0, 8).map((id) => (
+                          <button
+                            key={id}
+                            onClick={() => focusNode(id)}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--fg-tree-hover)] text-[var(--fg-text-secondary)] font-mono truncate max-w-[150px] hover:text-[var(--fg-accent)]"
+                            title={id}
+                          >
+                            {id.split(':').pop()?.split('/').pop() || id}
+                          </button>
+                        ))}
+                        {community.nodeIds.length > 8 && (
+                          <span className="text-[10px] text-[var(--fg-text-tertiary)] self-center">
+                            +{community.nodeIds.length - 8}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </>

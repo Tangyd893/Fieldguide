@@ -13,8 +13,9 @@
  * memoised list so typing in the search box does not re-highlight the whole file.
  */
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { Search, ChevronUp, ChevronDown, X, Crosshair } from 'lucide-react'
+import { Search, ChevronUp, ChevronDown, X, Crosshair, StickyNote, Plus } from 'lucide-react'
 import { detectLanguage, highlightLine } from './syntax'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -24,12 +25,16 @@ interface Props {
   highlightNodeId?: string | null
   /** One-shot scroll request (content search hit). `seq` distinguishes repeats. */
   jumpTarget?: { line: number; seq: number } | null
+  /** B9: report the graph node covering a clicked line (code → graph direction). */
+  onLineSelect?: (line: number) => void
+  /** B2: called after a note is added, so the notes panel can refresh. */
+  onNoteSaved?: () => void
   t: (key: string, opts?: Record<string, unknown>) => string
 }
 
 const HIGHLIGHT_DEBOUNCE_MS = 160
 
-export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpTarget, t }: Props) {
+export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpTarget, onLineSelect, onNoteSaved, t }: Props) {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,6 +104,70 @@ export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpT
   }, [projectId, filePath, highlightNodeId])
 
   const lines = useMemo(() => content.split('\n'), [content])
+
+  // B2: notes for this file, so the gutter can mark annotated lines.
+  const [notes, setNotes] = useState<CodeNoteRow[]>([])
+  const [noteDraft, setNoteDraft] = useState<{ line: number; body: string } | null>(null)
+  const [savingNote, setSavingNote] = useState(false)
+
+  const loadNotes = useCallback(async () => {
+    if (!projectId || !filePath) { setNotes([]); return }
+    try {
+      const r = await window.fieldguide.notesList(projectId, { filePath })
+      if (r.ok && r.data) setNotes(r.data)
+    } catch { /* ignore */ }
+  }, [projectId, filePath])
+
+  useEffect(() => { void loadNotes() }, [loadNotes])
+
+  const linesWithNotes = useMemo(() => {
+    const set = new Set<number>()
+    for (const note of notes) {
+      if (note.line_start == null) continue
+      const end = note.line_end ?? note.line_start
+      for (let l = note.line_start; l <= end; l++) set.add(l)
+    }
+    return set
+  }, [notes])
+
+  /** B9: clicking a line tells the shell which graph node it belongs to. */
+  async function handleLineClick(lineNo: number) {
+    if (!projectId || !filePath) return
+    if (onLineSelect) {
+      onLineSelect(lineNo)
+      return
+    }
+    // Fallback when the shell did not supply a handler: resolve locally.
+    try {
+      const r = await window.fieldguide.graphNodeAtLine(projectId, filePath, lineNo)
+      if (r.ok && r.data?.node) {
+        const { dashboardSelectNode } = await import('./GraphPanel')
+        dashboardSelectNode(r.data.node.id)
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function saveNote() {
+    if (!projectId || !filePath || !noteDraft || !noteDraft.body.trim()) return
+    setSavingNote(true)
+    try {
+      const r = await window.fieldguide.notesAdd({
+        project_id: projectId,
+        node_id: highlightNodeId ?? undefined,
+        file_path: filePath,
+        line_start: noteDraft.line,
+        line_end: noteDraft.line,
+        body: noteDraft.body.trim(),
+      })
+      if (r.ok) {
+        setNoteDraft(null)
+        await loadNotes()
+        onNoteSaved?.()
+      }
+    } finally {
+      setSavingNote(false)
+    }
+  }
 
   /** Line numbers (1-based) containing the current query. */
   const matches = useMemo(() => {
@@ -174,9 +243,13 @@ export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpT
       const isMatch = query.length > 0 && line.toLowerCase().includes(query)
       const isActiveMatch = activeLine === lineNo
       const isJumpLine = activeJumpLine === lineNo
-      return { lineNo, inRange, isMatch, isActiveMatch, isJumpLine, body: highlightLine(line, lang) }
+      return {
+        lineNo, inRange, isMatch, isActiveMatch, isJumpLine,
+        hasNote: linesWithNotes.has(lineNo),
+        body: highlightLine(line, lang),
+      }
     })
-  }, [lines, lang, nodeRange, matches, activeMatch, search, activeJumpLine])
+  }, [lines, lang, nodeRange, matches, activeMatch, search, activeJumpLine, linesWithNotes])
 
   if (!filePath) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.clickToOpen')}</div>
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--fg-text-tertiary)] text-sm">{t('codeMap.loading')}</div>
@@ -263,6 +336,35 @@ export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpT
         </div>
       )}
 
+      {noteDraft && (
+        <div className="shrink-0 border-b border-[var(--fg-border)] bg-[var(--fg-card)] p-2 space-y-1.5">
+          <p className="text-[10px] text-[var(--fg-text-tertiary)]">
+            {t('notes.addAtLine', { line: noteDraft.line })}
+          </p>
+          <textarea
+            autoFocus
+            value={noteDraft.body}
+            onChange={(e) => setNoteDraft({ ...noteDraft, body: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { e.preventDefault(); setNoteDraft(null) }
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void saveNote() }
+            }}
+            placeholder={t('notes.draftPlaceholder')}
+            aria-label={t('notes.draftPlaceholder')}
+            className="w-full h-16 px-2 py-1 text-[11px] rounded border border-[var(--fg-border)] bg-[var(--fg-bg)] resize-y"
+          />
+          <div className="flex items-center gap-2">
+            <Button size="sm" disabled={savingNote || !noteDraft.body.trim()} onClick={() => void saveNote()}>
+              {savingNote ? t('notes.saving') : t('notes.save')}
+            </Button>
+            <button onClick={() => setNoteDraft(null)} className="text-[10px] text-[var(--fg-text-tertiary)] hover:underline">
+              {t('common.close')}
+            </button>
+            <span className="text-[10px] text-[var(--fg-text-tertiary)]">{t('notes.saveHint')}</span>
+          </div>
+        </div>
+      )}
+
       <div
         ref={scrollRef}
         tabIndex={0}
@@ -280,7 +382,7 @@ export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpT
           className="font-mono leading-5"
           style={{ fontFamily: 'var(--fg-font-mono)', fontSize: 'var(--fg-mono-font-size, 13px)' }}
         >
-          {highlightedLines.map(({ lineNo, inRange, isMatch, isActiveMatch, isJumpLine, body }) => (
+          {highlightedLines.map(({ lineNo, inRange, isMatch, isActiveMatch, isJumpLine, hasNote, body }) => (
             <div
               key={lineNo}
               data-line={lineNo}
@@ -302,8 +404,29 @@ export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpT
               >
                 {lineNo}
               </span>
-              <span className="flex-1 pl-3 whitespace-pre text-[var(--fg-text-primary)] py-px min-w-0 overflow-x-auto">
+              <span
+                role="button"
+                tabIndex={-1}
+                aria-label={t('codeMap.selectLine', { line: lineNo })}
+                title={t('codeMap.selectLine', { line: lineNo })}
+                onClick={() => void handleLineClick(lineNo)}
+                className="flex-1 pl-3 whitespace-pre text-[var(--fg-text-primary)] py-px min-w-0 overflow-x-auto cursor-pointer"
+              >
                 {body}
+              </span>
+              {/* B2: note gutter — marker for existing notes, + to add one */}
+              <span className="w-5 shrink-0 flex items-center justify-center">
+                {hasNote && <StickyNote size={9} className="text-[var(--fg-status-warning)]" />}
+                {!hasNote && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setNoteDraft({ line: lineNo, body: '' }) }}
+                    aria-label={t('notes.addAtLine', { line: lineNo })}
+                    title={t('notes.addAtLine', { line: lineNo })}
+                    className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-[var(--fg-text-tertiary)] hover:text-[var(--fg-accent)] p-0.5"
+                  >
+                    <Plus size={9} />
+                  </button>
+                )}
               </span>
             </div>
           ))}

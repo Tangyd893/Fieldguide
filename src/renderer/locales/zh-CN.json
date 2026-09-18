@@ -37,7 +37,13 @@
     "knowledgeUnavailable": "知识面板不可用",
     "interviewUnavailable": "面试面板不可用",
     "explore": "探索",
-    "exploreUnavailable": "探索面板不可用"
+    "exploreUnavailable": "探索面板不可用",
+    "progress": "进度",
+    "notes": "笔记",
+    "tutor": "导师",
+    "progressUnavailable": "进度面板不可用",
+    "notesUnavailable": "笔记面板不可用",
+    "tutorUnavailable": "导师面板不可用"
   },
   "project": {
     "emptyTitle": "添加你的第一个项目",
@@ -112,7 +118,8 @@
     "nextMatch": "下一个匹配",
     "clearSearch": "清除搜索",
     "jumpToLine": "跳行",
-    "highlightedRange": "已高亮 {{label}} · 第 {{start}}–{{end}} 行"
+    "highlightedRange": "已高亮 {{label}} · 第 {{start}}–{{end}} 行",
+    "selectLine": "选中第 {{line}} 行（定位图谱）"
   },
   "fileTree": {
     "openFile": "打开文件",
@@ -237,7 +244,9 @@
     "maximizePanel": "最大化面板",
     "closePanel": "关闭面板",
     "closeFile": "关闭文件",
-    "exploreCode": "探索 | 代码"
+    "exploreCode": "探索 | 代码",
+    "notesCode": "笔记 | 代码",
+    "progressReview": "进度 | 代码"
   },
   "theory": {
     "title": "理论学习",
@@ -278,7 +287,13 @@
     "ragNotIndexed": "尚未建立索引，请先点「建立索引」",
     "ragBadge": "RAG {{count}} 块",
     "ragReadyHint": "已建立向量索引，AI 教练可直接引用本文",
-    "ragChunk": "第 {{index}} 块"
+    "ragChunk": "第 {{index}} 块",
+    "askCoach": "问教练（关于本文）",
+    "askCoachHint": "同一个学习教练，但上下文限定在这篇论文：论文 RAG + 图谱一起回答。",
+    "askCoachPlaceholder": "例如：论文里的 chunk 策略在项目代码里怎么实现的？",
+    "askCoachSend": "提问",
+    "askCoachAsking": "思考中…",
+    "askCoachNeedProject": "先在项目库中选中一个项目，教练才有代码上下文。"
   },
   "bridge": {
     "title": "概念桥接",
@@ -580,6 +595,119 @@
     "exporting": "导出中…",
     "exported": "报告已导出",
     "exportFailed": "导出失败",
-    "scanFailed": "扫描失败"
+    "scanFailed": "扫描失败",
+    "tab": {
+      "explore": "探索",
+      "debt": "技术债",
+      "evolution": "演化",
+      "clusters": "模块簇"
+    },
+    "evolution": "架构演化时间轴",
+    "notARepo": "这个项目不是 Git 仓库，无法分析历史。",
+    "evolutionSummary": "扫描 {{commits}} 个提交，最早 {{since}}",
+    "hotspots": "改动最频繁的文件",
+    "commits": "{{count}} 次提交",
+    "lastChanged": "最近 {{date}}",
+    "nodeCount": "{{count}} 节点",
+    "clusters": "模块簇（按依赖聚类）",
+    "clusterSummary": "{{count}} 个模块簇 · 内聚度 {{cohesion}}%",
+    "clusterSize": "{{count}} 个节点",
+    "audit": "AI 代码审查",
+    "runAudit": "分析代码",
+    "auditing": "分析中…",
+    "auditHint": "对依赖最重的文件做一次审查（未配置 LLM 时用启发式）。",
+    "auditDone": "{{source}}：{{count}} 条结论（{{files}} 个文件）",
+    "auditFailed": "分析失败",
+    "noFindings": "还没有审查结论。"
+  },
+  "notes": {
+    "search": "搜索笔记…",
+    "count": "{{count}} 条",
+    "refresh": "刷新",
+    "empty": "还没有笔记",
+    "emptyHint": "在代码面板点行号右侧的 + 添加批注，这里会汇总。",
+    "noMatch": "没有匹配的笔记",
+    "fileLevel": "文件级",
+    "save": "保存",
+    "delete": "删除笔记",
+    "addAtLine": "在第 {{line}} 行添加笔记",
+    "draftPlaceholder": "写下你的理解、疑问或与论文的关联…",
+    "saving": "保存中…",
+    "saveHint": "Ctrl+Enter 保存 · Esc 取消"
+  },
+  "progress": {
+    "tabProgress": "进度",
+    "tabReview": "复习",
+    "mastered": "已掌握",
+    "coverage": "共 {{nodes}} 个图谱节点",
+    "masteredCount": "已掌握 {{count}} 个",
+    "readingCount": "在读 {{count}} 个",
+    "coreUnread": "待读核心节点（{{count}}）",
+    "allCoreRead": "核心节点都读过了。",
+    "fanIn": "被依赖 {{count}} 次",
+    "markMastered": "标记为已掌握",
+    "currentFocus": "当前焦点",
+    "status": {
+      "unseen": "未读",
+      "reading": "在读",
+      "mastered": "已掌握"
+    },
+    "dueNow": "现在应复习 {{count}} 张",
+    "reviewStats": "卡片 {{total}} 张 · 今日 {{today}} 次 · 连续 {{streak}} 天",
+    "retention": "今日记住率 {{percent}}%",
+    "generateCards": "生成卡片",
+    "generating": "生成中…",
+    "cardsGenerated": "新增 {{added}} 张卡片（共 {{total}} 张）",
+    "noCards": "还没有卡片——先在「知识」或「面试」面板生成内容，再回来生成卡片。",
+    "allReviewed": "今天的复习都完成了。",
+    "cardQuestion": "问题",
+    "showAnswer": "显示答案",
+    "answerHidden": "答案已隐藏（先自己回想一遍）",
+    "remaining": "还剩 {{count}} 张",
+    "regenerate": "重建卡片",
+    "comeBackLater": "下次到期时会自动出现。",
+    "ratingForgot": "忘了",
+    "ratingHard": "有点难",
+    "ratingGood": "记得",
+    "ratingEasy": "很简单",
+    "source": {
+      "knowledge": "知识卡",
+      "question": "面试题",
+      "note": "笔记"
+    }
+  },
+  "tutor": {
+    "tabTutor": "导师提问",
+    "tabPath": "学习路径",
+    "context": "提问范围（跟随当前焦点）",
+    "noFocus": "未选中节点——会问项目整体",
+    "ask": "让导师提问",
+    "askAnother": "换一个问题",
+    "asking": "生成中…",
+    "question": "问题",
+    "sourceLlm": "LLM 生成",
+    "sourceHeuristic": "离线启发式",
+    "answerPlaceholder": "用自己的话回答，然后让导师评分…",
+    "evaluate": "提交并评分",
+    "evaluating": "评分中…",
+    "showPoints": "看评分要点",
+    "hidePoints": "收起要点",
+    "missed": "遗漏的要点",
+    "score": "得分 {{score}}/5",
+    "verdict": {
+      "weak": "还需补强",
+      "ok": "基本到位",
+      "strong": "讲清楚了"
+    },
+    "hint": "导师会围绕当前节点提问；先在图谱里选一个节点效果最好。",
+    "failed": "生成失败",
+    "goalHint": "写下你的目标（岗位、要改的功能、想补的知识点），生成一条阅读路线。",
+    "goalPlaceholder": "例如：准备后端面试 / 想改认证模块",
+    "generatePath": "生成学习路径",
+    "generatingPath": "生成中…",
+    "clearPaths": "清空",
+    "noPaths": "还没有学习路径。",
+    "pathFailed": "生成失败",
+    "groupGlobal": "全局"
   }
 }

@@ -33,11 +33,36 @@ import {
   getArchitectureSummary,
   listKnowledgeNodes,
   listQuestions,
+  listLearnProgress,
+  setLearnProgress,
+  clearLearnProgress,
+  listCodeNotes,
+  insertCodeNote,
+  updateCodeNote,
+  removeCodeNote,
+  listReviewCards,
+  countReviewCards,
+  insertReviewCardsIfMissing,
+  getReviewCard,
+  updateReviewCardSchedule,
+  insertReviewLog,
+  listReviewLogs,
+  removeReviewCardsForProject,
+  listReviewFindings,
+  replaceReviewFindings,
+  listLearningPaths,
+  insertLearningPath,
+  removeLearningPaths,
 } from '../db'
-import type { PaperRow } from '../db'
+import type { PaperRow, LearnStatus, CodeNoteInput } from '../db'
 import { readProjectTree } from '../file-tree'
 import { searchProjectContent } from '../content-search'
 import { writeLearningReport, scanProjectDebt } from '../insights'
+import { analyzeEvolution } from '../evolution'
+import { detectCommunities } from '../communities'
+import { buildReviewCards } from '../review-cards'
+import { schedule, computeReviewStats, type Rating } from '../srs'
+import { generateTutorQuestion, evaluateTutorAnswer, runCodeReview, generateLearningPath } from '../coach-plus'
 import { getProjectIgnoreFilter } from '../project-ignore'
 import { setApplicationMenu, popupTopLevelMenu, getTopLevelMenuLabels, type TopLevelMenuId } from '../menu'
 import { cloneRepo } from '../git'
@@ -1108,7 +1133,7 @@ ipcMain.handle('paper:indexStatus', (_e, { id }: { id: string }): IpcResult<unkn
   }
 })
 
-/* ──────────── Insights (report / debt) ──────────── */
+/* ──────────── Insights (report / debt / evolution / communities) ──────────── */
 
 ipcMain.handle('insights:exportReport', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
   const project = getProject(projectId)
@@ -1136,10 +1161,387 @@ ipcMain.handle('insights:debtScan', async (_e, { projectId }: { projectId: strin
   }
 })
 
+/** B7: git history × graph — which parts of the architecture are moving. */
+ipcMain.handle('insights:evolution', async (_e, {
+  projectId,
+  maxCommits,
+}: {
+  projectId: string
+  maxCommits?: number
+}): Promise<IpcResult<unknown>> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk(await analyzeEvolution(project.root_path, { maxCommits }))
+  } catch (err) {
+    return ipcErr('UNKNOWN', err instanceof Error ? err.message : String(err))
+  }
+})
+
+/** B8: label-propagation clusters over the graph. */
+ipcMain.handle('insights:communities', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  const graph = loadGraph(project.root_path)
+  if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+  try {
+    return ipcOk(detectCommunities({
+      nodes: graph.nodes.map((n) => ({ id: n.id, filePath: n.filePath, type: n.type })),
+      edges: graph.edges.map((e) => ({ source: e.source, target: e.target, type: e.type })),
+    }))
+  } catch (err) {
+    return ipcErr('UNKNOWN', err instanceof Error ? err.message : String(err))
+  }
+})
+
+/** B9: which graph node covers a file position (code → graph direction). */
+ipcMain.handle('graph:nodeAtLine', (_e, {
+  projectId,
+  path,
+  line,
+}: {
+  projectId: string
+  path: string
+  line?: number
+}): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  const check = resolveProjectPath(project.root_path, path)
+  if (!check.ok) return ipcErr('SOURCE_UNAVAILABLE', `非法路径: ${check.reason}`)
+
+  const graph = loadGraph(project.root_path)
+  if (!graph) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
+
+  const target = line ?? 0
+  const candidates = graph.nodes.filter((n) => n.filePath === path)
+  if (candidates.length === 0) return ipcOk({ node: null, candidates: [] })
+
+  // Prefer the tightest node range containing the line; fall back to the file node.
+  const ranged = candidates
+    .filter((n) => Array.isArray(n.lineRange) && n.lineRange!.length === 2)
+    .filter((n) => target >= n.lineRange![0] && target <= n.lineRange![1])
+    .sort((a, b) => (a.lineRange![1] - a.lineRange![0]) - (b.lineRange![1] - b.lineRange![0]))
+  const fileNode = candidates.find((n) => n.type === 'file')
+  const node = ranged[0] ?? fileNode ?? candidates[0]
+
+  return ipcOk({
+    node: node ? { id: node.id, label: node.label || node.name, type: node.type, filePath: node.filePath, lineRange: node.lineRange } : null,
+    candidates: candidates.slice(0, 20).map((n) => ({ id: n.id, label: n.label || n.name, type: n.type, lineRange: n.lineRange })),
+  })
+})
+
+/* ──────────── B1–B6: learning workbench ──────────── */
+
+/** Build the coach context shared by tutor / review / path handlers. */
+function coachContext(projectId: string) {
+  const project = getProject(projectId)
+  if (!project) return null
+  const config = loadConfig()
+  return {
+    projectId,
+    projectName: project.name,
+    rootPath: project.root_path,
+    language: config.ua?.language,
+    _project: project,
+  }
+}
+
+ipcMain.handle('progress:list', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk({ rows: listLearnProgress(projectId) })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('progress:set', (_e, {
+  projectId,
+  nodeId,
+  status,
+  confidence,
+}: {
+  projectId: string
+  nodeId: string
+  status: LearnStatus
+  confidence?: number
+}): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk(setLearnProgress(projectId, nodeId, status, confidence))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('progress:clear', (_e, { projectId }: { projectId: string }): IpcResult<null> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    clearLearnProgress(projectId)
+    return ipcOk(null)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('notes:list', (_e, {
+  projectId,
+  filePath,
+  nodeId,
+}: {
+  projectId: string
+  filePath?: string
+  nodeId?: string
+}): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk(listCodeNotes(projectId, { filePath, nodeId }))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('notes:add', (_e, note: CodeNoteInput): IpcResult<unknown> => {
+  const project = getProject(note.project_id)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${note.project_id} 不存在`)
+  if (!note.body?.trim()) return ipcErr('UNKNOWN', '笔记内容不能为空')
+  const check = resolveProjectPath(project.root_path, note.file_path)
+  if (!check.ok) return ipcErr('SOURCE_UNAVAILABLE', `非法路径: ${check.reason}`)
+  try {
+    return ipcOk(insertCodeNote({ ...note, body: note.body.trim() }))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('notes:update', (_e, { id, patch }: {
+  id: string
+  patch: { body?: string; tags?: string }
+}): IpcResult<unknown> => {
+  try {
+    const row = updateCodeNote(id, patch)
+    if (!row) return ipcErr('UNKNOWN', '笔记不存在')
+    return ipcOk(row)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('notes:remove', (_e, { id }: { id: string }): IpcResult<null> => {
+  try {
+    removeCodeNote(id)
+    return ipcOk(null)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('review:generate', (_e, {
+  projectId,
+  reset,
+}: {
+  projectId: string
+  reset?: boolean
+}): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    if (reset) removeReviewCardsForProject(projectId)
+
+    const cards = buildReviewCards(projectId)
+    const added = insertReviewCardsIfMissing(cards)
+    return ipcOk({ added, total: countReviewCards(projectId), candidates: cards.length })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('review:list', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const cards = listReviewCards(projectId)
+    const logs = listReviewLogs(projectId)
+    return ipcOk({
+      cards: cards.map((c) => ({ ...c, nodeIds: parseNodeRefs(c.node_ids) })),
+      stats: computeReviewStats(cards, logs),
+    })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('review:grade', (_e, {
+  cardId,
+  rating,
+}: {
+  cardId: string
+  rating: Rating
+}): IpcResult<unknown> => {
+  try {
+    const card = getReviewCard(cardId)
+    if (!card) return ipcErr('UNKNOWN', '卡片不存在')
+
+    const result = schedule(
+      { intervalDays: card.interval_days, ease: card.ease, reps: card.reps, lapses: card.lapses },
+      rating,
+    )
+    updateReviewCardSchedule(cardId, {
+      due_at: result.dueAt,
+      interval_days: result.intervalDays,
+      ease: result.ease,
+      reps: result.reps,
+      lapses: result.lapses,
+      last_reviewed_at: new Date().toISOString(),
+    })
+    insertReviewLog(cardId, card.project_id, rating, result.intervalDays)
+
+    // Mirror onto learning progress so the two views agree.
+    const nodeId = parseNodeRefs(card.node_ids)[0]
+    if (nodeId) {
+      setLearnProgress(card.project_id, nodeId, rating === 0 ? 'reading' : 'mastered')
+    }
+
+    return ipcOk({ dueAt: result.dueAt, intervalDays: result.intervalDays, ease: result.ease })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('tutor:question', async (_e, {
+  projectId,
+  focusedNodeId,
+  filePath,
+}: {
+  projectId: string
+  focusedNodeId?: string | null
+  filePath?: string | null
+}): Promise<IpcResult<unknown>> => {
+  const ctx = coachContext(projectId)
+  if (!ctx) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const question = await generateTutorQuestion(
+      { ...ctx, focusedNodeId, filePath },
+      llmOptions(),
+    )
+    return ipcOk(question)
+  } catch (err) {
+    return ipcErr('LLM_API_ERROR', err instanceof Error ? err.message : String(err), true)
+  }
+})
+
+ipcMain.handle('tutor:evaluate', async (_e, {
+  projectId,
+  focusedNodeId,
+  question,
+  answer,
+  hints,
+}: {
+  projectId: string
+  focusedNodeId?: string | null
+  question: string
+  answer: string
+  hints?: string[]
+}): Promise<IpcResult<unknown>> => {
+  const ctx = coachContext(projectId)
+  if (!ctx) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const evaluation = await evaluateTutorAnswer(
+      { ...ctx, focusedNodeId },
+      question,
+      answer,
+      hints ?? [],
+      llmOptions(),
+    )
+    return ipcOk(evaluation)
+  } catch (err) {
+    return ipcErr('LLM_API_ERROR', err instanceof Error ? err.message : String(err), true)
+  }
+})
+
+ipcMain.handle('review:audit', async (_e, {
+  projectId,
+  paths,
+  maxFiles,
+}: {
+  projectId: string
+  paths?: string[]
+  maxFiles?: number
+}): Promise<IpcResult<unknown>> => {
+  const ctx = coachContext(projectId)
+  if (!ctx) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const result = await runCodeReview({ ...ctx }, { paths, maxFiles }, llmOptions())
+    const stored = replaceReviewFindings(projectId, result.findings)
+    logInfo('review:audit', {
+      projectId,
+      source: result.source,
+      findings: result.findings.length,
+      files: result.filesReviewed.length,
+    })
+    return ipcOk({ ...result, findings: stored })
+  } catch (err) {
+    return ipcErr('LLM_API_ERROR', err instanceof Error ? err.message : String(err), true)
+  }
+})
+
+ipcMain.handle('review:findings', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk(listReviewFindings(projectId))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('path:generate', async (_e, {
+  projectId,
+  goal,
+}: {
+  projectId: string
+  goal: string
+}): Promise<IpcResult<unknown>> => {
+  const ctx = coachContext(projectId)
+  if (!ctx) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  if (!goal?.trim()) return ipcErr('UNKNOWN', '请先填写学习目标')
+  try {
+    const result = await generateLearningPath({ ...ctx }, goal, llmOptions())
+    insertLearningPath(projectId, result.goal, result.steps, result.source)
+    return ipcOk(result)
+  } catch (err) {
+    return ipcErr('LLM_API_ERROR', err instanceof Error ? err.message : String(err), true)
+  }
+})
+
+ipcMain.handle('path:list', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk(listLearningPaths(projectId))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('path:clear', (_e, { projectId }: { projectId: string }): IpcResult<null> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    removeLearningPaths(projectId)
+    return ipcOk(null)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
 /* ──────────── Diff Analysis ──────────── */
 
-ipcMain.handle('diff:analyze', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
-  const project = getProject(projectId)
+ipcMain.handle('diff:analyze', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {  const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
 
   try {
