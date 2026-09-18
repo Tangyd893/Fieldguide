@@ -3,7 +3,7 @@
  * Heuristic always available; LLM enrichment optional.
  */
 import type { ArchitectureSummary, ArchitectureModule, ArchitectureFlow, TechChoice } from '../../shared/understand'
-import { callLLM as sharedCallLLM, extractJson as sharedExtractJson } from './llm-utils'
+import { callLLM as sharedCallLLM, extractJson as sharedExtractJson } from '../llm/client'
 
 export interface GraphLike {
   project?: { projectName?: string; language?: string }

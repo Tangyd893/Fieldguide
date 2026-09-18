@@ -2,7 +2,7 @@
  * Interview Simulation — questions from architecture + knowledge cards.
  */
 import type { ArchitectureSummary, InterviewQuestion, KnowledgeNode } from '../../shared/understand'
-import { callLLM as sharedCallLLM, extractJson as sharedExtractJson } from './llm-utils'
+import { callLLM as sharedCallLLM, extractJson as sharedExtractJson } from '../llm/client'
 import type { LLMConfig } from './architecture'
 
 function uid(): string {

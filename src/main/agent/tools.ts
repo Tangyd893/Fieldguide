@@ -16,9 +16,11 @@ import { queryPaper } from '../vector'
 import { buildCrossSourceContext } from '../ua/cross-tour'
 import { flattenTourSteps, toSearchableNodes } from './context-packer'
 import { searchNodesDetailed } from '../ua/search'
+import type { ToolSchema } from '../llm/client'
 import type { AgentContext } from './types'
 
-export const AGENT_TOOLS = [
+/** Typed as OpenAI-style tool schemas so they can be handed to the LLM client as-is. */
+export const AGENT_TOOLS: ToolSchema[] = [
   {
     type: 'function' as const,
     function: {

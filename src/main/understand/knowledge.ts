@@ -2,7 +2,7 @@
  * Knowledge Extraction — tech concepts from architecture + graph → in-app cards.
  */
 import type { ArchitectureSummary, KnowledgeNode } from '../../shared/understand'
-import { callLLM as sharedCallLLM, extractJson as sharedExtractJson } from './llm-utils'
+import { callLLM as sharedCallLLM, extractJson as sharedExtractJson } from '../llm/client'
 import type { GraphLike, LLMConfig } from './architecture'
 
 function uid(): string {

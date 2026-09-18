@@ -181,7 +181,7 @@
 | **测试结构** | `ipc/index.ts` **1176 行、61 个通道，零 handler 级测试**（`ipc/__tests__/handlers.test.ts` 只断言 `ipcErr` 语义）；~~无 E2E~~ ✅ **已补 2026-09-19**（Playwright 8 例覆盖真实 IPC → UI 链路）；仍无覆盖率门槛 |
 | **数据演进** | ~~`db/index.ts:33 migrate()` 只有 `CREATE TABLE IF NOT EXISTS`，**无 `user_version` 版本化迁移**~~ ✅ **已修 2026-09-18**：新增 `db/migrations.ts`（声明式 `ADDED_COLUMNS` + 纯函数 `planMigrations()`），`migrate()` 按 `user_version` 与 `table_info` 应用 `ALTER TABLE`；规则抽成独立模块以便在原生模块不可用时仍可测试 |
 | **死代码 / 死表** | `index_jobs` 表从不写入；`getChunks`、`buildDiffPostMessage`、`buildGraphOverview`、`shared/graph.ts` 大部分类型无调用方；`config:uaRuntime` / `paper:get` 已注册但 preload 未暴露 |
-| **LLM 基建** | ~~`callLLM` 在 **4 个文件**各写一遍~~ ✅ **understand 侧已收敛 2026-09-18**（`understand/llm-utils.ts`；`ua/client.ts` 的摘要路径与 `agent/react.ts` 的内联调用仍未合并）；**无重试/退避、无限流、无 token 计量**（`embed.ts:53` 声明了 `usage.total_tokens` 却从不读）、无响应缓存；超时 30/60/90/120s 散落硬编码 |
+| **LLM 基建** | ~~`callLLM` 在 **4 个文件**各写一遍~~ ✅ **已收敛 2026-09-19**：全部走 [`llm/client.ts`](../src/main/llm/client.ts)（含 429/5xx/超时/网络错误的重试 + 指数退避 + jitter + 尊重 `Retry-After`、token 计量、工具调用类型），`understand/llm-utils.ts` 已删除、4 处显式调用点（understand 三阶段 / UA 摘要 / ReAct / 连通性测试）与 `agent/tools.ts` 的工具 schema 全部改用它；**仍缺**：限流（主动节流）、响应缓存、按模型的费用换算（`embed.ts` 声明了 `usage.total_tokens` 却从不读） |
 | **性能** | `loadGraph` 每次 IPC 都 `readFileSync` + `JSON.parse` 全量图（7 个 graph 通道每个都重复解析）；向量检索无 ANN，全表拉取 + JS 余弦阻塞主线程；`paper:search` 全表加载后 JS 过滤；`CodeViewer.tsx:44-53` 对整文件 `map` 且**无 memo / 无虚拟滚动**，每次渲染重跑逐行正则高亮 → 大文件全量 DOM |
 | **网络边界** | 渲染层**直连外网**（arXiv 搜索直接 fetch `export.arxiv.org`，`TheoryView.tsx:84`），绕过主进程；配合无 CSP 与无 sender 校验，网络出口不收敛 |
 | **可观测性** | 只有 10 处 logger 调用；`chat:send` / `paper:index` / `diff:analyze` / `understand:run` 等关键路径**无日志**；无诊断包导出、无崩溃上报、日志无轮转且 `appendFileSync` 阻塞主线程 |
@@ -322,7 +322,7 @@ Phase 7 — 可验证性（把「我做了」变成「我证明了」）
 | 新 Agent 工具 | `src/main/agent/tools.ts:19`（schema 数组）+ `:142` `switch` —— 加一个 case 即生效 |
 | 新表 / 迁移 | `src/main/db/index.ts:33` `migrate()`（**先补 `user_version`**） |
 | 新 IPC | `src/main/ipc/index.ts`（单文件路由）+ `src/shared/ipc.ts` 错误码 + `src/preload/index.ts` |
-| 统一 LLM 客户端（重试/限流/计量/流式） | 抽 `src/main/llm/client.ts`，替换 4 处重复 `callLLM` —— **单项 ROI 最高的重构** |
+| 统一 LLM 客户端（重试/限流/计量/流式） | ~~抽 `src/main/llm/client.ts`，替换 4 处重复 `callLLM`~~ ✅ **已完成 2026-09-19**：重试/退避/计量/工具调用均已落地；剩限流与流式 |
 | 图谱查询缓存 | `src/main/ua/graph-reader.ts` 是全部图查询的唯一出口，加 LRU + mtime 失效即可 |
 | Dashboard 新交互 | `src/main/ua/dashboard.ts:142` 桥接脚本 `switch(data.type)`（现 16 下行 / 3 上行） |
 

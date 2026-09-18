@@ -18,6 +18,7 @@ import { app } from 'electron'
 import { BINARY_EXTS, IGNORE_DIRS, getProjectIgnoreFilter, normalizeIgnoreFilter } from '../project-ignore'
 import { invalidateGraphCache } from './graph-reader'
 import { setDetectLayersImpl } from './ensure-layers'
+import { callLLM as sharedCallLLM } from '../llm/client'
 import { atomicWriteJson, isJsonReadable } from '../fs-atomic'
 
 let indexAbortController: AbortController | null = null
@@ -399,43 +400,19 @@ export interface LLMEnrichConfig {
   chatModel: string
 }
 
-import { joinLlmUrl } from '../../shared/llm-url'
-
 /**
- * Call the configured LLM with a prompt and return the response text.
+ * Summary/layer/tour prompts go through the shared transport (`llm/client.ts`),
+ * which owns the endpoint rule, retries and token metering. The local copy that
+ * used to live here had its own error wording and no retry at all, so a single 429
+ * silently degraded a whole index to structure-only.
  */
 async function callLLM(prompt: string, config: LLMEnrichConfig, language?: string): Promise<string> {
-  const url = joinLlmUrl(config.baseUrl, '/v1/chat/completions')
-
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.chatModel,
-      messages: [
-        { role: 'system', content: language === 'en'
-          ? 'You are a code analysis assistant. Respond with valid JSON only. Do not include markdown fences or extra commentary.'
-          : '你是一个代码分析助手。只回复合法的 JSON，不要包含 markdown 代码块或额外解释。' },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 4096,
-    }),
-    signal: AbortSignal.timeout(120_000),
+  return sharedCallLLM(prompt, config, language, {
+    temperature: 0.3,
+    system: language === 'en'
+      ? 'You are a code analysis assistant. Respond with valid JSON only. Do not include markdown fences or extra commentary.'
+      : '你是一个代码分析助手。只回复合法的 JSON，不要包含 markdown 代码块或额外解释。',
   })
-
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => '')
-    throw new Error(`LLM API error (${resp.status}): ${text.slice(0, 300)}`)
-  }
-
-  const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> }
-  const content = data.choices?.[0]?.message?.content
-  if (!content) throw new Error('LLM returned empty response')
-  return content
 }
 
 /**

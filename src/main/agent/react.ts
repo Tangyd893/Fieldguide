@@ -7,23 +7,13 @@ import { loadConfig } from '../config'
 import { AGENT_TOOLS, executeTool, extractNodeRefsFromObservation, toolCallKey } from './tools'
 import { packCoachContext, coachPolicyHints } from './context-packer'
 import type { AgentContext, AgentResult, AgentStep } from './types'
-import { joinLlmUrl } from '../../shared/llm-url'
+import { chatCompletion, type ChatMessage, type ToolCall } from '../llm/client'
 
 const MAX_ITERATIONS = 6
 
-interface LLMMessage {
+interface LLMMessage extends ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
-  content?: string
-  tool_calls?: Array<{
-    id: string
-    type: 'function'
-    function: { name: string; arguments: string }
-  }>
-  tool_call_id?: string
-}
-
-function chatCompletionsUrl(baseUrl: string): string {
-  return joinLlmUrl(baseUrl, '/v1/chat/completions')
+  tool_calls?: ToolCall[]
 }
 
 function localeHint(locale: string): string {
@@ -81,8 +71,6 @@ export async function runAgent(
     })),
   ]
 
-  const url = chatCompletionsUrl(config.llm.baseUrl)
-
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const isLast = i === MAX_ITERATIONS - 1
     if (isLast) {
@@ -93,43 +81,19 @@ export async function runAgent(
       })
     }
 
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.llm.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: config.llm.chatModel,
+    // Shared transport: retries on 429/5xx/timeouts. A long tool loop is exactly
+    // where a single transient failure used to kill the whole answer.
+    const { message: choice } = await chatCompletion(
+      { baseUrl: config.llm.baseUrl, apiKey: config.llm.apiKey, chatModel: config.llm.chatModel },
+      {
         messages,
         tools: isLast ? undefined : AGENT_TOOLS,
-        tool_choice: isLast ? undefined : 'auto',
+        toolChoice: isLast ? undefined : 'auto',
         temperature: 0.3,
-        max_tokens: 2048,
-      }),
-      signal: AbortSignal.timeout(90_000),
-    })
-
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => '')
-      throw new Error(`LLM API ${resp.status}: ${text.slice(0, 200)}`)
-    }
-
-    const data = await resp.json() as {
-      choices?: Array<{
-        message?: {
-          content?: string | null
-          tool_calls?: Array<{
-            id: string
-            type: 'function'
-            function: { name: string; arguments: string }
-          }>
-        }
-      }>
-    }
-
-    const choice = data.choices?.[0]?.message
-    if (!choice) throw new Error('Empty LLM response')
+        maxTokens: 2048,
+        timeoutMs: 90_000,
+      },
+    )
 
     if (choice.content?.trim()) {
       steps.push({ type: 'thought', content: choice.content.trim() })

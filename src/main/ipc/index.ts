@@ -8,7 +8,7 @@ import { ipcMain, BrowserWindow, shell, app, type IpcMainInvokeEvent } from 'ele
 import { join } from 'node:path'
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs'
 import { loadConfig, updateConfig } from '../config'
-import { joinLlmUrl } from '../../shared/llm-url'
+import { chatCompletion, LlmError } from '../llm/client'
 import {
   listProjects,
   getProject,
@@ -138,25 +138,19 @@ ipcMain.handle('config:testLlm', async (): Promise<IpcResult<unknown>> => {
   if (!isLLMConfigured()) {
     return ipcErr('LLM_NOT_CONFIGURED', '请先配置 LLM', true)
   }
-  const url = joinLlmUrl(config.llm.baseUrl, '/v1/chat/completions')
   try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.llm.apiKey}` },
-      body: JSON.stringify({
-        model: config.llm.chatModel,
-        messages: [{ role: 'user', content: 'Hi' }],
-        max_tokens: 5,
-      }),
-      signal: AbortSignal.timeout(15_000),
-    })
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => '')
-      return ipcErr('LLM_API_ERROR', `API 返回 ${resp.status}: ${text.slice(0, 200)}`, true)
-    }
+    // No retries: the user is staring at a "test connection" button, so a wrong
+    // key or an unreachable host should say so immediately.
+    await chatCompletion(
+      { baseUrl: config.llm.baseUrl, apiKey: config.llm.apiKey, chatModel: config.llm.chatModel },
+      { messages: [{ role: 'user', content: 'Hi' }], maxTokens: 5, timeoutMs: 15_000, retries: 0 },
+    )
     return ipcOk({ ok: true })
   } catch (err) {
-    return ipcErr('LLM_API_ERROR', `连接失败: ${err instanceof Error ? err.message : String(err)}`, true)
+    const status = err instanceof LlmError ? err.status : undefined
+    const detail = err instanceof Error ? err.message : String(err)
+    if (status) return ipcErr('LLM_API_ERROR', `API 返回 ${status}: ${detail.slice(0, 200)}`, true)
+    return ipcErr('LLM_API_ERROR', `连接失败: ${detail}`, true)
   }
 })
 

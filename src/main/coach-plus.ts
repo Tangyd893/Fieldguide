@@ -8,7 +8,7 @@
  */
 import { getArchitectureSummary, listKnowledgeNodes, listQuestions } from './db'
 import { loadGraph, getNode, getNeighbors } from './ua/graph-reader'
-import { callLLM, extractJson, type LLMConfig } from './understand/llm-utils'
+import { callLLM, extractJson, type LLMConfig } from './llm/client'
 import { scanProjectDebt } from './insights'
 import type { ReviewFindingInput, LearningStep } from './db'
 

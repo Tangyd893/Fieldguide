@@ -334,6 +334,22 @@ flowchart TD
 
 > **本批新增规模**：Playwright E2E 8 例（2 个 spec + harness + 构建前置脚本）；`.gitignore` 补 `test-results/` `playwright-report/` `blob-report/` `.playwright/`；lint warning 51 → 49；构建警告 3 → 0。
 
+### 统一 LLM 客户端（2026-09-19，补审计 §1.4「LLM 基建」+ 缝表最高 ROI 项）
+
+- [x] **eng-llm-client** · 收敛 4 处重复的 `callLLM` 并补上重试/退避/计量
+  - 问题（审计 §1.4）：`fetch /v1/chat/completions` 被手写 **4 遍**（`understand/*` 经 llm-utils、`ua/client.ts` 摘要、`agent/react.ts` ReAct 循环、`ipc/index.ts` 连通性测试），超时各写 15s/90s/120s、报错文案各异、**全都没有重试** —— 一次 429 就能让整次索引静默退化成「只有结构、没有摘要/分层/导览」
+  - 新增 [`src/main/llm/client.ts`](../src/main/llm/client.ts)：
+    - `chatCompletion()`：唯一传输层。重试 **429/408/409/425/5xx/超时/网络错误**（401/403/404 等**快速失败**——重试一个错的 key 只是浪费用户时间），指数退避 + full jitter + 封顶 8s，**尊重响应头 `Retry-After`**（秒数或 HTTP 日期两种写法都解析）；每次尝试单独计时（90s 是单次上限，不是整条重试链的上限）
+    - token 计量：`llmUsageTotals()` / `resetLlmUsage()`，读取 provider 返回的 `usage`（缺 `total_tokens` 时用 prompt+completion 求和）；同时记录 `calls` / `failedCalls` / `retries`，让失败率第一次变得可观测
+    - `LlmError` 带 `status` / `retriable` / `attempts`，调用方据此判断「重试有用吗」
+    - 工具调用：`tools` / `toolChoice` 入参 + `tool_calls` 出参；**只调用工具、不带正文的那一轮不再被误判为「空响应」**（否则 ReAct 第一步就会挂）
+    - `callLLM()` 保留原签名（prompt 进、文本出）作为 stage 级便捷封装，`extractJson()` / `jsonSystemPrompt()` 一并迁入
+  - 改造调用点：`understand/{architecture,knowledge,interview}.ts`、`coach-plus.ts`、`ua/client.ts`（删掉本地 `callLLM`）、`agent/react.ts`（删掉 `chatCompletionsUrl` + 手写 fetch）、`ipc/index.ts`（连通性测试改为 `retries: 0`——用户正盯着按钮，必须立刻给出答案）
+  - `agent/tools.ts` 的 `AGENT_TOOLS` 显式标注为 `ToolSchema[]`：顺带消掉了 `react.ts` 里为了塞进 fetch body 而加的 `as` 断言
+  - 删除 `src/main/understand/llm-utils.ts`，测试迁到 [`src/main/llm/__tests__/client.test.ts`](../src/main/llm/__tests__/client.test.ts) 并扩到 **26 例**（新增：429 重试后成功、5xx 用尽重试、401 不重试、连接重置重试、退避函数与 jitter 上下界、`Retry-After` 两种格式与封顶、token 计量含缺字段回退、失败计数、调用方取消不重试、工具调用轮次）
+  - 验收：单测 279 → **294 例**；`pnpm typecheck` / `lint`（0 error）/ `build`（0 警告）/ QA 三项 / `eval:agent`（关键词 Recall@5 仍 68.0%，未回归）/ E2E 8/8 全绿
+
+
 
 
 
