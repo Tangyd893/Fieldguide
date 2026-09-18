@@ -1,0 +1,340 @@
+{
+  "name": "pulsegate",
+  "projectPath": "resources/sample-project",
+  "description": "针对内置 Demo（pulsegate，104 节点 / 9 分层）人工标注的问答基准。每题标注了能回答该问题的图谱节点与文件，并提供三种提问形式（中文自然语言 / 英文自然语言 / 关键词）。检索与图导航全本地，因此可离线复现。",
+  "annotationNotes": "ground truth 只标注真正能回答问题的节点/文件，不追求穷举；节点 id 取自 resources/sample-project/.understand-anything/knowledge-graph.json；expectedHops 由源码 import 结构核对得出。",
+  "queryFields": [
+    { "field": "question", "label": "中文自然语言" },
+    { "field": "questionEn", "label": "英文自然语言" },
+    { "field": "keywords", "label": "关键词" }
+  ],
+  "items": [
+    {
+      "id": "q01",
+      "kind": "locate",
+      "question": "事件从 HTTP 入口进来之后，经过哪些环节才落到存储？",
+      "questionEn": "Which steps does an event go through from the HTTP entry point to the store?",
+      "keywords": "request flow httpapi service worker pool store ingest",
+      "expect": {
+        "nodes": [
+          "file:internal/httpapi/router.go",
+          "file:internal/httpapi/handlers.go",
+          "file:internal/service/ingest.go",
+          "file:internal/worker/pool.go",
+          "file:internal/store/memory.go"
+        ],
+        "files": [
+          "internal/httpapi/router.go",
+          "internal/httpapi/handlers.go",
+          "internal/service/ingest.go",
+          "internal/worker/pool.go",
+          "internal/store/memory.go"
+        ]
+      }
+    },
+    {
+      "id": "q02",
+      "kind": "locate",
+      "question": "写路径是怎么做到不阻塞 HTTP 请求的？",
+      "questionEn": "How does the write path avoid blocking the HTTP request?",
+      "keywords": "write path async worker pool submit queue ingest",
+      "expect": {
+        "nodes": [
+          "file:internal/worker/pool.go",
+          "file:internal/service/ingest.go",
+          "function:internal/worker/pool.go:Submit"
+        ],
+        "files": ["internal/worker/pool.go", "internal/service/ingest.go"]
+      }
+    },
+    {
+      "id": "q03",
+      "kind": "locate",
+      "question": "队列满了会发生什么？在哪段代码里处理的？",
+      "questionEn": "What happens when the queue is full, and where is it handled?",
+      "keywords": "queue full ErrQueueFull back-pressure 503 handler",
+      "expect": {
+        "nodes": ["file:internal/worker/pool.go", "file:internal/httpapi/handlers.go"],
+        "files": ["internal/worker/pool.go", "internal/httpapi/handlers.go"]
+      }
+    },
+    {
+      "id": "q04",
+      "kind": "locate",
+      "question": "读路径的缓存是怎么插进去的？写入之后缓存怎么办？",
+      "questionEn": "How is the cache used on the read path and what happens to it after a write?",
+      "keywords": "read path cache aside LRU invalidate query",
+      "expect": {
+        "nodes": ["file:internal/service/query.go", "file:internal/cache/lru.go"],
+        "files": ["internal/service/query.go", "internal/cache/lru.go"]
+      }
+    },
+    {
+      "id": "q05",
+      "kind": "locate",
+      "question": "事件重复提交会被怎么处理？",
+      "questionEn": "How are duplicate event submissions handled?",
+      "keywords": "duplicate dedupe idempotency event id ingest",
+      "expect": {
+        "nodes": ["file:internal/service/ingest.go"],
+        "files": ["internal/service/ingest.go"]
+      }
+    },
+    {
+      "id": "q06",
+      "kind": "locate",
+      "question": "Store 接口定义了哪些方法？谁实现它？",
+      "questionEn": "Which methods does the Store interface define and who implements it?",
+      "keywords": "Store interface Save List Stats memory implementation",
+      "expect": {
+        "nodes": ["file:internal/store/store.go", "file:internal/store/memory.go"],
+        "files": ["internal/store/store.go", "internal/store/memory.go"]
+      }
+    },
+    {
+      "id": "q07",
+      "kind": "locate",
+      "question": "项目里的技术债标注在哪个文件？说的是什么问题？",
+      "questionEn": "Where is the tech-debt TODO and what problem does it describe?",
+      "keywords": "TODO tech-debt mutex contention memory ring buffer",
+      "expect": {
+        "nodes": ["file:internal/store/memory.go"],
+        "files": ["internal/store/memory.go"]
+      }
+    },
+    {
+      "id": "q08",
+      "kind": "locate",
+      "question": "配置是怎么加载与校验的？默认值在哪？",
+      "questionEn": "How is configuration loaded and validated, and where are the defaults?",
+      "keywords": "config load Validate defaults environment",
+      "expect": {
+        "nodes": ["file:internal/config/config.go", "class:internal/config/config.go:Config"],
+        "files": ["internal/config/config.go"]
+      }
+    },
+    {
+      "id": "q09",
+      "kind": "locate",
+      "question": "配置里哪些组合会被拒绝启动？",
+      "questionEn": "Which configuration combinations are rejected at startup?",
+      "keywords": "config validate reject workers queue batch log level",
+      "expect": {
+        "nodes": ["file:internal/config/config.go"],
+        "files": ["internal/config/config.go"]
+      }
+    },
+    {
+      "id": "q10",
+      "kind": "locate",
+      "question": "HTTP 中间件链包含哪些？顺序为什么重要？",
+      "questionEn": "Which middleware does the HTTP chain include and why does order matter?",
+      "keywords": "middleware request id recover access log router chain",
+      "expect": {
+        "nodes": ["file:internal/httpapi/router.go"],
+        "files": ["internal/httpapi/router.go"]
+      }
+    },
+    {
+      "id": "q11",
+      "kind": "locate",
+      "question": "请求被取消（客户端断开）时，写路径会怎么表现？",
+      "questionEn": "What does the write path do when the request context is cancelled?",
+      "keywords": "context cancellation submit cancelled request timeout",
+      "expect": {
+        "nodes": ["file:internal/worker/pool.go", "function:internal/worker/pool.go:Submit"],
+        "files": ["internal/worker/pool.go"]
+      }
+    },
+    {
+      "id": "q12",
+      "kind": "locate",
+      "question": "程序退出时怎么保证队列里的事件不被丢弃？",
+      "questionEn": "How does shutdown avoid dropping queued events?",
+      "keywords": "graceful shutdown drain pool shutdown signal sigterm",
+      "expect": {
+        "nodes": [
+          "file:cmd/gateway/main.go",
+          "file:internal/worker/pool.go",
+          "function:cmd/gateway/main.go:shutdown"
+        ],
+        "files": ["cmd/gateway/main.go", "internal/worker/pool.go"]
+      }
+    },
+    {
+      "id": "q13",
+      "kind": "locate",
+      "question": "LRU 缓存有容量上限和过期时间吗？在哪实现的？",
+      "questionEn": "Does the LRU have a capacity limit and TTL, and where is it implemented?",
+      "keywords": "LRU capacity ttl cache eviction container list",
+      "expect": {
+        "nodes": ["file:internal/cache/lru.go", "class:internal/cache/lru.go:LRU"],
+        "files": ["internal/cache/lru.go"]
+      }
+    },
+    {
+      "id": "q14",
+      "kind": "locate",
+      "question": "事件类型和它的校验规则定义在哪？",
+      "questionEn": "Where are the event type and its validation rules defined?",
+      "keywords": "domain Event Level Validate invariants",
+      "expect": {
+        "nodes": ["file:internal/domain/event.go"],
+        "files": ["internal/domain/event.go"]
+      }
+    },
+    {
+      "id": "q15",
+      "kind": "locate",
+      "question": "有没有并发相关的测试？测了哪些语义？",
+      "questionEn": "Are there concurrency tests and which semantics do they cover?",
+      "keywords": "worker pool test queue full cancellation shutdown counters",
+      "expect": {
+        "nodes": ["file:internal/worker/pool_test.go"],
+        "files": ["internal/worker/pool_test.go"]
+      }
+    },
+    {
+      "id": "q16",
+      "kind": "locate",
+      "question": "HTTP 层端到端的测试覆盖了哪些场景？",
+      "questionEn": "Which scenarios do the end-to-end HTTP tests cover?",
+      "keywords": "httptest ingest list validation status 405 stats",
+      "expect": {
+        "nodes": ["file:internal/httpapi/router_test.go"],
+        "files": ["internal/httpapi/router_test.go"]
+      }
+    },
+    {
+      "id": "q17",
+      "kind": "locate",
+      "question": "如果我要新增一个 /v1/alerts 接口，需要改哪几个文件？",
+      "questionEn": "Which files would I touch to add a new /v1/alerts endpoint?",
+      "keywords": "add endpoint route handler service validate",
+      "expect": {
+        "nodes": [
+          "file:internal/httpapi/handlers.go",
+          "file:internal/httpapi/router.go",
+          "file:internal/service/ingest.go"
+        ],
+        "files": [
+          "internal/httpapi/handlers.go",
+          "internal/httpapi/router.go",
+          "internal/service/ingest.go"
+        ]
+      }
+    },
+    {
+      "id": "q18",
+      "kind": "locate",
+      "question": "项目的分层结构是怎样的？从入口到最内层依次是什么？",
+      "questionEn": "What is the layering, from entry point down to the innermost layer?",
+      "keywords": "layers architecture entry cmd gateway internal domain README",
+      "expect": {
+        "nodes": ["file:README.md", "file:cmd/gateway/main.go"],
+        "files": ["README.md", "cmd/gateway/main.go"]
+      }
+    },
+    {
+      "id": "q19",
+      "kind": "path",
+      "question": "HTTP 处理器是怎么一路走到内存存储的？",
+      "questionEn": "How does the HTTP handler reach the in-memory store?",
+      "keywords": "handlers store memory path dependency",
+      "expect": {
+        "nodes": ["file:internal/httpapi/handlers.go", "file:internal/store/memory.go"],
+        "files": ["internal/httpapi/handlers.go", "internal/store/memory.go"]
+      },
+      "path": {
+        "from": "file:internal/httpapi/handlers.go",
+        "to": "file:internal/store/memory.go",
+        "expectedHops": 2
+      }
+    },
+    {
+      "id": "q20",
+      "kind": "path",
+      "question": "入口文件和服务层之间的依赖链有多长？",
+      "questionEn": "How long is the dependency chain from the entry point to the service layer?",
+      "keywords": "main service ingest dependency chain",
+      "expect": {
+        "nodes": ["file:cmd/gateway/main.go", "file:internal/service/ingest.go"],
+        "files": ["cmd/gateway/main.go", "internal/service/ingest.go"]
+      },
+      "path": {
+        "from": "file:cmd/gateway/main.go",
+        "to": "file:internal/service/ingest.go",
+        "expectedHops": 1
+      }
+    },
+    {
+      "id": "q21",
+      "kind": "path",
+      "question": "缓存模块和配置模块之间能连通吗？",
+      "questionEn": "Are the cache module and the config module connected?",
+      "keywords": "cache config connection wiring main",
+      "expect": {
+        "nodes": ["file:internal/cache/lru.go", "file:internal/config/config.go"],
+        "files": ["internal/cache/lru.go", "internal/config/config.go"]
+      },
+      "path": {
+        "from": "file:internal/cache/lru.go",
+        "to": "file:internal/config/config.go",
+        "expectedHops": 2
+      }
+    },
+    {
+      "id": "q22",
+      "kind": "path",
+      "question": "领域模型到 HTTP 层怎么连通？",
+      "questionEn": "How is the domain model connected to the HTTP layer?",
+      "keywords": "domain event handlers import connection",
+      "expect": {
+        "nodes": ["file:internal/domain/event.go", "file:internal/httpapi/handlers.go"],
+        "files": ["internal/domain/event.go", "internal/httpapi/handlers.go"]
+      },
+      "path": {
+        "from": "file:internal/domain/event.go",
+        "to": "file:internal/httpapi/handlers.go",
+        "expectedHops": 1
+      }
+    },
+    {
+      "id": "q23",
+      "kind": "explain",
+      "question": "为什么 worker pool 要限制队列长度而不是无限排队？",
+      "questionEn": "Why is the worker queue bounded instead of unbounded?",
+      "keywords": "bounded queue back-pressure memory growth tradeoff",
+      "expect": {
+        "nodes": ["file:internal/worker/pool.go", "file:README.md"],
+        "files": ["internal/worker/pool.go", "README.md"]
+      }
+    },
+    {
+      "id": "q24",
+      "kind": "explain",
+      "question": "为什么事件去重窗口是有界的？窗口之外的重试会怎样？",
+      "questionEn": "Why is the dedupe window bounded, and what happens to retries outside it?",
+      "keywords": "dedupe window bounded retry idempotency cache",
+      "expect": {
+        "nodes": ["file:internal/service/ingest.go", "file:internal/cache/lru.go"],
+        "files": ["internal/service/ingest.go", "internal/cache/lru.go"]
+      }
+    },
+    {
+      "id": "q25",
+      "kind": "explain",
+      "question": "这套设计里哪些地方是「简单但正确」的取舍？",
+      "questionEn": "Where does this design choose simple-but-correct tradeoffs?",
+      "keywords": "tradeoff simple correct cache invalidation memory buffer README",
+      "expect": {
+        "nodes": [
+          "file:README.md",
+          "file:internal/service/query.go",
+          "file:internal/store/memory.go"
+        ],
+        "files": ["README.md", "internal/service/query.go", "internal/store/memory.go"]
+      }
+    }
+  ]
+}

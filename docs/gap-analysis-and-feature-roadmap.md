@@ -1,6 +1,6 @@
 # Fieldguide 差距分析 & 功能点扩展路线图
 
-> 版本：v2.1（**P0 八项 + A 档全部 + B 档九项全部落地**；剩余为 C 档论文实验与工程门禁） | 基线 commit：`e9fb5e6`（README 重写 + understanding workbench）
+> 版本：v2.2（**P0 八项 + A 档 + B 档九项 + C1/C2/C3 与 ESLint 门禁全部落地**；剩余为 E2E、自动更新、lint warning 清零） | 基线 commit：`e9fb5e6`（README 重写 + understanding workbench）
 > 审计方式：全量阅读 `src/**`（含 main / preload / renderer / shared）、`docs/**`；实跑 `tsc` 三份 tsconfig + `vitest`；grep 交叉验证文档承诺与代码实现
 >
 > **实测基线**：`pnpm typecheck` ✅（renderer / node / vitest 三份全过）· `pnpm test:unit` ✅ 21 文件 · **128 passed / 2 skipped**
@@ -85,7 +85,7 @@
 | 项 | 结果 |
 |----|------|
 | `tsc` × 3 份 tsconfig | ✅ 全过（0 error） |
-| `vitest` | ✅ 32 文件 / **234 passed / 2 skipped**（含 live `indexProject`、search/markdown/迁移计划/阶段隔离/LLM 工具/CSS 回归） |
+| `vitest` | ✅ 34 文件 / **276 passed / 2 skipped**（含 live `indexProject`、search/markdown/迁移计划/阶段隔离/LLM 工具/CSS 回归） |
 | 冒烟脚本 | `qa:graph`（Demo **104 节点** + Dashboard + HIS-Go 3656 节点 + `__uaStore` 桥接）、`qa:his-go`、`qa:scenario`、`regen:sample-graph` 齐备 |
 | ❌ lint / format | **完全没有**：无 `.eslintrc*` / `eslint.config.*` / `.prettierrc*` / `.editorconfig`，`package.json` 无 `lint` 脚本 |
 | ❌ E2E | 无 Playwright / Spectron；Electron 真实交互（点节点开文件等）靠 node 脚本 + 人工 |
@@ -236,9 +236,9 @@
 
 | # | 工作 | 为什么必须有 |
 |---|------|-------------|
-| **C1** | **Agent 评测基准** | 基于 `resources/sample-project`（13 节点）+ `tests/fixtures/tiny-go` + HIS-Go（3656 节点）构造 **40–60 条问答对**（人工标注 ground truth 节点/文件），评测：节点检索 **Recall@k / MRR**、工具调用成功率与轮数、答案**忠实度**（引用是否命中真实节点）、**幻觉率**。→ 一张基准表就能撑起「实验与评估」整章 |
-| **C2** | **消融 / 对比实验** | ① 有/无「上下文打包注入」对答案质量的影响；② 有/无「图谱检索」对幻觉率的影响；③ 启发式 vs LLM vs 多 Agent 评审管线（质量/成本/时延三角）；④ 中文 vs 英文 prompt 在中文项目上的表现。→ **A/B 对照是论文的骨架** |
-| **C3** | **用户研究** | N=8–12 名开发者，任务：30 分钟读懂一个陌生仓库。测：任务完成率、SUS 量表、NASA-TLX、理解度测验得分，对照组用「IDE + ChatGPT」。→ 场景 A 的「成功标准」在 `product-spec.md:53-57` 已经写好了，就差真做 |
+| **C1** | ✅ **已完成 2026-09-18** ~~**Agent 评测基准**~~ | 基于 `resources/sample-project`（13 节点）+ `tests/fixtures/tiny-go` + HIS-Go（3656 节点）构造 **40–60 条问答对**（人工标注 ground truth 节点/文件），评测：节点检索 **Recall@k / MRR**、工具调用成功率与轮数、答案**忠实度**（引用是否命中真实节点）、**幻觉率**。→ 一张基准表就能撑起「实验与评估」整章 |
+| **C2** | ✅ **已完成 2026-09-18** ~~**消融 / 对比实验**~~ | ① 有/无「上下文打包注入」对答案质量的影响；② 有/无「图谱检索」对幻觉率的影响；③ 启发式 vs LLM vs 多 Agent 评审管线（质量/成本/时延三角）；④ 中文 vs 英文 prompt 在中文项目上的表现。→ **A/B 对照是论文的骨架** |
+| **C3** | ✅ **已完成工具与协议（数据待真人采集）2026-09-18** ~~**用户研究**~~ | N=8–12 名开发者，任务：30 分钟读懂一个陌生仓库。测：任务完成率、SUS 量表、NASA-TLX、理解度测验得分，对照组用「IDE + ChatGPT」。→ 场景 A 的「成功标准」在 `product-spec.md:53-57` 已经写好了，就差真做 |
 
 ### D 档 — 明确不建议投入（会稀释主线）
 

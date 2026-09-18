@@ -888,31 +888,95 @@ export async function indexProject(
 }
 
 /**
- * Resolve a relative import to a file path in the scanned files.
- * E.g. "./handler" → "internal/service/handler.go"
+ * Resolve an import target to a file path in the scanned files.
+ *
+ * Two shapes are handled:
+ *   - relative: "./handler" → "internal/service/handler.go"
+ *   - package / absolute: "github.com/acme/proj/internal/store" → "internal/store/store.go"
+ *     (also Python dotted form "internal.store" → internal/store)
+ *
+ * The second case matters for Go, Java and Python projects, where imports are
+ * module paths rather than file paths — without it those graphs contain no
+ * inter-file edges at all, which breaks "how does A reach B" questions and
+ * community clustering. Resolution is suffix-based: the longest suffix of the
+ * import path that matches a directory in the repo wins, so third-party imports
+ * ("net/http") resolve to nothing instead of guessing.
  */
 function resolveImport(
   importSource: string,
   fromFile: string,
   files: ScannedFile[],
 ): string | null {
-  if (!importSource.startsWith('.')) return null
+  const source = importSource.trim()
 
-  const fromDir = fromFile.split('/').slice(0, -1).join('/')
-  const resolved = join(fromDir, importSource).replace(/\\/g, '/')
+  if (source.startsWith('.')) {
+    const fromDir = fromFile.split('/').slice(0, -1).join('/')
+    const resolved = join(fromDir, source).replace(/\\/g, '/')
 
-  // Try exact match first
-  const exact = files.find(f => {
-    const base = f.path.replace(/\.[^.]+$/, '')
-    return base === resolved || f.path === resolved
-  })
-  if (exact) return exact.path
+    // Try exact match first
+    const exact = files.find(f => {
+      const base = f.path.replace(/\.[^.]+$/, '')
+      return base === resolved || f.path === resolved
+    })
+    if (exact) return exact.path
 
-  // Try with common extensions
-  for (const ext of ['.go', '.ts', '.js', '.py', '.rs', '.java']) {
-    const withExt = files.find(f => f.path === resolved + ext)
-    if (withExt) return withExt.path
+    // Try with common extensions
+    for (const ext of ['.go', '.ts', '.js', '.py', '.rs', '.java']) {
+      const withExt = files.find(f => f.path === resolved + ext)
+      if (withExt) return withExt.path
+    }
+    // Directory import (e.g. "./service" → internal/service/*)
+    return pickFromDirectory(`${resolved}/`, source.split('/').pop() ?? '', files)
+  }
+
+  if (!source || source.startsWith('/') || source.startsWith('@types')) return null
+  // Bare npm-style specifiers ("react", "lodash/fp") are packages, not repo paths.
+  if (!source.includes('/') && !source.includes('.')) return null
+
+  // Python dotted module → path-ish
+  const asPath = !source.includes('/') && source.includes('.')
+    ? source.replace(/\./g, '/')
+    : source
+
+  const segments = asPath.split('/').filter(Boolean)
+  // Longest suffix first, but never match on a single generic segment unless the
+  // repo root actually has such a directory (handled by the same lookup).
+  for (let take = segments.length; take >= 1; take--) {
+    const suffix = segments.slice(-take).join('/')
+    const hit = pickFromDirectory(`${suffix}/`, segments[segments.length - 1], files)
+    if (hit) return hit
   }
 
   return null
+}
+
+/** Pick a representative file inside a directory prefix (package → file). */
+function pickFromDirectory(
+  dirPrefix: string,
+  packageName: string,
+  files: ScannedFile[],
+): string | null {
+  const candidates = files.filter(f => f.path.startsWith(dirPrefix))
+  if (candidates.length === 0) return null
+
+  const normalizedPkg = packageName.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()
+  // A package import points at its implementation, not at its tests.
+  const isTest = (path: string) => /(_test|\.test|\.spec)\.[^.]+$/.test(path) || /(^|\/)test_[^/]+$/.test(path)
+  const preferred = candidates.filter(f => !isTest(f.path))
+  const pool = preferred.length > 0 ? preferred : candidates
+
+  // 1. a file named after the package: store → store.go
+  const named = pool.find(
+    f => f.path.slice(dirPrefix.length).replace(/\.[^.]+$/, '').toLowerCase() === normalizedPkg,
+  )
+  if (named) return named.path
+
+  // 2. an index-style entry point
+  const entry = pool.find(f => /(^|\/)(index|main|mod)\.[^.]+$/.test(f.path.slice(dirPrefix.length)))
+  if (entry) return entry.path
+
+  // 3. deterministic fallback — plain code-unit ordering, NOT localeCompare:
+  //    locale collation ranks "pool_test.go" before "pool.go", which silently
+  //    made package imports resolve to test files.
+  return pool.slice().sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))[0].path
 }

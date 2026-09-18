@@ -293,7 +293,8 @@
     "askCoachPlaceholder": "例如：论文里的 chunk 策略在项目代码里怎么实现的？",
     "askCoachSend": "提问",
     "askCoachAsking": "思考中…",
-    "askCoachNeedProject": "先在项目库中选中一个项目，教练才有代码上下文。"
+    "askCoachNeedProject": "先在项目库中选中一个项目，教练才有代码上下文。",
+    "openPdfExternal": "用系统阅读器打开"
   },
   "bridge": {
     "title": "概念桥接",

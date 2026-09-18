@@ -6,7 +6,7 @@
  * and pushes results to the dashboard via postMessage.
  */
 import { join } from 'node:path'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { loadGraph } from './graph-reader'

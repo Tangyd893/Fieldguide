@@ -25,13 +25,12 @@ interface Highlight {
 interface Props {
   pdfPath: string
   paperId: string
-  projectId: string
   t: (key: string, opts?: Record<string, unknown>) => string
   onClose: () => void
   onSelectText?: (text: string) => void
 }
 
-export default function PdfReader({ pdfPath, paperId, projectId, t, onClose, onSelectText }: Props) {
+export default function PdfReader({ pdfPath, paperId, t, onClose, onSelectText }: Props) {
   const [numPages, setNumPages] = useState(0)
   const [pageNumber, setPageNumber] = useState(1)
   const [selectedText, setSelectedText] = useState('')

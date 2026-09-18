@@ -28,6 +28,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Lint
+        run: pnpm lint
+
       - name: Unit tests
         run: pnpm test:unit
 
@@ -36,3 +39,17 @@ jobs:
 
       - name: Scenario smoke
         run: node scripts/scenario-smoke.mjs
+
+      # Retrieval + graph navigation are local, so the coach benchmark runs
+      # offline in CI: it fails if recall collapses or paths stop resolving.
+      - name: Coach benchmark (offline)
+        run: pnpm eval:agent
+
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-baseline
+          path: docs/eval/agent-baseline.md
+          if-no-files-found: ignore
+

@@ -293,7 +293,8 @@
     "askCoachPlaceholder": "例如：論文裡的 chunk 策略在專案程式碼裡怎麼實作的？",
     "askCoachSend": "提問",
     "askCoachAsking": "思考中…",
-    "askCoachNeedProject": "先在專案庫中選取一個專案，教練才有程式碼上下文。"
+    "askCoachNeedProject": "先在專案庫中選取一個專案，教練才有程式碼上下文。",
+    "openPdfExternal": "用系統閱讀器開啟"
   },
   "bridge": {
     "title": "概念橋接",

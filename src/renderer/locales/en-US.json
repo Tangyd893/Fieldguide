@@ -293,7 +293,8 @@
     "askCoachPlaceholder": "e.g. how is the paper's chunking strategy implemented in this repo?",
     "askCoachSend": "Ask",
     "askCoachAsking": "Thinking…",
-    "askCoachNeedProject": "Pick a project in the library first so the coach has code context."
+    "askCoachNeedProject": "Pick a project in the library first so the coach has code context.",
+    "openPdfExternal": "Open in system viewer"
   },
   "bridge": {
     "title": "Concept Bridge",

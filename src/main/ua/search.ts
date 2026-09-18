@@ -48,6 +48,7 @@ let loadFailed = false
 function getAppRoot(): string {
   try {
     // Lazy require so vitest / plain node can still use substring fallback
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- electron is only available at runtime
     const { app } = require('electron') as typeof import('electron')
     if (app?.isPackaged) return app.getAppPath()
   } catch {
@@ -92,6 +93,53 @@ export async function loadSearchEngineClass(): Promise<SearchEngineCtor | null> 
 /** True when the UA semantic SearchEngine loaded successfully. */
 export async function isSemanticSearchAvailable(): Promise<boolean> {
   return (await loadSearchEngineClass()) !== null
+}
+
+/**
+ * Normalize FG graph nodes for fuzzy search (name/summary/tags at top level).
+ *
+ * Lives here (not in agent/context-packer) so the search subsystem and the
+ * evaluation harness can use it without pulling in the agent → db → native
+ * better-sqlite3 import chain.
+ */
+export function toSearchableNodes(nodes: Array<{
+  id: string
+  type?: string
+  name?: string
+  label?: string
+  filePath?: string
+  lineRange?: [number, number]
+  summary?: string
+  tags?: string[]
+  complexity?: string
+  metadata?: Record<string, unknown>
+}>): SearchableNode[] {
+  return nodes.map((n): SearchableNode => {
+    const summary = String(
+      n.metadata?.summary
+      || (typeof n.summary === 'string' ? n.summary : '')
+      || '',
+    )
+    const tags = (n.metadata?.tags as string[] | undefined)
+      || (Array.isArray(n.tags) ? (n.tags as string[]) : [])
+      || []
+    const complexity = (n.metadata?.complexity as SearchableNode['complexity'] | undefined)
+      || (n.complexity as SearchableNode['complexity'] | undefined)
+      || 'moderate'
+    return {
+      id: n.id,
+      type: n.type || 'file',
+      name: String(n.name || n.label || n.id),
+      filePath: n.filePath,
+      lineRange: n.lineRange,
+      summary,
+      tags,
+      complexity,
+      languageNotes: typeof n.metadata?.languageNotes === 'string'
+        ? n.metadata.languageNotes
+        : undefined,
+    }
+  })
 }
 
 /** Deterministic substring/token matcher used when UA core is unavailable. */

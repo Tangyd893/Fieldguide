@@ -6,7 +6,7 @@
  */
 import { ipcMain, BrowserWindow, shell, app, type IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs'
 import { loadConfig, updateConfig } from '../config'
 import { joinLlmUrl } from '../../shared/llm-url'
 import {
@@ -54,7 +54,7 @@ import {
   insertLearningPath,
   removeLearningPaths,
 } from '../db'
-import type { PaperRow, LearnStatus, CodeNoteInput } from '../db'
+import type { LearnStatus, CodeNoteInput } from '../db'
 import { readProjectTree } from '../file-tree'
 import { searchProjectContent } from '../content-search'
 import { writeLearningReport, scanProjectDebt } from '../insights'
@@ -83,7 +83,7 @@ import {
   getGraphStats,
   isGraphStale,
 } from '../ua/graph-reader'
-import { indexPaper, queryPaper, countChunks, getChunks, removeChunks, getIndexStats } from '../vector'
+import { indexPaper, queryPaper, countChunks, getIndexStats } from '../vector'
 import { analyzeProjectDiff } from '../ua/diff'
 import { generateCrossTour } from '../ua/cross-tour'
 import { searchNodesDetailed } from '../ua/search'

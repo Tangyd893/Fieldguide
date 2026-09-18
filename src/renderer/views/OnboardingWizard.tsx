@@ -43,7 +43,6 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
   // Step 5 state
   const [selectedOption, setSelectedOption] = useState<'demo' | 'local' | null>(null)
   const [step5Phase, setStep5Phase] = useState<Step5Phase>('setting-up')
-  const [step5Progress, setStep5Progress] = useState('')
   const [step5NodeCount, setStep5NodeCount] = useState(0)
   const [step5Error, setStep5Error] = useState('')
   const [step5ProjectId, setStep5ProjectId] = useState<string | null>(null)
@@ -88,7 +87,6 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
 
     setSelectedOption(option)
     setStep5Phase('setting-up')
-    setStep5Progress('')
     setStep5NodeCount(0)
     setStep5Error('')
     setStep(4)
@@ -99,7 +97,6 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
     if (step !== 4 || !selectedOption || !onSetupStart) return
 
     let cancelled = false
-    let unsubProgress: (() => void) | undefined
 
     async function run() {
       let projectId: string | null = null

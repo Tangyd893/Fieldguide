@@ -9,7 +9,7 @@
     ],
     "frameworks": [],
     "description": "",
-    "analyzedAt": "2026-09-18T01:12:11.674Z",
+    "analyzedAt": "2026-09-18T04:24:04.622Z",
     "gitCommitHash": ""
   },
   "nodes": [
@@ -3287,6 +3287,181 @@
       "type": "contains",
       "direction": "forward",
       "weight": 1
+    },
+    {
+      "source": "file:cmd/gateway/main.go",
+      "target": "file:internal/cache/lru.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:cmd/gateway/main.go",
+      "target": "file:internal/config/config.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:cmd/gateway/main.go",
+      "target": "file:internal/domain/event.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:cmd/gateway/main.go",
+      "target": "file:internal/httpapi/handlers.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:cmd/gateway/main.go",
+      "target": "file:internal/service/ingest.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:cmd/gateway/main.go",
+      "target": "file:internal/store/store.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:cmd/gateway/main.go",
+      "target": "file:internal/worker/pool.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/httpapi/handlers.go",
+      "target": "file:internal/domain/event.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/httpapi/handlers.go",
+      "target": "file:internal/service/ingest.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/httpapi/handlers.go",
+      "target": "file:internal/store/store.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/httpapi/handlers.go",
+      "target": "file:internal/worker/pool.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/httpapi/router_test.go",
+      "target": "file:internal/cache/lru.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/httpapi/router_test.go",
+      "target": "file:internal/domain/event.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/httpapi/router_test.go",
+      "target": "file:internal/service/ingest.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/httpapi/router_test.go",
+      "target": "file:internal/store/store.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/httpapi/router_test.go",
+      "target": "file:internal/worker/pool.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/service/ingest.go",
+      "target": "file:internal/cache/lru.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/service/ingest.go",
+      "target": "file:internal/domain/event.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/service/ingest.go",
+      "target": "file:internal/store/store.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/service/ingest.go",
+      "target": "file:internal/worker/pool.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/service/query.go",
+      "target": "file:internal/cache/lru.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/service/query.go",
+      "target": "file:internal/domain/event.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/service/query.go",
+      "target": "file:internal/store/store.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/store/memory.go",
+      "target": "file:internal/domain/event.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/store/store.go",
+      "target": "file:internal/domain/event.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
     }
   ],
   "layers": [

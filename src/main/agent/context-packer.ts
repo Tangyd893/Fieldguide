@@ -14,8 +14,13 @@ import {
 } from '../ua/graph-reader'
 import { buildCrossSourceContext } from '../ua/cross-tour'
 import { queryPaper } from '../vector'
-import { searchNodesFuzzy, type SearchableNode } from '../ua/search'
+import { searchNodesFuzzy, toSearchableNodes, type SearchableNode } from '../ua/search'
 import type { AgentContext } from './types'
+
+// Re-exported for existing importers (agent/tools.ts, ipc); the implementation
+// now lives in ua/search.ts so it can be used without the db import chain.
+export { toSearchableNodes }
+export type { SearchableNode }
 
 export type CoachIntent = 'overview' | 'paper' | 'code' | 'general'
 
@@ -37,36 +42,6 @@ export function detectCoachIntent(query: string): CoachIntent {
     return 'code'
   }
   return 'general'
-}
-
-/** Normalize FG graph nodes for fuzzy search (name/summary/tags at top level). */
-export function toSearchableNodes(nodes: GraphNode[]): SearchableNode[] {
-  return nodes.map((n): SearchableNode => {
-    const summary = String(
-      n.metadata?.summary
-      || (typeof n.summary === 'string' ? n.summary : '')
-      || '',
-    )
-    const tags = (n.metadata?.tags as string[] | undefined)
-      || (Array.isArray(n.tags) ? (n.tags as string[]) : [])
-      || []
-    const complexity = (n.metadata?.complexity as SearchableNode['complexity'] | undefined)
-      || (n.complexity as SearchableNode['complexity'] | undefined)
-      || 'moderate'
-    return {
-      id: n.id,
-      type: n.type || 'file',
-      name: String(n.name || n.label || n.id),
-      filePath: n.filePath,
-      lineRange: n.lineRange,
-      summary,
-      tags,
-      complexity,
-      languageNotes: typeof n.metadata?.languageNotes === 'string'
-        ? n.metadata.languageNotes
-        : undefined,
-    }
-  })
 }
 
 export function flattenTourSteps(graph: KnowledgeGraph): TourStep[] {

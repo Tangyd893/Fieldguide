@@ -1,8 +1,7 @@
 /**
  * Git service — wraps simple-git for clone operations.
  */
-import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git'
-import { join } from 'node:path'
+import { simpleGit, type SimpleGit } from 'simple-git'
 import { existsSync } from 'node:fs'
 
 export interface CloneResult {

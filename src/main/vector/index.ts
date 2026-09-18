@@ -11,7 +11,7 @@
  *   - OpenAI-compatible /embeddings endpoint
  */
 import { getDb } from '../db'
-import { extractPdfText, chunkText, type PaperChunk } from './chunk'
+import { extractPdfText, chunkText } from './chunk'
 import { generateEmbeddings, cosineSimilarity } from './embed'
 import type { PaperRow } from '../db'
 

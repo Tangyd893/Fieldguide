@@ -11,7 +11,7 @@
  * `llm.apiKeyPlaintext` is set so the UI can say so.
  */
 import { app, safeStorage } from 'electron'
-import { join, dirname } from 'node:path'
+import { join } from 'node:path'
 import { existsSync, readFileSync, mkdirSync } from 'node:fs'
 import { atomicWriteFileSync } from './fs-atomic'
 import { migrateLegacyChatModel } from '../shared/llm-catalog'

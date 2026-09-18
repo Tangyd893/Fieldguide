@@ -48,9 +48,19 @@ const DEFAULT_MAX_ITERATIONS = 20
 const DEFAULT_MIN_SIZE = 3
 const DEFAULT_MAX_COMMUNITIES = 12
 
-/** Ignore structural edges so clusters reflect calls/imports, not containment. */
+/**
+ * Edges used for clustering.
+ *
+ * `contains` (file → symbol) is structural and normally ignored, because keeping
+ * it would just cluster each file with its own symbols. But some indexers emit
+ * *only* containment edges — the bundled Go demo is one such case — and then
+ * ignoring them would leave every node isolated. So: use containment only when
+ * there is nothing else to work with.
+ */
 function usableEdges(edges: CommunityGraph['edges']): Array<{ source: string; target: string }> {
-  return edges.filter((e) => e.type !== 'contains' && e.source !== e.target)
+  const nonContains = edges.filter((e) => e.type !== 'contains' && e.source !== e.target)
+  if (nonContains.length > 0) return nonContains
+  return edges.filter((e) => e.source !== e.target)
 }
 
 /**
@@ -149,7 +159,7 @@ export function detectCommunities(graph: CommunityGraph, opts: CommunityOptions 
   }
 
   // Group by final community label.
-  let groups = new Map<string, string[]>()
+  const groups = new Map<string, string[]>()
   for (const id of nodeIds) {
     const c = community.get(id)!
     if (!groups.has(c)) groups.set(c, [])
@@ -188,7 +198,7 @@ function mergeAdjacentCommunities(
   const m = twoM / 2
   if (m === 0) return groups
 
-  let clusters = groups.map((members) => ({
+  const clusters = groups.map((members) => ({
     members: [...members],
     tot: members.reduce((sum, id) => {
       let d = 0

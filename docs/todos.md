@@ -276,6 +276,43 @@ flowchart TD
 >
 > **测试抓到的两个真 bug**（均已修复并加回归测试）：① SRS 反复评「很简单」会让间隔指数增长到 1.2 亿天，`Date.toISOString()` 抛异常直接打挂调度器 → 加 3 年上限；② 模块度计算里 `twoM`/`m` 混用导致统计口径错误 → 修正并补单测。
 
+### C 档与工程门禁（2026-09-18）
+
+- [x] **fg-agent-benchmark** · Agent 评测基准（C1）
+  - 指标：[`src/main/eval/metrics.ts`](../src/main/eval/metrics.ts)——Recall@k / Precision@k / MRR（命中 = 节点 id 命中标注节点，或该节点所在文件命中标注文件）、引用忠实度/精确率/召回率、幻觉引用计数、路径可达率与跳数准确率；纯函数 + 23 例单测
+  - 数据集：[`eval/datasets/pulsegate.qa.json`](../eval/datasets/pulsegate.qa.json)——**25 题人工标注**（locate 18 / explain 3 / path 4），每题三种提问形式（中文 NL / 英文 NL / 关键词）
+  - Harness：[`src/main/eval/harness.ts`](../src/main/eval/harness.ts)，`pnpm eval:agent` 一键跑 **4 检索变体 × 3 提问形式 × 2 个 k**，产出 [`docs/eval/agent-baseline.md`](./eval/agent-baseline.md)
+  - **离线可复现**：检索与图导航全本地，不需要 API Key；引用类指标在配置 Key 后经 `scoreAnswer()` 运行
+
+- [x] **fg-ablation** · 消融实验（C2）：检索方式 × 提问形式（上一项的同一套代码路径）
+  - 实测（Demo pulsegate，104 节点 / 113 边，k=5）：无检索 **0%** → 子串中文 11.8% / 英文 23.3% / 关键词 33.8% → 语义中文 12.8% / 英文 26.4% / **关键词 68.0%**（MRR 0.82）
+  - k=10 关键词：子串 61.9% → 语义 75.6%
+  - **结论（含一个负结果）**：① 检索是决定性的（基线 0%）；② 离线词法检索**对提问语言敏感**，中文提问只有关键词的 1/5——产品里靠上下文打包 + LLM 阅读弥补；③ 语义引擎显著优于子串（关键词 68.0% vs 33.8%）；④ **邻居扩展没有带来检索召回增益**（@5/@10 与纯语义相同），它的价值是给模型提供连接关系，属答案级收益，检索指标测不到——如实写进报告
+
+- [x] **fg-user-study-kit** · 用户研究工具（C3）
+  - [`src/main/eval/usability.ts`](../src/main/eval/usability.ts)：SUS 量表（10 题中英双语 + 极性校验）、×2.5 标度、分量表（可用性 1/2/3/5/6/7/9、易学性 4/10）、形容词分级、**无效问卷剔除**、均值/中位数/标准差/95% CI、任务指标（完成率/正确率/均值与中位耗时/自评理解）；19 例单测
+  - 协议：[`docs/eval/user-study-protocol.md`](./eval/user-study-protocol.md)——RQ、被试内设计、等难度任务序列、任务脚本与成功标准、偏倚控制、分析方案（配对 t / Wilcoxon / McNemar / 效应量）、执行清单、隐私与局限
+  - **不预置任何模拟数据**：数据必须由真实参与者产生
+
+- [x] **eng-eslint** · 工程门禁：ESLint（补审计 P2「零 lint 配置」）
+  - 安装 `eslint@9` + `typescript-eslint@8` + `eslint-plugin-react-hooks@5` + `@eslint/js`；[`eslint.config.mjs`](../eslint.config.mjs) 扁平配置，只启用能抓缺陷的规则（unused vars、空 catch、`prefer-const`、hooks 规则、`no-explicit-any` 为 warn）
+  - **首次运行抓到 18 个真实错误**并全部修复：14 处死代码/未用导入、2 处 `prefer-const`、1 处 `no-empty-object-type`；另有 OnboardingWizard 的 `step5Progress`/`unsubProgress` 死状态、`openPdf`（系统阅读器打开）丢失入口——已重新接线为论文详情页的第二个按钮
+  - 剩余 51 条 warning（31 处 UA 边界的 `any`、18 处数据加载 effect 的依赖提示）**如实保留**并在文档说明，不为了让数字好看而关规则
+
+- [x] **eng-ci** · CI 补 lint 与离线基准
+  - [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) 新增 `pnpm lint` 与 `pnpm eval:agent`（基准离线可跑，召回崩塌或路径失效会让 CI 失败），并上传基准报告为构建产物
+
+- [x] **fg-go-imports** · 修复索引器只解析相对导入（评测过程中发现的真问题）
+  - 问题：`resolveImport` 对非相对导入一律返回 null → Go / Java / Python 这类**模块路径导入不产生任何边**，Demo 图谱只有 88 条 `contains` 边、文件之间彼此不可达（HIS-Go 这类真实 Go 项目同样受影响）
+  - 实现：新增包导入解析（最长后缀匹配目录 + 包名同名文件优先 + index/main 入口次之 + 测试文件排除 + 确定性排序），Demo 图谱边数 88 → **113**，路径题 100% 可达且跳数与源码 import 结构一致
+  - 顺带修掉一个隐蔽 bug：原先用 `localeCompare` 选代表文件，ICU 排序把 `pool_test.go` 排在 `pool.go` 之前，导致**包导入被解析到测试文件**
+
+> **本批新增规模**：C1/C2 指标与 harness、25 题标注数据集、C3 量表与协议、ESLint 门禁 + CI；单测增至 **34 文件 / 276 例**；i18n 三语各 **620 键**。
+>
+> **剩余（未做，如实列出）**：E2E（Playwright for Electron）未引入；`electron-updater` 自动更新、代码签名未做；51 条 lint warning 未清零；`ua/client.ts` 摘要 LLM 与 `agent/react.ts` 内联调用未并入 `llm-utils`；C3 的**真实参与者数据必须由人来跑**。
+
+
+
 
 
 

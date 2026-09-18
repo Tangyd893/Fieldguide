@@ -8,7 +8,7 @@
  * and expose in-paper semantic lookup.
  */
 import { useState, useEffect } from 'react'
-import { Library, Search, BookOpen, Download, StickyNote, Sparkles, RefreshCw, CheckCircle2, AlertTriangle, MessagesSquare } from 'lucide-react'
+import { Library, Search, BookOpen, Download, StickyNote, Sparkles, RefreshCw, CheckCircle2, AlertTriangle, MessagesSquare, ExternalLink } from 'lucide-react'
 import ConceptBridge from './ConceptBridge'
 import PdfReader from './PdfReader'
 import { renderMarkdown } from '@/lib/markdown'
@@ -442,10 +442,20 @@ export default function TheoryView({ t, projectId }: Props) {
                 </div>
                 <div className="flex gap-1.5 shrink-0">
                   {pdfPath ? (
-                    <button onClick={openPdfInApp}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--fg-status-success-bg)] text-[var(--fg-status-success)] rounded-lg text-xs font-medium hover:bg-[var(--fg-status-success-bg)]/70 border border-[var(--fg-status-success)]">
-                      <BookOpen size={13} />{t('theory.readPdf')}
-                    </button>
+                    <>
+                      <button onClick={openPdfInApp}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--fg-status-success-bg)] text-[var(--fg-status-success)] rounded-lg text-xs font-medium hover:bg-[var(--fg-status-success-bg)]/70 border border-[var(--fg-status-success)]">
+                        <BookOpen size={13} />{t('theory.readPdf')}
+                      </button>
+                      {/* The in-app reader is fine for reading + bridging; the system
+                          viewer is better for printing or heavy scrolling. */}
+                      <button onClick={openPdf}
+                        title={t('theory.openPdfExternal')}
+                        aria-label={t('theory.openPdfExternal')}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-[var(--fg-border)] text-[var(--fg-text-secondary)] hover:bg-[var(--fg-tree-hover)]">
+                        <ExternalLink size={13} />
+                      </button>
+                    </>
                   ) : (
                     <button onClick={downloadPdf} disabled={downloading}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--fg-accent-muted)] text-[var(--fg-accent-text)] rounded-lg text-xs font-medium hover:bg-[var(--fg-accent-muted)]/70 border border-[var(--fg-accent)] disabled:opacity-50">
@@ -614,7 +624,6 @@ export default function TheoryView({ t, projectId }: Props) {
         <PdfReader
           pdfPath={pdfPath}
           paperId={selectedPaper.id}
-          projectId={projectId}
           t={t}
           onClose={() => setShowPdfReader(false)}
           onSelectText={handlePdfTextSelected}
