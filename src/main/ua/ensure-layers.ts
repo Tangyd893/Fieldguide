@@ -26,7 +26,6 @@ function tryLoadDetectLayersSync(): ((graph: GraphLike) => Layer[]) | null {
   try {
     const appRoot = app.isPackaged ? app.getAppPath() : process.cwd()
     const require_ = createRequire(join(appRoot, 'package.json'))
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const core = require_('@understand-anything/core') as { detectLayers: (g: GraphLike) => Layer[] }
     detectLayersFn = core.detectLayers
     return detectLayersFn
@@ -43,7 +42,6 @@ function tryLoadDetectLayersSync(): ((graph: GraphLike) => Layer[]) | null {
         'index.js',
       )
       const require_ = createRequire(uaCorePath)
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const core = require_(uaCorePath) as { detectLayers: (g: GraphLike) => Layer[] }
       detectLayersFn = core.detectLayers
       return detectLayersFn

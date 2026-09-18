@@ -1,8 +1,8 @@
 # Fieldguide 待办清单
 
-> 最后更新：2026-07-17（图谱闭环签收：runtime 桥接 + pack `__uaStore` + 交付边界对齐）  
-> 来源：UA 图谱未落地根因排查落地 + `qa:graph` / bridge runtime / `prepare-pack`  
-> **壳层 / UX ~98%**；**UA 图谱能力 ~85%**（结构索引 + Dashboard + 增量合并 + **点击开文件闭环已签收**）；完整六 Agent / domain **明确延期**；Phase 4 可发布约 **70%**  
+> 最后更新：2026-09-19（**E2E 端到端测试层落地**；审计 A/B/C 三档 + P0 缺陷已全部完成，见下文分节）  
+> 来源：UA 图谱未落地根因排查落地 + `qa:graph` / bridge runtime / `prepare-pack` + 差距审计（[gap-analysis-and-feature-roadmap.md](./gap-analysis-and-feature-roadmap.md)）  
+> **壳层 / UX ~98%**；**UA 图谱能力 ~85%**（结构索引 + Dashboard + 增量合并 + **点击开文件闭环已签收**）；完整六 Agent / domain **明确延期**；发布链路（自动更新 / 代码签名）未做  
 > 产品分阶段任务见 [roadmap.md](./roadmap.md)；UA 集成见 [understand-anything-integration.md](./understand-anything-integration.md)；本文跟踪**下一步工程待办**。
 
 ---
@@ -26,10 +26,12 @@
 
 | 场景 | 完成度 | 主要缺口 |
 |------|--------|----------|
-| A 读懂新项目 | **~85%** | 图谱数据/索引/点击开文件闭环已通；30 分钟口述仍待人工 |
+| A 读懂新项目 | **~85%** | 图谱数据/索引/点击开文件闭环已通（**E2E 已自动回归**）；30 分钟口述仍待人工 |
 | B 论文↔实现 | ~85% | 桥接 UI 齐；需人工走 PDF 路径 |
 | C 影响评估 | ~80% | HIS-Go 图就绪；diff GUI 高亮未勾 |
-| 可发布产品 | ~60% | 干净机器安装 + GUI 最小清单 |
+| 可发布产品 | ~70% | 质量门禁已齐（typecheck/lint/单测/QA/E2E/离线基准）；**干净机安装验收 + 自动更新 + 代码签名**仍缺 |
+
+> **审计批次进度**（详见 [gap-analysis-and-feature-roadmap.md](./gap-analysis-and-feature-roadmap.md)）：P0 缺陷 8 项 ✅ · A 档功能 ✅ · B 档九项 ✅ · C1/C2/C3 ✅ · ESLint + CI ✅ · **E2E ✅**。剩余只有「发布链路」（自动更新 / 代码签名 / 干净机验收）、49 条 lint warning 清零、`llm-utils` 收敛、以及必须由真人跑的 C3 用户研究。
 
 ### UA 图谱：文档声称 vs 实际（2026-07-16）
 
@@ -297,7 +299,8 @@ flowchart TD
 - [x] **eng-eslint** · 工程门禁：ESLint（补审计 P2「零 lint 配置」）
   - 安装 `eslint@9` + `typescript-eslint@8` + `eslint-plugin-react-hooks@5` + `@eslint/js`；[`eslint.config.mjs`](../eslint.config.mjs) 扁平配置，只启用能抓缺陷的规则（unused vars、空 catch、`prefer-const`、hooks 规则、`no-explicit-any` 为 warn）
   - **首次运行抓到 18 个真实错误**并全部修复：14 处死代码/未用导入、2 处 `prefer-const`、1 处 `no-empty-object-type`；另有 OnboardingWizard 的 `step5Progress`/`unsubProgress` 死状态、`openPdf`（系统阅读器打开）丢失入口——已重新接线为论文详情页的第二个按钮
-  - 剩余 51 条 warning（31 处 UA 边界的 `any`、18 处数据加载 effect 的依赖提示）**如实保留**并在文档说明，不为了让数字好看而关规则
+  - 剩余 49 条 warning（31 处 UA 边界的 `any`、18 处数据加载 effect 的依赖提示）**如实保留**并在文档说明，不为了让数字好看而关规则
+  - 另有 2 条 **失效的** `eslint-disable-next-line @typescript-eslint/no-require-imports`（`ua/ensure-layers.ts`：规则只匹配 `require(...)` 直接调用，而这里用 `createRequire()` 变量，抑制本身已无作用）— 已删除，warning 51 → 49
 
 - [x] **eng-ci** · CI 补 lint 与离线基准
   - [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) 新增 `pnpm lint` 与 `pnpm eval:agent`（基准离线可跑，召回崩塌或路径失效会让 CI 失败），并上传基准报告为构建产物
@@ -309,7 +312,28 @@ flowchart TD
 
 > **本批新增规模**：C1/C2 指标与 harness、25 题标注数据集、C3 量表与协议、ESLint 门禁 + CI；单测增至 **34 文件 / 276 例**；i18n 三语各 **620 键**。
 >
-> **剩余（未做，如实列出）**：E2E（Playwright for Electron）未引入；`electron-updater` 自动更新、代码签名未做；51 条 lint warning 未清零；`ua/client.ts` 摘要 LLM 与 `agent/react.ts` 内联调用未并入 `llm-utils`；C3 的**真实参与者数据必须由人来跑**。
+> **剩余（未做，如实列出）**：`electron-updater` 自动更新、代码签名未做；49 条 lint warning 未清零；`ua/client.ts` 摘要 LLM 与 `agent/react.ts` 内联调用未并入 `llm-utils`；C3 的**真实参与者数据必须由人来跑**。
+
+### E2E 端到端测试层（2026-09-19，补审计 §2.3「有能力的都不测」）
+
+- [x] **eng-e2e** · Playwright for Electron 真实交互回归（补上测试金字塔缺的顶层）
+  - [`playwright.config.ts`](../playwright.config.ts)：直接驱动本仓库的 Electron 二进制 `out/main/index.js`（`_electron.launch`），**不下载浏览器**；`workers: 1` 串行，避免多实例抢同一份临时数据目录
+  - [`e2e/harness.ts`](../e2e/harness.ts)：每次跑都新建 `FIELDGUIDE_DATA_DIR` + `projectsRoot` 临时目录，**从不触碰开发者本机数据**；`launchApp()` 预置「引导已完成」的 config，`installDemo()` 安装内置 Demo
+  - [`e2e/boot.spec.ts`](../e2e/boot.spec.ts)：空项目库首屏、安装 Demo 后就绪且节点数正确、未完成引导时弹向导
+  - [`e2e/codemap.spec.ts`](../e2e/codemap.spec.ts)：**图谱 iframe 真的来自 `ua-dashboard://`**（这一处曾经长期静默降级为占位符）、文件树渲染真实文件、**节点搜索 → 点击结果 → 代码面板打开该文件**、**7 个工作台面板逐个挂载**（不再是「面板不可用」兜底）、全库内容搜索命中并跳行、命令面板打开快捷键表
+  - [`scripts/prepare-e2e.mjs`](../scripts/prepare-e2e.mjs)：跑 E2E 前重建 `out/` 并校验 Dashboard dist —— 否则会**拿旧构建跑新断言**（首轮就踩到：快照里还是上一版的文案）
+  - 命令：`pnpm test:e2e`（构建 + 跑）；`pnpm test:e2e:only`（只跑，调试用）
+  - **8/8 通过**，全量约 10s
+
+  - 过程中抓到的 3 个**真问题**（不是测试写法问题）：
+    1. **`installDemo` 的根本前提被写错**：安装 Demo 会直接 `onSelect` → 应用切到代码地图，**根本没有「再点一次项目卡片」这一步**；而原先等待的「104 个节点」文案同时命中空态里的提示语「约 104 个节点…」，于是等待**在安装完成前就返回**，后续点击落到标题栏项目下拉按钮上，其 `fixed inset-0 z-40` 点击遮罩随后挡住了整个页面（这就是「元素可见可点却 30s 点不动」的真相）
+    2. **两处冗余动态导入**：`CodeViewer.tsx` 动态 `import('./GraphPanel')`、`ua/client.ts` 动态 `import('./ensure-layers')`、`llm/catalog.ts` 动态 `import('../../shared/llm-catalog')` —— 三个模块都**已被静态导入**（App / dashboard / config），动态导入不会分包，只会在构建时报警告并把同步路径变成异步。已改为静态导入，构建输出恢复干净
+    3. 2 条失效的 eslint 抑制指令（见上）
+
+  - **CI 取舍（有意为之，非遗漏）**：E2E 未加入 CI。CI 的 `pnpm install` 因 `@understand-anything/core` 指向 sibling 仓库而 `continue-on-error`，Dashboard dist 也就无法在 CI 构建；此时嵌入的图谱 iframe 必然降级为占位符，E2E 会以「环境缺件」而非「代码回归」失败。与其加一个恒红的 job，不如把 E2E 明确记为**本地门禁**（`pnpm test:e2e`），CI 继续守 typecheck / lint / 单测 / QA / 离线基准这条不依赖外部仓库的链路。
+
+> **本批新增规模**：Playwright E2E 8 例（2 个 spec + harness + 构建前置脚本）；`.gitignore` 补 `test-results/` `playwright-report/` `blob-report/` `.playwright/`；lint warning 51 → 49；构建警告 3 → 0。
+
 
 
 
@@ -816,6 +840,8 @@ Fieldguide/
 | `pnpm qa:his-go` | HIS-Go 图谱头less |
 | `pnpm regen:sample-graph` | 重新生成内置 Demo 预置图谱（无 LLM，补齐摘要/分层/导览） |
 | `pnpm qa:scenario` | 场景 A/B/C 模块检查 |
+| `pnpm test:e2e` | Playwright 真实交互回归（构建 + 8 例，直连 Electron 二进制） |
+| `pnpm test:e2e:only` | 同上，跳过构建（调试用） |
 | `pnpm dev` | electron-vite 开发（依赖 sibling UA workspace） |
 | `pnpm dist` | NSIS 安装包（需 `resources/icon.ico`） |
 

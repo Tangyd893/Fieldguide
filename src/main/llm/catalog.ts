@@ -5,6 +5,7 @@ import {
   BUILTIN_LLM_PROVIDERS,
   getBuiltinProvider,
   looksLikeEmbeddingModel,
+  matchProviderId,
   type LlmProviderCatalogEntry,
 } from '../../shared/llm-catalog'
 import { joinLlmUrl } from '../../shared/llm-url'
@@ -166,7 +167,6 @@ function mergePreferBuiltin(preferred: string[], live: string[]): string[] {
 /** Fetch models for current saved config (settings “刷新模型列表”). */
 export async function fetchModelsForSavedConfig(): Promise<FetchModelsResult> {
   const config = loadConfig()
-  const { matchProviderId } = await import('../../shared/llm-catalog')
   const providerId = matchProviderId(config.llm.baseUrl)
   return fetchProviderModels({
     providerId,

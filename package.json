@@ -21,7 +21,9 @@
     "pack": "node scripts/prepare-pack.mjs && electron-vite build && electron-builder --win --config",
     "dist": "node scripts/prepare-pack.mjs && electron-vite build && electron-builder --win --publish never",
     "eval:agent": "vitest run --config scripts/vitest.tools.config.ts eval-agent",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:e2e": "node scripts/prepare-e2e.mjs && playwright test",
+    "test:e2e:only": "playwright test"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
@@ -50,6 +52,7 @@
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.63.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",

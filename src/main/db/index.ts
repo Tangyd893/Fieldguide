@@ -5,20 +5,17 @@
  * Graph nodes/edges are NOT stored here (UA knowledge-graph.json is the authority).
  */
 import Database from 'better-sqlite3'
-import { app } from 'electron'
 import { join } from 'node:path'
-import { existsSync, mkdirSync } from 'node:fs'
 import type { ArchitectureSummary, KnowledgeNode, InterviewQuestion } from '../../shared/understand'
+import { dataDir } from '../config'
 import { SCHEMA_VERSION, planMigrations, migrationSql } from './migrations'
 
 let db: Database.Database | null = null
 
 function dbPath(): string {
-  const dir = join(app.getPath('appData'), 'Fieldguide')
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
-  return join(dir, 'app.db')
+  // Shares the data-directory resolution with config.ts, so a portable install
+  // (or an E2E run) keeps the database and the config together.
+  return join(dataDir(), 'app.db')
 }
 
 export function getDb(): Database.Database {

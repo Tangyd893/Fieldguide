@@ -17,6 +17,7 @@ import { pathToFileURL } from 'node:url'
 import { app } from 'electron'
 import { BINARY_EXTS, IGNORE_DIRS, getProjectIgnoreFilter, normalizeIgnoreFilter } from '../project-ignore'
 import { invalidateGraphCache } from './graph-reader'
+import { setDetectLayersImpl } from './ensure-layers'
 import { atomicWriteJson, isJsonReadable } from '../fs-atomic'
 
 let indexAbortController: AbortController | null = null
@@ -125,7 +126,6 @@ async function loadCore(): Promise<void> {
   detectLayers = core.detectLayers
 
   // Share with ensure-layers (sync path for graph-reader / dashboard)
-  const { setDetectLayersImpl } = await import('./ensure-layers')
   setDetectLayersImpl(detectLayers)
 }
 

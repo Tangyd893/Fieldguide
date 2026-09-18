@@ -15,6 +15,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Search, ChevronUp, ChevronDown, X, Crosshair, StickyNote, Plus } from 'lucide-react'
 import { detectLanguage, highlightLine } from './syntax'
+import { dashboardSelectNode } from './GraphPanel'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -141,7 +142,6 @@ export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpT
     try {
       const r = await window.fieldguide.graphNodeAtLine(projectId, filePath, lineNo)
       if (r.ok && r.data?.node) {
-        const { dashboardSelectNode } = await import('./GraphPanel')
         dashboardSelectNode(r.data.node.id)
       }
     } catch { /* ignore */ }

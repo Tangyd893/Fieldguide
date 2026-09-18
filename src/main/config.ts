@@ -84,12 +84,26 @@ const DEFAULT_CONFIG: AppConfig = {
   },
 }
 
-function configDir(): string {
-  const dir = join(app.getPath('appData'), 'Fieldguide')
+/**
+ * Root directory for all app data (config, SQLite, exports, logs).
+ *
+ * Defaults to `%APPDATA%/Fieldguide`. `FIELDGUIDE_DATA_DIR` overrides it, which
+ * gives two real use cases: a portable install (data next to the binary), and
+ * end-to-end tests that must not touch the developer's own library — Electron
+ * resolves `appData` through the OS API, so pointing APPDATA at a temp dir does
+ * not isolate anything.
+ */
+export function dataDir(): string {
+  const override = process.env.FIELDGUIDE_DATA_DIR?.trim()
+  const dir = override ? override : join(app.getPath('appData'), 'Fieldguide')
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true })
   }
   return dir
+}
+
+function configDir(): string {
+  return dataDir()
 }
 
 function configPath(): string {

@@ -219,7 +219,9 @@ Fieldguide/
 - **禁止**把图谱节点 / 边写进 SQLite——权威源是 `.understand-anything/knowledge-graph.json`。
 - 动工前请先跑完 [docs/spike-ua.md](docs/spike-ua.md) 里的集成 Spike（硬门禁）。
 
-质量基线：`pnpm typecheck` + `pnpm test:unit` 全绿；`pnpm qa:graph` 自动验收「Demo 图谱 + Dashboard 加载 + 点节点开文件」闭环；`pnpm qa:his-go` 是对一个真实 Go 项目（HIS-Go，3656 节点）的无头冒烟。说实话，图谱「点击节点 → 打开文件」这个闭环我修了两轮才通——UA Dashboard 内部用的是 Zustand，桥接脚本得直接调 `store.getState()` 而不是 hook，后来 `qa:graph` 里加了对 `__uaStore` 的自动检查，防止回归。
+质量基线：`pnpm typecheck` + `pnpm lint` + `pnpm test:unit` 全绿；`pnpm qa:graph` 自动验收「Demo 图谱 + Dashboard 加载 + 点节点开文件」闭环；`pnpm qa:his-go` 是对一个真实 Go 项目（HIS-Go，3656 节点）的无头冒烟。说实话，图谱「点击节点 → 打开文件」这个闭环我修了两轮才通——UA Dashboard 内部用的是 Zustand，桥接脚本得直接调 `store.getState()` 而不是 hook，后来 `qa:graph` 里加了对 `__uaStore` 的自动检查，防止回归。
+
+再往上还有一层真实交互回归：`pnpm test:e2e` 用 Playwright 直接驱动本仓库的 Electron 二进制（不下载浏览器），每次跑都在临时数据目录里装一遍内置 Demo，覆盖「装 Demo → 图谱 iframe 真的来自 `ua-dashboard://` → 搜节点并打开文件 → 7 个工作台面板逐个挂载 → 全库内容搜索跳行 → 命令面板」。8 例全绿、约 10 秒。它抓到的第一个真问题是：安装 Demo 本来就会直接切到代码地图，而我的 harness 在等一句**空态提示语**里的「104 个节点」，于是断言在安装完成前就通过了。
 
 ## 许可与致谢
 

@@ -51,7 +51,7 @@
     "addLocal": "选择本地文件夹",
     "addGit": "从 Git URL 克隆",
     "addDemo": "安装内置 Demo",
-    "addDemoHint": "约 13 个节点，自带图谱，适合先验证代码地图",
+    "addDemoHint": "约 104 个节点，9 个架构分层，自带图谱，适合先验证代码地图",
     "addLocalTitle": "选择本地文件夹",
     "addGitTitle": "从 Git 克隆",
     "pathLabel": "项目路径",

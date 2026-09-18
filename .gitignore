@@ -35,5 +35,11 @@ logs/
 # Test artifacts
 tests/fixtures/*/.understand-anything/intermediate/
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
 # Reasonix
 .reasonix/

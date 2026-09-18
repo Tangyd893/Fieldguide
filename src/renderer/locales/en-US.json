@@ -51,7 +51,7 @@
     "addLocal": "Add local folder",
     "addGit": "Clone from Git URL",
     "addDemo": "Install built-in Demo",
-    "addDemoHint": "~13 nodes with a prebuilt graph — best for verifying Code Map",
+    "addDemoHint": "~104 nodes across 9 architecture layers, graph included — good for a first look at the code map",
     "addLocalTitle": "Add local folder",
     "addGitTitle": "Clone from Git",
     "pathLabel": "Project path",

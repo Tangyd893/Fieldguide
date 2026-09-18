@@ -1,6 +1,6 @@
 # Fieldguide 差距分析 & 功能点扩展路线图
 
-> 版本：v2.2（**P0 八项 + A 档 + B 档九项 + C1/C2/C3 与 ESLint 门禁全部落地**；剩余为 E2E、自动更新、lint warning 清零） | 基线 commit：`e9fb5e6`（README 重写 + understanding workbench）
+> 版本：v2.3（**P0 八项 + A 档 + B 档九项 + C1/C2/C3 + ESLint/CI 门禁 + Playwright E2E 全部落地**；剩余为自动更新/代码签名、lint warning 清零） | 基线 commit：`e9fb5e6`（README 重写 + understanding workbench）
 > 审计方式：全量阅读 `src/**`（含 main / preload / renderer / shared）、`docs/**`；实跑 `tsc` 三份 tsconfig + `vitest`；grep 交叉验证文档承诺与代码实现
 >
 > **实测基线**：`pnpm typecheck` ✅（renderer / node / vitest 三份全过）· `pnpm test:unit` ✅ 21 文件 · **128 passed / 2 skipped**
@@ -85,10 +85,10 @@
 | 项 | 结果 |
 |----|------|
 | `tsc` × 3 份 tsconfig | ✅ 全过（0 error） |
-| `vitest` | ✅ 34 文件 / **276 passed / 2 skipped**（含 live `indexProject`、search/markdown/迁移计划/阶段隔离/LLM 工具/CSS 回归） |
+| `vitest` | ✅ 34 文件 / **276 passed / 2 skipped**（含 live `indexProject`、search/markdown/迁移计划/阶段隔离/LLM 工具/CSS 回归）；**当前 35 文件 / 279 passed / 2 skipped**，另有 `pnpm test:e2e` **8 例全绿** |
 | 冒烟脚本 | `qa:graph`（Demo **104 节点** + Dashboard + HIS-Go 3656 节点 + `__uaStore` 桥接）、`qa:his-go`、`qa:scenario`、`regen:sample-graph` 齐备 |
-| ❌ lint / format | **完全没有**：无 `.eslintrc*` / `eslint.config.*` / `.prettierrc*` / `.editorconfig`，`package.json` 无 `lint` 脚本 |
-| ❌ E2E | 无 Playwright / Spectron；Electron 真实交互（点节点开文件等）靠 node 脚本 + 人工 |
+| ❌ lint / format | **完全没有**（审计基线快照）：无 `.eslintrc*` / `eslint.config.*` / `.prettierrc*` / `.editorconfig`，`package.json` 无 `lint` 脚本 —— **已补齐**：ESLint 9 扁平配置上线，首跑抓到 18 个真实错误并全部修复，现 **0 error / 49 warning**（详见 todos「C 档与工程门禁」） |
+| ❌ E2E | **无 Playwright / Spectron**（审计基线快照）：Electron 真实交互（点节点开文件等）靠 node 脚本 + 人工 —— **已补齐**：Playwright for Electron **8 例全绿**，覆盖安装 Demo → 图谱 iframe → 节点搜索开文件 → 7 面板挂载 → 内容搜索跳行（详见 todos「E2E 端到端测试层」） |
 | ❌ LICENSE / CHANGELOG / CONTRIBUTING | 三个都缺（README 的 MIT 徽章指向 `NOTICE.md`） |
 | ❌ 人工验收 | `docs/p4-release-checklist.md` 与 `docs/scenario-abc-test-record.md` 勾选为空；`docs/screenshots/ux-baseline/` 只有 `.gitkeep` |
 
@@ -161,7 +161,7 @@
 | `projects.ua_graph_path` 列 | `architecture.md:278` | 不存在 |
 | `index_jobs` 表驱动取消/重试 | `architecture.md:284-294,416` | 建表但从不写入（死表） |
 | 向量库 **LanceDB** | `architecture.md:71,113,141,474` | 早已换成 SQLite `paper_chunks`（`vector/index.ts:23`）；`roadmap.md:172` 记了这条变更，`architecture.md` 没同步 |
-| E2E = Playwright + Electron | `testing-strategy.md:21,85-95` | devDeps 无 playwright，CI 里没有 |
+| E2E = Playwright + Electron | `testing-strategy.md:21,85-95` | ✅ **已补齐**：`playwright.config.ts` + `e2e/`（8 例，直连 Electron 二进制），`pnpm test:e2e`；CI 不跑，理由见 todos（UA sibling 仓库缺失时 Dashboard dist 无法构建） |
 | 性能基准（tiny-go parse < 5s，CI 非阻塞） | `testing-strategy.md:80-82` | 无基准脚本 |
 | 内置 Demo = "Go + TypeScript 混合，约 500 行" | `onboarding-spec.md:99` | ✅ **已修正 2026-09-18**：Demo 重做为 `pulsegate`（15 文件 / 104 节点 / 9 分层），文档同步 |
 | parchment 已加网格纹理 | `todos.md:385-388` | `ui-spec.md:327` 与代码都显示**无网格** → 文档自相矛盾 |
@@ -177,8 +177,8 @@
 
 | 类别 | 具体缺口（证据） |
 |------|------------------|
-| **代码规范** | 无 ESLint / Prettier / husky / commitlint（`package.json` 无 lint 脚本） |
-| **测试结构** | `ipc/index.ts` **1176 行、61 个通道，零 handler 级测试**（`ipc/__tests__/handlers.test.ts` 只断言 `ipcErr` 语义）；无 E2E；无覆盖率门槛 |
+| **代码规范** | 无 ESLint / Prettier / husky / commitlint（`package.json` 无 lint 脚本）—— ✅ **ESLint 已补 2026-09-18**（0 error / 49 warning）；Prettier / husky / commitlint 仍未引入 |
+| **测试结构** | `ipc/index.ts` **1176 行、61 个通道，零 handler 级测试**（`ipc/__tests__/handlers.test.ts` 只断言 `ipcErr` 语义）；~~无 E2E~~ ✅ **已补 2026-09-19**（Playwright 8 例覆盖真实 IPC → UI 链路）；仍无覆盖率门槛 |
 | **数据演进** | ~~`db/index.ts:33 migrate()` 只有 `CREATE TABLE IF NOT EXISTS`，**无 `user_version` 版本化迁移**~~ ✅ **已修 2026-09-18**：新增 `db/migrations.ts`（声明式 `ADDED_COLUMNS` + 纯函数 `planMigrations()`），`migrate()` 按 `user_version` 与 `table_info` 应用 `ALTER TABLE`；规则抽成独立模块以便在原生模块不可用时仍可测试 |
 | **死代码 / 死表** | `index_jobs` 表从不写入；`getChunks`、`buildDiffPostMessage`、`buildGraphOverview`、`shared/graph.ts` 大部分类型无调用方；`config:uaRuntime` / `paper:get` 已注册但 preload 未暴露 |
 | **LLM 基建** | ~~`callLLM` 在 **4 个文件**各写一遍~~ ✅ **understand 侧已收敛 2026-09-18**（`understand/llm-utils.ts`；`ua/client.ts` 的摘要路径与 `agent/react.ts` 的内联调用仍未合并）；**无重试/退避、无限流、无 token 计量**（`embed.ts:53` 声明了 `usage.total_tokens` 却从不读）、无响应缓存；超时 30/60/90/120s 散落硬编码 |
@@ -279,7 +279,7 @@ Phase 7 — 可验证性（把「我做了」变成「我证明了」）
 | **W1** | 修 P0（§2.1 的 1/3/4/5/6）+ A 档 A1–A3 | 论文 RAG 复活；不再改写用户图谱；引用可点；安全收口（`file:read`/`shell:openFile` 统一走 `file-content.ts` 的校验） |
 | **W2** | B1 学习进度 + B2 代码笔记 | 2 张新表、2 个新面板、图谱着色 + 进度环；**功能点可见增长最快的一周** |
 | **W3** | B3 间隔重复 + C1 评测基准 | 「今日复习」闭环；40–60 条 QA 基准 + 首次评测跑分（论文实验第一节） |
-| **W4** | C2 消融实验 + A6 报告导出 + 工程门禁（ESLint/Prettier/E2E 一条主链路） | 实验表格成稿；报告导出可演示；CI 加 lint 与打包 |
+| **W4** | C2 消融实验 + A6 报告导出 + 工程门禁（ESLint/Prettier/E2E 一条主链路） | 实验表格成稿；报告导出可演示；CI 加 lint 与打包 —— ✅ **实际交付 2026-09-18/19**：C1/C2/C3 + ESLint + CI（lint / 单测 / QA / 离线基准）+ **Playwright E2E 8 例**；Prettier 未引入（有意，见 §7） |
 
 > 每周结束都跑 `pnpm typecheck && pnpm test:unit`，并把新增表写进 `db/index.ts:migrate()` —— **顺手补 `user_version` 版本化迁移**，否则第 2 周加的 4 张表会让老库无法升级。
 
@@ -308,6 +308,8 @@ Phase 7 — 可验证性（把「我做了」变成「我证明了」）
 | 用户研究耗时 | 招募 + 伦理 + 统计 | 降到 N=8，用 within-subject（同人对比 Fieldguide vs IDE+ChatGPT），显著性好做 |
 | 新模块稀释主线 | 一次开太多表/面板 | 严格按 W1–W4 排期，B 档只做 2–3 个并做深，其余写进"未来工作" |
 | 上游 UA 变更 | 集成层已是四份独立 `loadCore` 回退路径 | 优先重构为统一的「UA 适配层」（也顺手消掉重复代码） |
+| E2E 在 CI 里恒红 | CI 的 `pnpm install` 因 UA 指向 sibling 仓库而 `continue-on-error`，Dashboard dist 无法构建 → 嵌入图谱必然降级为占位符 | 有意不加 E2E job：与其加一个因环境缺件而恒红的 job，不如把 `pnpm test:e2e` 明确记为本地门禁；CI 只守不依赖外部仓库的链路 |
+| Prettier 未引入 | 引入会一次性重排全仓库，diff 噪音会淹没本轮功能改动 | 留到功能冻结后再单独一个 commit 引入（`eslint-config-prettier` + 一次全量 `--write`） |
 
 ---
 
@@ -327,3 +329,5 @@ Phase 7 — 可验证性（把「我做了」变成「我证明了」）
 ---
 
 *本文为差距审计与规划建议，未修改任何产品代码。*
+>
+> **后续状态**：A/B/C 三档 + P0 缺陷 + E2E 均已落地，逐项完成记录见 [`todos.md`](./todos.md)（「第二批」→「E2E 端到端测试层」），实测数据见 [`eval/agent-baseline.md`](./eval/agent-baseline.md)。
