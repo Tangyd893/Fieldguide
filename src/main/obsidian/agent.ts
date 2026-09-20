@@ -13,7 +13,7 @@
 import { existsSync } from 'node:fs'
 import { loadConfig } from '../config'
 import { backlinks, probeCli, searchVault } from './cli'
-import { listProjectNotes, projectFolderRel, readProjectNote, userAnnotationOf } from './read'
+import { listProjectNotes, listVaultFiles, projectFolderRel, readProjectNote, userAnnotationOf } from './read'
 import { upsertAgentCard } from './sync'
 import type { VaultNoteKind } from './types'
 import type { ToolSchema } from '../llm/client'
@@ -146,9 +146,14 @@ export async function executeVaultTool(
   switch (name) {
     case 'vault_list_cards': {
       const notes = listProjectNotes(ctx.projectId)
+      // The bookkeeping table and the folder can disagree (another install wrote
+      // the cards, or the database was reset). Reporting only the tracked rows
+      // made the coach believe the sync had never run, so both views are returned.
+      const tracked = new Set(notes.map((note) => note.notePath))
+      const onDisk = listVaultFiles(ctx.projectId).filter((file) => !tracked.has(file))
       return JSON.stringify({
         folder: ctx.folderRel,
-        count: notes.length,
+        trackedCount: notes.length,
         cards: notes.slice(0, 60).map((note) => ({
           path: note.notePath,
           title: note.title,
@@ -156,6 +161,13 @@ export async function executeVaultTool(
           status: note.status,
           readerAnnotations: note.userChars,
         })),
+        ...(onDisk.length > 0
+          ? {
+            untrackedCount: onDisk.length,
+            untracked: onDisk.slice(0, 50),
+            untrackedNote: 'These notes exist in the vault folder but have no Fieldguide bookkeeping in this profile — read them with vault_read_note instead of concluding the sync never ran.',
+          }
+          : {}),
       })
     }
 

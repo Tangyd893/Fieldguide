@@ -48,6 +48,11 @@ export function projectFolderName(slug: string, projectId: string, allSlugs: str
   return collides ? `${base}-${projectId.slice(-6)}` : base
 }
 
+/** Absolute path of the folder this project owns inside the vault. */
+export function projectFolderPath(vaultPath: string, folder: string, projectFolder: string): string {
+  return join(vaultPath, ...folder.split('/').filter(Boolean), projectFolder)
+}
+
 /** Vault-relative posix path of the project folder, as the CLI expects it. */
 export function projectFolderRelative(folder: string, projectFolder: string): string {
   return [...folder.split('/').filter(Boolean), projectFolder].join('/')

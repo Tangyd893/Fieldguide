@@ -1,13 +1,18 @@
 /**
- * Simple file logger — writes to %APPDATA%/Fieldguide/logs/.
+ * Simple file logger — writes to `<data dir>/logs/`.
  * Phase 4.5: provides diagnostics for indexing errors and usage stats.
+ *
+ * Uses `dataDir()` rather than `app.getPath('appData')` so a portable install or an
+ * E2E run (`FIELDGUIDE_DATA_DIR`) keeps its logs with the rest of its data — the
+ * isolation the harness documents ("config, SQLite, exports and logs") only holds
+ * if every writer honours the override.
  */
 import { join } from 'node:path'
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
-import { app } from 'electron'
+import { dataDir } from './config'
 
 function logDir(): string {
-  const dir = join(app.getPath('appData'), 'Fieldguide', 'logs')
+  const dir = join(dataDir(), 'logs')
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   return dir
 }

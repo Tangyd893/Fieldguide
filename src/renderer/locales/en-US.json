@@ -480,6 +480,8 @@
     "testing": "Testing…",
     "testSuccess": "Connected",
     "testFail": "Connection failed — check settings",
+    "keyFromEnv": "Using the API key from the {{name}} environment variable (already configured — no need to paste it here)",
+    "keyFromEnvHint": "A key taken from the environment is never written to config.json; typing one here takes precedence.",
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved",

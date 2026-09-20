@@ -23,6 +23,46 @@ export interface LLMConfig {
   embedModel: string
   /** Set when the key had to be persisted unencrypted (no OS keyring). */
   apiKeyPlaintext?: boolean
+  /**
+   * Where the in-memory key came from. Derived on every load, never persisted:
+   * a key taken from the environment must not be copied into config.json.
+   */
+  apiKeySource?: 'config' | 'env'
+  /** Name of the environment variable that supplied the key, when source is 'env'. */
+  apiKeyEnvVar?: string
+}
+
+/**
+ * Environment variables that supply an API key, most specific first.
+ *
+ * A developer-machine and CI convenience: the key is already exported by the shell
+ * or the OS, so the app works without pasting a secret into a settings field (and
+ * without that secret ever reaching disk). `FIELDGUIDE_API_KEY` is the generic
+ * escape hatch for any OpenAI-compatible provider.
+ */
+const API_KEY_ENV_VARS: Array<{ match: RegExp; vars: string[] }> = [
+  { match: /deepseek/i, vars: ['DEEPSEEK_API_KEY'] },
+  { match: /openai\.com/i, vars: ['OPENAI_API_KEY'] },
+  { match: /moonshot/i, vars: ['MOONSHOT_API_KEY'] },
+  { match: /siliconflow/i, vars: ['SILICONFLOW_API_KEY'] },
+  { match: /openrouter/i, vars: ['OPENROUTER_API_KEY'] },
+]
+const GENERIC_API_KEY_VARS = ['FIELDGUIDE_API_KEY']
+
+/**
+ * The key the environment offers for this base URL, or null.
+ *
+ * Provider-specific variables are only consulted when they plausibly belong to the
+ * configured endpoint — a `DEEPSEEK_API_KEY` must not be sent to OpenAI.
+ */
+export function envApiKey(baseUrl: string, env: NodeJS.ProcessEnv = process.env): { key: string; name: string } | null {
+  const forProvider = API_KEY_ENV_VARS.find((entry) => entry.match.test(baseUrl))
+  const names = [...(forProvider?.vars ?? []), ...GENERIC_API_KEY_VARS]
+  for (const name of names) {
+    const value = env[name]?.trim()
+    if (value) return { key: value, name }
+  }
+  return null
 }
 
 export interface UAConfig {
@@ -223,11 +263,31 @@ function mergeConfig(raw: Partial<AppConfig>): AppConfig {
   }
 }
 
+/**
+ * Overlay the environment key when — and only when — nothing was configured in-app.
+ *
+ * Precedence matters: a key the user typed is an explicit choice and must win, so
+ * an exported variable cannot silently redirect their API calls. The source is
+ * recorded so the UI can explain *why* the field is empty yet the app is
+ * "configured", and so `saveConfig` knows not to write the secret to disk.
+ */
+function applyEnvApiKey(config: AppConfig): AppConfig {
+  const stored = config.llm.apiKey?.trim() ?? ''
+  if (stored) return { ...config, llm: { ...config.llm, apiKeySource: 'config', apiKeyEnvVar: undefined } }
+
+  const fromEnv = envApiKey(config.llm.baseUrl)
+  if (!fromEnv) return { ...config, llm: { ...config.llm, apiKeySource: undefined, apiKeyEnvVar: undefined } }
+  return {
+    ...config,
+    llm: { ...config.llm, apiKey: fromEnv.key, apiKeySource: 'env', apiKeyEnvVar: fromEnv.name },
+  }
+}
+
 export function loadConfig(): AppConfig {
   const p = configPath()
   if (!existsSync(p)) {
     saveConfig(DEFAULT_CONFIG)
-    return freshDefaults()
+    return applyEnvApiKey(freshDefaults())
   }
   try {
     const parsed = JSON.parse(readFileSync(p, 'utf-8')) as Partial<AppConfig> & {
@@ -246,9 +306,9 @@ export function loadConfig(): AppConfig {
     if (needsRewrite) {
       saveConfig(merged)
     }
-    return merged
+    return applyEnvApiKey(merged)
   } catch {
-    return freshDefaults()
+    return applyEnvApiKey(freshDefaults())
   }
 }
 
@@ -281,11 +341,23 @@ export function saveConfig(config: AppConfig): void {
   // Drop deprecated zoom from persisted file
   const { zoom: _z, ...appearance } = toSave.appearance as AppearanceConfig & { zoom?: number }
 
-  const { apiKey, ...llmWithoutKey } = toSave.llm
-  const apiKeyEnc = encryptApiKey(apiKey)
+  // `apiKeySource`/`apiKeyEnvVar` are derived on load, never persisted — and an
+  // env-supplied key must not be written to disk at all, which is the whole point
+  // of reading it from the environment.
+  const {
+    apiKey,
+    apiKeySource: _s,
+    apiKeyEnvVar: _e,
+    ...llmWithoutKey
+  } = toSave.llm
+  const fromEnv = toSave.llm.apiKeySource === 'env'
+  const apiKeyEnc = fromEnv ? null : encryptApiKey(apiKey)
   const llm: Record<string, unknown> = { ...llmWithoutKey }
 
-  if (apiKeyEnc) {
+  if (fromEnv) {
+    delete llm.apiKeyEnc
+    llm.apiKeyPlaintext = false
+  } else if (apiKeyEnc) {
     llm.apiKeyEnc = apiKeyEnc
     llm.apiKeyPlaintext = false
   } else if (apiKey) {
@@ -316,7 +388,10 @@ export function updateConfig(patch: Partial<AppConfig>): AppConfig {
     obsidian: patch.obsidian ? { ...current.obsidian, ...patch.obsidian } : current.obsidian,
   })
   saveConfig(next)
-  return next
+  // Re-derive the key source so the returned config matches what the next
+  // `loadConfig()` would produce (e.g. clearing the field must fall back to the
+  // environment key rather than reporting "not configured" until a restart).
+  return applyEnvApiKey(next)
 }
 
 export function ensureLogDir(): string {

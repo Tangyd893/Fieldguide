@@ -88,6 +88,8 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
   const [providerId, setProviderId] = useState('deepseek')
   const [providers, setProviders] = useState<LlmProviderPreset[]>(() => [...LLM_PROVIDERS])
   const [modelsSource, setModelsSource] = useState<'builtin' | 'live'>('builtin')
+  const [apiKeySource, setApiKeySource] = useState<'config' | 'env' | 'none'>('none')
+  const [apiKeyEnvVar, setApiKeyEnvVar] = useState<string | undefined>(undefined)
   const [modelsHint, setModelsHint] = useState<string | null>(null)
   const [refreshingModels, setRefreshingModels] = useState(false)
   const [customModel, setCustomModel] = useState(false)
@@ -367,7 +369,16 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
     void Promise.all([
       window.fieldguide.configGet(),
       window.fieldguide.llmListProviders(),
-    ]).then(([configResult, catalogResult]) => {
+      window.fieldguide.configLlmStatus(),
+    ]).then(([configResult, catalogResult, statusResult]) => {
+      if (statusResult.ok && statusResult.data) {
+        const status = statusResult.data as { source?: 'config' | 'env' | 'none'; envVar?: string }
+        setApiKeySource(status.source ?? 'none')
+        setApiKeyEnvVar(status.envVar)
+        // The environment supplies the key: keep the field empty so the secret is
+        // not echoed into the renderer, and so saving cannot overwrite it.
+        if (status.source === 'env') setApiKey('')
+      }
       if (catalogResult.ok && Array.isArray(catalogResult.data) && catalogResult.data.length > 0) {
         setProviders(catalogResult.data as LlmProviderPreset[])
       }
@@ -746,6 +757,14 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                 <div>
                   <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">API Key</label>
                   <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." />
+                  {apiKeySource === 'env' && (
+                    <p className="text-[11px] text-[var(--fg-status-success)] mt-1">
+                      {t('settings.keyFromEnv', { name: apiKeyEnvVar ?? '' })}
+                    </p>
+                  )}
+                  {apiKeySource === 'env' && (
+                    <p className="text-[11px] text-[var(--fg-text-tertiary)] mt-0.5">{t('settings.keyFromEnvHint')}</p>
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1">

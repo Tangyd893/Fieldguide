@@ -7,6 +7,7 @@ import {
   createVaultDirectory,
   fallbackVaultName,
   projectFolderName,
+  projectFolderPath,
   projectFolderRelative,
   validateVaultDirectory,
 } from '../binding'
@@ -83,6 +84,12 @@ describe('folder paths', () => {
     expect(projectFolderRelative('Fieldguide', 'pulsegate')).toBe('Fieldguide/pulsegate')
     expect(projectFolderRelative('A/B', 'p')).toBe('A/B/p')
     expect(projectFolderRelative('', 'p')).toBe('p')
+  })
+
+  it('builds the absolute path inside the vault', () => {
+    expect(projectFolderPath(dir, 'Fieldguide', 'pulsegate')).toBe(join(dir, 'Fieldguide', 'pulsegate'))
+    // An empty folder means "directly under the vault root".
+    expect(projectFolderPath(dir, '', 'p')).toBe(join(dir, 'p'))
   })
 })
 

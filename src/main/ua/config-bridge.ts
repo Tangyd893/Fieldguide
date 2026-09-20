@@ -44,10 +44,23 @@ export function buildUARuntimeConfig() {
   }
 }
 
-/** Check if LLM is configured (has API key) */
+/**
+ * Check if LLM is configured (has API key).
+ *
+ * The key may come from the environment rather than config.json, so callers must
+ * not treat "the settings field is empty" as "not configured".
+ */
 export function isLLMConfigured(): boolean {
   const config = loadConfig()
   return !!(config.llm.apiKey && config.llm.baseUrl && config.llm.chatModel)
+}
+
+/** Where the effective API key came from, so the UI can explain an empty field. */
+export function llmKeySource(): { source: 'config' | 'env' | 'none'; envVar?: string } {
+  const { llm } = loadConfig()
+  if (!llm.apiKey) return { source: 'none' }
+  if (llm.apiKeySource === 'env') return { source: 'env', envVar: llm.apiKeyEnvVar }
+  return { source: 'config' }
 }
 
 /** Get a masked API key for display */

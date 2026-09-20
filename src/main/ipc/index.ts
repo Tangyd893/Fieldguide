@@ -72,7 +72,7 @@ import { indexProject, beginIndex, cancelIndex, isIndexRunning } from '../ua/cli
 import { runUnderstandPipeline, type UnderstandRunResult } from '../understand/pipeline'
 import type { AnalysisStage, ArchitectureSummary, InterviewQuestion, KnowledgeNode } from '../../shared/understand'
 import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
-import { buildUARuntimeConfig, isLLMConfigured, maskedApiKey } from '../ua/config-bridge'
+import { buildUARuntimeConfig, isLLMConfigured, llmKeySource, maskedApiKey } from '../ua/config-bridge'
 import { getLlmProviderCatalog, fetchProviderModels } from '../llm/catalog'
 import {
   loadGraph,
@@ -155,7 +155,7 @@ ipcMain.handle('config:set', (_e, patch: Record<string, unknown>): IpcResult<unk
 
 ipcMain.handle('config:llmStatus', (): IpcResult<unknown> => {
   try {
-    return ipcOk({ configured: isLLMConfigured(), maskedKey: maskedApiKey() })
+    return ipcOk({ configured: isLLMConfigured(), maskedKey: maskedApiKey(), ...llmKeySource() })
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }

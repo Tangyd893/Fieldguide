@@ -474,7 +474,6 @@ interface IpcError {
 | `OBSIDIAN_CLI_ERROR` | CLI 调用失败（超时 / 异常退出码 / 应用无法启动） | true |
 | `VAULT_NOT_BOUND` | 尚未绑定 vault（`config.obsidian.vaultPath` 为空） | false |
 | `VAULT_NOT_FOUND` | vault 目录、笔记文件或笔记来源已不存在 | false |
-| `VAULT_NOT_REGISTERED` | 目录未被 Obsidian 登记为库（UI 侧以绑定类型 `unregistered` + 登记引导呈现） | false |
 | `VAULT_PATH_INVALID` | vault 路径非法（不存在 / 与项目根重叠 / 笔记路径越界） | false |
 | `VAULT_SYNC_IN_PROGRESS` | 已有同步任务在进行（同步与 Agent 写卡片不可交错） | true |
 | `VAULT_WRITE_CONFLICT` | 目标文件不属于 Fieldguide（无托管块 / 属其他项目），或 Agent 写入已被设置关闭 | false |
