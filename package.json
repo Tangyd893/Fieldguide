@@ -12,6 +12,7 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "qa:baseline": "node scripts/qa-baseline.mjs",
+    "qa:contracts": "node scripts/contract-audit.mjs",
     "qa:scenario": "node scripts/scenario-smoke.mjs",
     "bootstrap:ua": "node scripts/bootstrap-ua.mjs",
     "qa:graph": "node scripts/graph-e2e-smoke.mjs",

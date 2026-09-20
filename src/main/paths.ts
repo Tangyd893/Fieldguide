@@ -11,8 +11,7 @@
  */
 import { join, resolve, relative, isAbsolute, normalize, sep } from 'node:path'
 import { existsSync } from 'node:fs'
-import { app } from 'electron'
-import { loadConfig } from './config'
+import { dataDir, loadConfig } from './config'
 import { listProjects } from './db'
 
 /** True when `child` is inside `parent` (or equal to it). */
@@ -102,7 +101,7 @@ export function resolveVaultPath(vaultPath: string, userPath: string): PathCheck
 export function allowedOpenRoots(): string[] {
   const roots: string[] = []
   try {
-    roots.push(join(app.getPath('appData'), 'Fieldguide'))
+    roots.push(dataDir())
   } catch { /* app not ready */ }
   try {
     const { projectsRoot, obsidian } = loadConfig()

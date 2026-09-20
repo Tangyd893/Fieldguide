@@ -357,14 +357,47 @@ export function resetStaleIndexingStatus(): string[] {
   return rows.map((r) => r.id)
 }
 
-export function removeProject(id: string): void {  const db = getDb()
-  db.prepare('DELETE FROM index_jobs WHERE project_id = ?').run(id)
-  db.prepare('DELETE FROM concept_links WHERE project_id = ?').run(id)
-  db.prepare('DELETE FROM architecture_summaries WHERE project_id = ?').run(id)
-  db.prepare('DELETE FROM knowledge_nodes WHERE project_id = ?').run(id)
-  db.prepare('DELETE FROM interview_questions WHERE project_id = ?').run(id)
-  db.prepare('DELETE FROM chat_messages WHERE project_id = ?').run(id)
-  db.prepare('DELETE FROM vault_notes WHERE project_id = ?').run(id)
+/**
+ * Tables that hold rows owned by a project, deepest dependents first.
+ *
+ * Derived from the schema rather than hand-listed, because the hand-written list
+ * *did* fall behind: progress, code notes, review cards/logs/findings and learning
+ * paths were missing, and `foreign_keys = ON` makes that a hard failure — deleting a
+ * project that had used those features threw a constraint error, so the project
+ * stayed in the library. Ordering matters too: `review_logs` references
+ * `review_cards`, so dependents must be deleted before their targets.
+ */
+function projectChildTables(db: Database.Database): string[] {
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>)
+    .map((row) => row.name)
+    .filter((name) => tableColumns(db, name)?.includes('project_id'))
+
+  const references = new Map<string, Set<string>>()
+  for (const table of tables) {
+    const fks = db.prepare(`PRAGMA foreign_key_list(${table})`).all() as Array<{ table: string }>
+    references.set(table, new Set(fks.map((fk) => fk.table).filter((name) => tables.includes(name))))
+  }
+
+  const ordered: string[] = []
+  const remaining = new Set(tables)
+  while (remaining.size > 0) {
+    // A table that nothing else still references is safe to delete now.
+    const free = [...remaining].filter((table) =>
+      [...remaining].every((other) => other === table || !references.get(other)?.has(table)),
+    )
+    // A dependency cycle would stall this loop forever; take one deterministically.
+    const next = free[0] ?? [...remaining][0]
+    ordered.push(next)
+    remaining.delete(next)
+  }
+  return ordered
+}
+
+export function removeProject(id: string): void {
+  const db = getDb()
+  for (const table of projectChildTables(db)) {
+    db.prepare(`DELETE FROM ${table} WHERE project_id = ?`).run(id)
+  }
   db.prepare('DELETE FROM projects WHERE id = ?').run(id)
 }
 

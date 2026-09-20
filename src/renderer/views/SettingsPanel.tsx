@@ -1000,7 +1000,7 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                         {t('settings.obsidian.unbindCleanup')}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => setUnbindOpen(false)}>
-                        {t('settings.obsidian.cancel')}
+                        {t('settings.cancel')}
                       </Button>
                     </div>
                   </div>
@@ -1043,7 +1043,7 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
                         {t('settings.obsidian.newVaultCreate')}
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => setNewVaultOpen(false)}>
-                        {t('settings.obsidian.cancel')}
+                        {t('settings.cancel')}
                       </Button>
                     </div>
                   </div>

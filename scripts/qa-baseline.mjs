@@ -43,6 +43,11 @@ const sampleOk = existsSync(sampleGraph)
 console.log(sampleOk ? '✅ bundled sample-project graph' : '❌ bundled sample-project graph missing')
 results.push({ label: 'sample graph', ok: sampleOk, output: sampleOk ? 'exists' : 'missing' })
 
+// Contract audit: the surfaces that must agree (IPC handlers ↔ preload ↔ renderer
+// types, i18n keys, data-dir overrides). None of these can be caught by typecheck —
+// the preload API is hand-typed — and each one silently ships as a broken button.
+run('node', ['scripts/contract-audit.mjs'], 'contract audit')
+
 const failed = results.filter(r => !r.ok)
 console.log(`\n${failed.length === 0 ? 'All checks passed.' : `${failed.length} check(s) failed.`}`)
 process.exit(failed.length === 0 ? 0 : 1)

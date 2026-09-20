@@ -7,7 +7,7 @@
 import { ipcMain, BrowserWindow, shell, app, type IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs'
-import { loadConfig, updateConfig, type AppConfig } from '../config'
+import { dataDir, loadConfig, updateConfig, type AppConfig } from '../config'
 import { chatCompletion, LlmError } from '../llm/client'
 import {
   listProjects,
@@ -72,7 +72,7 @@ import { indexProject, beginIndex, cancelIndex, isIndexRunning } from '../ua/cli
 import { runUnderstandPipeline, type UnderstandRunResult } from '../understand/pipeline'
 import type { AnalysisStage, ArchitectureSummary, InterviewQuestion, KnowledgeNode } from '../../shared/understand'
 import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
-import { buildUARuntimeConfig, isLLMConfigured, llmKeySource, maskedApiKey } from '../ua/config-bridge'
+import { isLLMConfigured, llmKeySource, maskedApiKey } from '../ua/config-bridge'
 import { getLlmProviderCatalog, fetchProviderModels } from '../llm/catalog'
 import {
   loadGraph,
@@ -156,14 +156,6 @@ ipcMain.handle('config:set', (_e, patch: Record<string, unknown>): IpcResult<unk
 ipcMain.handle('config:llmStatus', (): IpcResult<unknown> => {
   try {
     return ipcOk({ configured: isLLMConfigured(), maskedKey: maskedApiKey(), ...llmKeySource() })
-  } catch (err) {
-    return ipcErr('UNKNOWN', String(err))
-  }
-})
-
-ipcMain.handle('config:uaRuntime', (): IpcResult<unknown> => {
-  try {
-    return ipcOk(buildUARuntimeConfig())
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }
@@ -979,7 +971,7 @@ ipcMain.handle('project:exportGraph', (_e, { projectId }: { projectId: string })
   if (!existsSync(graphPath)) return ipcErr('UNKNOWN', '图谱尚未生成，请先索引该项目')
 
   try {
-    const exportsDir = join(app.getPath('appData'), 'Fieldguide', 'exports')
+    const exportsDir = join(dataDir(), 'exports')
     if (!existsSync(exportsDir)) mkdirSync(exportsDir, { recursive: true })
     const dest = join(exportsDir, `${project.slug}-knowledge-graph.json`)
     copyFileSync(graphPath, dest)
@@ -997,12 +989,6 @@ ipcMain.handle('paper:list', (): IpcResult<unknown> => {
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }
-})
-
-ipcMain.handle('paper:get', (_e, { id }: { id: string }): IpcResult<unknown> => {
-  const p = getPaper(id)
-  if (!p) return ipcErr('UNKNOWN', '论文不存在')
-  return ipcOk(p)
 })
 
 ipcMain.handle('paper:save', (_e, paper: {
@@ -1186,7 +1172,7 @@ ipcMain.handle('insights:exportReport', (_e, { projectId }: { projectId: string 
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
   try {
-    const dir = join(app.getPath('appData'), 'Fieldguide', 'exports')
+    const dir = join(dataDir(), 'exports')
     mkdirSync(dir, { recursive: true })
     const { exportPath, markdown } = writeLearningReport(projectId, dir)
     logInfo('report:exported', { projectId, exportPath, bytes: markdown.length })
@@ -1644,7 +1630,7 @@ ipcMain.handle('bridge:generateTour', (_e, { projectId }: { projectId: string })
 
 ipcMain.handle('diagnostics:getLogs', (_e, { lines }: { lines?: number }): IpcResult<unknown> => {
   try {
-    const dir = join(app.getPath('appData'), 'Fieldguide', 'logs')
+    const dir = join(dataDir(), 'logs')
     if (!existsSync(dir)) return ipcOk({ files: [], content: '' })
 
     const logFiles = readdirSync(dir)
@@ -1670,7 +1656,7 @@ ipcMain.handle('diagnostics:getLogs', (_e, { lines }: { lines?: number }): IpcRe
 
 ipcMain.handle('diagnostics:openLogDir', async (): Promise<IpcResult<null>> => {
   try {
-    const dir = join(app.getPath('appData'), 'Fieldguide', 'logs')
+    const dir = join(dataDir(), 'logs')
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     await shell.openPath(dir)
     return ipcOk(null)
@@ -1683,7 +1669,7 @@ ipcMain.handle('diagnostics:openLogDir', async (): Promise<IpcResult<null>> => {
 
 ipcMain.handle('data:openDir', async (): Promise<IpcResult<unknown>> => {
   try {
-    const dir = join(app.getPath('appData'), 'Fieldguide')
+    const dir = dataDir()
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     await shell.openPath(dir)
     return ipcOk({ path: dir })
@@ -1694,7 +1680,7 @@ ipcMain.handle('data:openDir', async (): Promise<IpcResult<unknown>> => {
 
 ipcMain.handle('data:clearCache', (): IpcResult<unknown> => {
   try {
-    const base = join(app.getPath('appData'), 'Fieldguide')
+    const base = dataDir()
     const exportsDir = join(base, 'exports')
     let removed = 0
     if (existsSync(exportsDir)) {
