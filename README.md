@@ -48,6 +48,8 @@ clone 一个热门仓库下来，打开后对着目录发呆——入口在哪�
 
 **没有 LLM Key 也能用**：图谱退化成纯结构图，节点和源码照样能看；配了 Key 之后摘要、架构分层和 Tour 会更完整（也有启发式兜底）。LLM Key 在设置页配，向导里不强制。
 
+**已经导出过 API Key 的机器不用再填**：若环境变量里有 `DEEPSEEK_API_KEY`（或 `OPENAI_API_KEY` / `MOONSHOT_API_KEY` / `FIELDGUIDE_API_KEY`，按 Base URL 匹配），Fieldguide 直接用它，设置页会显示「已从环境变量 X 读取」。环境变量里的 Key **不会**写进 `config.json`；优先级是「设置页填的 > 环境变量」。
+
 **Obsidian 联动完全可选**：想把项目拆解导出成 Obsidian 卡片，需要官方的 **Obsidian CLI** —— Obsidian **1.12.7+**（安装器版本），在 Obsidian 里「设置 → 通用」启用「命令行界面（Command line interface）」，并保持 Obsidian 在运行（CLI 是运行中应用的客户端）。条件不满足时绑定入口会置灰并给出四步修复指引；不绑定 vault 的话，其余功能完全不受影响。
 
 <details>

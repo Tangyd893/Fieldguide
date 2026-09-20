@@ -211,7 +211,10 @@ Windows 路径：`%APPDATA%/Fieldguide/`
 | `locale` | `zh-CN`（默认）\| `zh-TW` \| `en-US` — Fieldguide UI |
 | `ua.language` | UA pipeline 语言：`zh` \| `zh-TW` \| `en` 等 |
 | `projectsRoot` | Git clone 与 demo 的默认父目录 |
+| `llm.apiKey` | 设置页填写的 Key（经 `safeStorage` 加密落盘）。**也可以来自环境变量**：见下 |
 | `onboardingCompleted` | 首次引导是否已完成 |
+
+**API Key 也可以来自环境变量**（`src/main/config.ts` 的 `envApiKey()`）：按 `llm.baseUrl` 匹配 `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` / `MOONSHOT_API_KEY` / `SILICONFLOW_API_KEY` / `OPENROUTER_API_KEY`，另有通用 `FIELDGUIDE_API_KEY` 兜底。规则：仅在 `config.json` 里没有 Key 时生效（**设置页填的优先级更高**，环境变量不会悄悄改写用户的选择）；供应商变量只用于该供应商的 endpoint（`DEEPSEEK_API_KEY` 不会被发到 OpenAI）；来源以内存字段 `llm.apiKeySource/apiKeyEnvVar` 表示，**永不落盘**——`saveConfig()` 遇到 `env` 来源时不写任何 Key 字段。渲染层只在设置页显示「已从环境变量 X 读取」，不回填 Key 输入框。
 
 **`obsidian` 块（F-17，默认关闭）**：`vaultPath` 为空即整体停用——`src/main/obsidian/` 之外没有任何代码会去碰 vault 目录（取值与默认值以 `src/main/config.ts` 的 `ObsidianConfig` / `DEFAULT_CONFIG.obsidian` 为准）。
 
