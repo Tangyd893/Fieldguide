@@ -7,7 +7,7 @@
  * build/rebuild the index, report chunk counts, auto-index after a PDF download,
  * and expose in-paper semantic lookup.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Library, Search, BookOpen, Download, StickyNote, Sparkles, RefreshCw, CheckCircle2, AlertTriangle, MessagesSquare, ExternalLink } from 'lucide-react'
 import ConceptBridge from './ConceptBridge'
 import PdfReader from './PdfReader'
@@ -73,20 +73,8 @@ export default function TheoryView({ t, projectId }: Props) {
   const [coachAsking, setCoachAsking] = useState(false)
   const [coachError, setCoachError] = useState<string | null>(null)
 
-  useEffect(() => { loadPapers() }, [])
-
-  async function loadPapers() {
-    try {
-      const r = await window.fieldguide.paperList()
-      if (r.ok && r.data) {
-        setPapers(r.data)
-        void loadChunkCounts(r.data)
-      }
-    } catch { /* ignore */ }
-  }
-
   /** Chunk counts drive the "RAG 就绪" badges; one cheap COUNT per paper. */
-  async function loadChunkCounts(list: PaperRow[]) {
+  const loadChunkCounts = useCallback(async (list: PaperRow[]) => {
     if (list.length === 0) return
     const entries = await Promise.all(
       list.slice(0, 60).map(async (p) => {
@@ -100,7 +88,21 @@ export default function TheoryView({ t, projectId }: Props) {
       }),
     )
     setChunkMap(Object.fromEntries(entries))
-  }
+  }, [])
+
+  // Reads nothing but the IPC layer and `loadChunkCounts` (both stable), so the effect
+  // below still loads the library exactly once on mount.
+  const loadPapers = useCallback(async () => {
+    try {
+      const r = await window.fieldguide.paperList()
+      if (r.ok && r.data) {
+        setPapers(r.data)
+        void loadChunkCounts(r.data)
+      }
+    } catch { /* ignore */ }
+  }, [loadChunkCounts])
+
+  useEffect(() => { void loadPapers() }, [loadPapers])
 
   async function search() {
     if (!query.trim()) return

@@ -117,8 +117,7 @@ export default function ProgressPanel({ projectId, focusedNodeId, t, onOpenNode,
     if (!projectId) return
     void loadProgress()
     void loadReview()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId])
+  }, [projectId, loadProgress, loadReview])
 
   const statusById = useMemo(() => {
     const map = new Map<string, ProgressRow>()

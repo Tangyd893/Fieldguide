@@ -1,7 +1,7 @@
 /**
  * OverviewPanel — Architecture Mapping summary (layers, modules, flows, stack).
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ArchitectureSummary } from '../../../shared/understand'
 import { postToDashboard } from './GraphPanel'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,7 @@ export default function OverviewPanel({ projectId, t, onOpenNode }: Props) {
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const r = await window.fieldguide.understandGetArchitecture(projectId)
@@ -27,11 +27,11 @@ export default function OverviewPanel({ projectId, t, onOpenNode }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
 
   useEffect(() => {
-    load()
-  }, [projectId])
+    void load()
+  }, [load])
 
   async function regenerate() {
     setRunning(true)

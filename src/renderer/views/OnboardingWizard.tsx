@@ -142,7 +142,10 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
     }
   }, [step, selectedOption, locale, projectsRoot, localProjectPath, onSetupStart, t])
 
-  // Watch global index progress for complete/error
+  // Watch global index progress for complete/error.
+  //
+  // Every read is listed: the effect only acts while `step5Phase` is 'indexing', so a
+  // re-run after it settles falls straight through, and both setters are idempotent.
   useEffect(() => {
     if (step5Phase !== 'indexing' || !idxProgress.progress) return
     const p = idxProgress.progress
@@ -153,7 +156,7 @@ export default function OnboardingWizard({ t, onComplete, onStartOption, onSetup
       setStep5Error(p.error ?? t('project.status.failed'))
       setStep5Phase('error')
     }
-  }, [idxProgress.progress])
+  }, [idxProgress.progress, step5Phase, step5NodeCount, t])
 
   function handleFinish(navigateTo: 'codemap' | 'library') {
     onComplete(locale, projectsRoot, navigateTo)

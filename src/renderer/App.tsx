@@ -102,7 +102,27 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('library')
   const activeTabRef = useRef<Tab>(activeTab)
   activeTabRef.current = activeTab
+
+  /**
+   * Latest-value refs for the listeners that must be registered only once.
+   *
+   * The menu and wheel handlers used to be captured in an effect whose dependency
+   * list omitted them (a stale-closure risk the linter flagged, and a real one for
+   * `t` after a language switch). Refreshing the refs every render keeps the
+   * listeners stable *and* the values current — the same trick as `activeTabRef`.
+   */
+  const shellHandlersRef = useRef({
+    openLocalProject: async () => {},
+    bumpShellZoom: (_delta: number, _notify?: boolean) => {},
+    setShellZoom: (_zoom: number, _notify?: boolean) => {},
+    t: (_key: string, _opts?: Record<string, unknown>): string => '',
+  })
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  // The Dashboard/`lastProjectId` effects key on these primitives rather than the
+  // project object, so a library refresh (new object, same project) does not look
+  // like a project switch. Keep them in sync with `selectedProject`.
+  const selectedProjectId = selectedProject?.id
+  const selectedProjectRoot = selectedProject?.root_path
   // Refs let the global key handler read current values without re-subscribing.
   const selectedProjectRef = useRef<Project | null>(selectedProject)
   selectedProjectRef.current = selectedProject
@@ -172,31 +192,31 @@ export default function App() {
         }
       })
     })
-    const unsubOpenProject = window.fieldguide.onMenuOpenProject?.(() => { void openLocalProject() })
+    const unsubOpenProject = window.fieldguide.onMenuOpenProject?.(() => { void shellHandlersRef.current.openLocalProject() })
     const unsubAbout = window.fieldguide.onMenuAbout?.(() => setShowAbout(true))
     const unsubShortcuts = window.fieldguide.onMenuShortcuts?.(() => setShowShortcuts(true))
     const unsubZoomIn = window.fieldguide.onMenuZoomIn?.(() => {
       if (activeTabRef.current === 'codemap') {
         dashboardViewportZoomIn()
-        showToast('info', t('status.graphZoomIn'))
+        showToast('info', shellHandlersRef.current.t('status.graphZoomIn'))
       } else {
-        bumpShellZoom(10)
+        shellHandlersRef.current.bumpShellZoom(10)
       }
     })
     const unsubZoomOut = window.fieldguide.onMenuZoomOut?.(() => {
       if (activeTabRef.current === 'codemap') {
         dashboardViewportZoomOut()
-        showToast('info', t('status.graphZoomOut'))
+        showToast('info', shellHandlersRef.current.t('status.graphZoomOut'))
       } else {
-        bumpShellZoom(-10)
+        shellHandlersRef.current.bumpShellZoom(-10)
       }
     })
     const unsubZoomReset = window.fieldguide.onMenuZoomReset?.(() => {
       if (activeTabRef.current === 'codemap') {
         dashboardViewportZoomReset()
-        showToast('info', t('status.graphZoomReset'))
+        showToast('info', shellHandlersRef.current.t('status.graphZoomReset'))
       } else {
-        setShellZoom(100)
+        shellHandlersRef.current.setShellZoom(100)
       }
     })
     return () => {
@@ -208,7 +228,8 @@ export default function App() {
       unsubZoomOut?.()
       unsubZoomReset?.()
     }
-  }, [appearance.shellZoom, appearance.uiFontSize])
+    // Listeners are registered once; they read the latest values through the refs.
+  }, [])
 
   async function openLocalProject() {
     const picked = await window.fieldguide.openFolderDialog()
@@ -256,6 +277,9 @@ export default function App() {
       return { ...prev, shellZoom: next }
     })
   }
+
+  // Hand the current closures to the listeners registered in the mount effect.
+  shellHandlersRef.current = { openLocalProject, bumpShellZoom, setShellZoom, t }
 
   useEffect(() => {
     window.fieldguide.configGet().then((r) => {
@@ -318,21 +342,25 @@ export default function App() {
       const now = Date.now()
       if (now - last < 50) return
       last = now
-      bumpShellZoom(e.deltaY < 0 ? 10 : -10, false)
+      shellHandlersRef.current.bumpShellZoom(e.deltaY < 0 ? 10 : -10, false)
     }
     window.addEventListener('wheel', onWheel, { passive: false })
     return () => window.removeEventListener('wheel', onWheel)
-  }, [appearance.shellZoom, appearance.uiFontSize])
+    // Registered once: the handler reads the current zoom step through the ref
+    // (the previous dependency list re-registered on every zoom change for nothing).
+  }, [])
 
   // Shell zoom via View menu (accelerators) — see onMenuZoom*
   // Keyboard is handled by Electron menu accelerators → menu:zoomIn/Out/Reset
   useEffect(() => {
-    if (selectedProject) {
-      window.fieldguide.dashboardSetProject?.(selectedProject.root_path)
+    if (selectedProjectId) {
+      window.fieldguide.dashboardSetProject?.(selectedProjectRoot ?? null)
     } else {
       window.fieldguide.dashboardSetProject?.(null)
     }
-  }, [selectedProject?.id])
+    // Keyed on the values it reads, not the whole project object: a library
+    // refresh replaces that object, which must not re-point the Dashboard.
+  }, [selectedProjectId, selectedProjectRoot])
 
   useEffect(() => {
     if (activeTab !== 'settings') {
@@ -341,10 +369,10 @@ export default function App() {
   }, [activeTab])
 
   useEffect(() => {
-    if (selectedProject) {
-      window.fieldguide.configSet({ lastProjectId: selectedProject.id } as never).catch(() => {})
+    if (selectedProjectId) {
+      window.fieldguide.configSet({ lastProjectId: selectedProjectId } as never).catch(() => {})
     }
-  }, [selectedProject?.id])
+  }, [selectedProjectId])
 
   async function handleOnboardingComplete(locale: string, projectsRoot: string, navigateTo?: 'codemap' | 'library') {
     await window.fieldguide.configSet({ locale, projectsRoot, onboardingCompleted: true })

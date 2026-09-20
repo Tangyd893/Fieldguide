@@ -86,19 +86,12 @@ export default function InsightsPanel({ projectId, focusedNodeId, t, onOpenNode,
   const [clusterResult, setClusterResult] = useState<CommunityResult | null>(null)
   const [loadingClusters, setLoadingClusters] = useState(false)
 
-  useEffect(() => {
-    if (!projectId) return
-    void loadStats()
-    void loadNeighbors()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, focusedNodeId, depth])
-
-  async function loadStats() {
+  const loadStats = useCallback(async () => {
     try {
       const r = await window.fieldguide.graphStats(projectId)
       if (r.ok && r.data) setStats(r.data as Stats)
     } catch { /* ignore */ }
-  }
+  }, [projectId])
 
   const loadNeighbors = useCallback(async () => {
     if (!projectId || !focusedNodeId) { setNeighbors([]); return }
@@ -112,6 +105,14 @@ export default function InsightsPanel({ projectId, focusedNodeId, t, onOpenNode,
     } catch { /* ignore */ }
     finally { setLoadingNeighbors(false) }
   }, [projectId, focusedNodeId, depth])
+
+  // Declared after the loaders: a dependency array is evaluated during render, so a
+  // later `const` would be a TDZ error.
+  useEffect(() => {
+    if (!projectId) return
+    void loadStats()
+    void loadNeighbors()
+  }, [projectId, focusedNodeId, depth, loadStats, loadNeighbors])
 
   async function findPath() {
     if (!projectId || !fromId.trim() || !toId.trim()) return
@@ -168,12 +169,12 @@ export default function InsightsPanel({ projectId, focusedNodeId, t, onOpenNode,
     }
   }
 
-  async function loadFindings() {
+  const loadFindings = useCallback(async () => {
     try {
       const r = await window.fieldguide.reviewFindings(projectId)
       if (r.ok && r.data) setFindings(r.data)
     } catch { /* ignore */ }
-  }
+  }, [projectId])
 
   /** B7: git history × graph. */
   const loadEvolution = useCallback(async () => {
@@ -196,7 +197,7 @@ export default function InsightsPanel({ projectId, focusedNodeId, t, onOpenNode,
   }, [projectId])
 
   // Load stored findings with the panel; timeline/clusters run on demand.
-  useEffect(() => { void loadFindings() }, [projectId])
+  useEffect(() => { void loadFindings() }, [loadFindings])
 
   function focusNode(id: string) {
     postToDashboard({ type: 'focusNode', nodeId: id })

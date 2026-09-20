@@ -2,7 +2,7 @@
  * TourPanel — shows tour steps from knowledge-graph.json.
  * Phase 2: syncs with Dashboard postMessage for bidirectional tour control.
  */
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { postToDashboard } from './GraphPanel'
 
 interface TourStep {
@@ -33,19 +33,22 @@ export default function TourPanel({ projectId, t, externalStepIndex }: Props) {
   const [activeTourIndex, setActiveTourIndex] = useState<number | null>(null)
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0)
 
-  useEffect(() => {
-    loadTours()
-  }, [projectId])
+  /**
+   * Latest-value refs for the Dashboard sync effect below.
+   *
+   * That effect is driven by a push from the Dashboard (`externalStepIndex`); it
+   * only *reads* `tours` and `activeTourIndex` as guards ("is anything loaded to
+   * sync onto, and is a tour already active?"). Reading them through refs keeps
+   * the effect's dependency list honest — it reacts to the external step alone —
+   * and prevents a local tour/step click from re-firing the sync, which would
+   * pull the selection back to a stale Dashboard step.
+   */
+  const toursRef = useRef(tours)
+  toursRef.current = tours
+  const activeTourIndexRef = useRef(activeTourIndex)
+  activeTourIndexRef.current = activeTourIndex
 
-  // Sync with Dashboard-initiated tour step changes
-  useEffect(() => {
-    if (externalStepIndex != null && tours.length > 0) {
-      setActiveStepIndex(externalStepIndex)
-      if (activeTourIndex == null) setActiveTourIndex(0)
-    }
-  }, [externalStepIndex])
-
-  async function loadTours() {
+  const loadTours = useCallback(async () => {
     setLoading(true)
     try {
       const result = await window.fieldguide.graphGet(projectId)
@@ -58,7 +61,19 @@ export default function TourPanel({ projectId, t, externalStepIndex }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
+
+  useEffect(() => {
+    void loadTours()
+  }, [loadTours])
+
+  // Sync with Dashboard-initiated tour step changes
+  useEffect(() => {
+    if (externalStepIndex != null && toursRef.current.length > 0) {
+      setActiveStepIndex(externalStepIndex)
+      if (activeTourIndexRef.current == null) setActiveTourIndex(0)
+    }
+  }, [externalStepIndex])
 
   function handleStepClick(tourIdx: number, stepIdx: number) {
     setActiveTourIndex(tourIdx)

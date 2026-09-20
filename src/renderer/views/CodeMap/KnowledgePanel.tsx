@@ -1,7 +1,7 @@
 /**
  * KnowledgePanel — in-app knowledge cards extracted from the project.
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { KnowledgeNode, AnalysisStage } from '../../../shared/understand'
 import { postToDashboard } from './GraphPanel'
 import { Button } from '@/components/ui/button'
@@ -19,25 +19,31 @@ export default function KnowledgePanel({ projectId, t, onOpenNode }: Props) {
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const r = await window.fieldguide.understandListKnowledge(projectId)
       if (r.ok && Array.isArray(r.data)) {
-        const list = r.data as KnowledgeNode[]
-        setNodes(list)
-        if (list.length && !selectedId) setSelectedId(list[0].id)
+        setNodes(r.data as KnowledgeNode[])
       }
     } catch {
       /* ignore */
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
 
   useEffect(() => {
-    load()
-  }, [projectId])
+    void load()
+  }, [load])
+
+  // Auto-select the first card once the list arrives. This lives outside `load`
+  // so the loader stays identity-stable and only re-runs when the project does;
+  // the selection is read from state, which is exactly what the old `!selectedId`
+  // guard meant (and `selected` already falls back to `nodes[0]`).
+  useEffect(() => {
+    if (nodes.length > 0 && !selectedId) setSelectedId(nodes[0].id)
+  }, [nodes, selectedId])
 
   async function regenerate() {
     setRunning(true)

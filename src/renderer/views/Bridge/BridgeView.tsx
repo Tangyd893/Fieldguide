@@ -1,7 +1,7 @@
 /**
  * BridgeView — 顶栏「桥接」Tab (Phase 3)
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link2, FileText, Loader2, Sparkles } from 'lucide-react'
 import ConceptBridge from '../Theory/ConceptBridge'
 import { Dialog, DialogContent, DialogTitle, DialogCloseButton, DialogBody } from '@/components/ui/dialog'
@@ -31,14 +31,38 @@ export default function BridgeView({ t, projectId }: Props) {
   const [generatingTour, setGeneratingTour] = useState(false)
   const [tourResult, setTourResult] = useState<{ stepCount: number; summary: string } | null>(null)
 
-  useEffect(() => { loadPapers() }, [])
-  useEffect(() => { if (projectId) loadAllLinks() }, [projectId])
+  const loadPapers = useCallback(async () => {
+    try {
+      const r = await window.fieldguide.paperList()
+      if (r.ok && r.data) setPapers(r.data)
+    } catch { /* ignore */ }
+    finally { setLoading(false) }
+  }, [])
+
+  const loadAllLinks = useCallback(async () => {
+    try {
+      const r = await window.fieldguide.conceptList(projectId)
+      if (r.ok && r.data) setAllLinks(r.data)
+    } catch { /* ignore */ }
+  }, [projectId])
+
+  useEffect(() => { void loadPapers() }, [loadPapers])
+  useEffect(() => { if (projectId) void loadAllLinks() }, [projectId, loadAllLinks])
 
   /**
    * Subscribe to the bridge:tourGenerated broadcast as well as the invoke reply.
    * The main process emits it after writing the Tour into the graph, so a result
    * arriving this way (e.g. from a run started elsewhere) still surfaces.
    */
+  const applyTourResult = useCallback((raw: unknown) => {
+    const d = (raw ?? {}) as { stepCount?: number; summary?: string; noLinks?: boolean; message?: string }
+    if (d.noLinks) {
+      setTourResult({ stepCount: 0, summary: d.message ?? t('bridge.noLinksFound') })
+    } else {
+      setTourResult({ stepCount: d.stepCount ?? 0, summary: d.summary ?? t('bridge.tourGenerated') })
+    }
+  }, [t])
+
   useEffect(() => {
     if (!projectId) return
     const off = window.fieldguide.onBridgeTourGenerated((data) => {
@@ -46,32 +70,7 @@ export default function BridgeView({ t, projectId }: Props) {
       applyTourResult(data)
     })
     return off
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, t])
-
-  function applyTourResult(raw: unknown) {
-    const d = (raw ?? {}) as { stepCount?: number; summary?: string; noLinks?: boolean; message?: string }
-    if (d.noLinks) {
-      setTourResult({ stepCount: 0, summary: d.message ?? t('bridge.noLinksFound') })
-    } else {
-      setTourResult({ stepCount: d.stepCount ?? 0, summary: d.summary ?? t('bridge.tourGenerated') })
-    }
-  }
-
-  async function loadPapers() {
-    try {
-      const r = await window.fieldguide.paperList()
-      if (r.ok && r.data) setPapers(r.data)
-    } catch { /* ignore */ }
-    finally { setLoading(false) }
-  }
-
-  async function loadAllLinks() {
-    try {
-      const r = await window.fieldguide.conceptList(projectId)
-      if (r.ok && r.data) setAllLinks(r.data)
-    } catch { /* ignore */ }
-  }
+  }, [projectId, applyTourResult])
 
   async function handleGenerateTour() {
     if (!projectId) return

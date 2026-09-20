@@ -16,7 +16,7 @@ import { join, relative, extname, basename } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app } from 'electron'
 import { BINARY_EXTS, IGNORE_DIRS, getProjectIgnoreFilter, normalizeIgnoreFilter } from '../project-ignore'
-import { invalidateGraphCache } from './graph-reader'
+import { invalidateGraphCache, type KnowledgeGraph, type GraphNode, type GraphEdge } from './graph-reader'
 import { setDetectLayersImpl } from './ensure-layers'
 import { callLLM as sharedCallLLM } from '../llm/client'
 import { atomicWriteJson, isJsonReadable } from '../fs-atomic'
@@ -58,7 +58,14 @@ export function isIndexCancelled(): boolean {
   return indexAbortController?.signal.aborted ?? false
 }
 
-// UA Core imports — loaded dynamically to handle ESM
+// UA Core imports — loaded dynamically to handle ESM.
+//
+// These slots are deliberately untyped: the module is resolved at runtime (npm
+// package, or the sibling checkout during development), so its declarations are not
+// part of our build and pinning them here would only duplicate upstream's internal
+// shapes. Everything they *produce* is typed below, which is where mistakes would
+// actually reach the graph.
+/* eslint-disable @typescript-eslint/no-explicit-any -- runtime-resolved UA core surface (see above) */
 let TreeSitterPlugin: any
 let PluginRegistry: any
 let builtinLanguageConfigs: any
@@ -77,6 +84,49 @@ let buildTourGenerationPrompt: any
 let parseTourGenerationResponse: any
 let generateHeuristicTour: any
 let detectLayers: any
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/**
+ * Tree-sitter analysis shapes as produced by UA's registry.
+ *
+ * Only the fields this pipeline consumes are declared; UA may carry more, and the
+ * narrow shape here is what the extract stage actually forwards to the graph.
+ */
+interface UaFunctionInfo {
+  name: string
+  lineRange?: [number, number]
+  params?: string[]
+}
+interface UaClassInfo {
+  name: string
+  lineRange?: [number, number]
+  methods?: string[]
+  properties?: string[]
+}
+interface UaImportInfo {
+  source: string
+  specifiers?: string[]
+  lineNumber?: number
+}
+interface UaExportInfo {
+  name: string
+  lineNumber?: number
+  isDefault?: boolean
+}
+interface UaFileAnalysis {
+  functions?: UaFunctionInfo[]
+  classes?: UaClassInfo[]
+  imports?: UaImportInfo[]
+  exports?: UaExportInfo[]
+}
+interface UaLanguageConfig {
+  treeSitter?: unknown
+  [key: string]: unknown
+}
+interface UaPluginRegistry {
+  register(plugin: unknown): void
+  analyzeFile?(path: string, content: string): UaFileAnalysis | null | undefined
+}
 
 async function loadCore(): Promise<void> {
   if (TreeSitterPlugin) return // already loaded
@@ -86,7 +136,9 @@ async function loadCore(): Promise<void> {
   const appRoot = app.isPackaged ? app.getAppPath() : process.cwd()
   const require_ = createRequire(join(appRoot, 'package.json'))
 
-  let core: any
+  // `unknown` members: the module shape belongs to UA, and the members we care
+  // about are assigned to the slots above.
+  let core: Record<string, unknown>
   try {
     core = await import(pathToFileURL(require_.resolve('@understand-anything/core')).href)
   } catch {
@@ -307,11 +359,11 @@ export async function extractStructure(
   await loadCore()
 
   // Init Tree-sitter
-  const tsConfigs = builtinLanguageConfigs.filter((c: any) => c.treeSitter)
+  const tsConfigs = (builtinLanguageConfigs as UaLanguageConfig[]).filter((c) => c.treeSitter)
   const tsPlugin = new TreeSitterPlugin(tsConfigs)
   await tsPlugin.init()
 
-  const registry = new PluginRegistry()
+  const registry = new PluginRegistry() as UaPluginRegistry
   registry.register(tsPlugin)
   registerAllParsers?.(registry)
 
@@ -337,25 +389,25 @@ export async function extractStructure(
         results.push({
           path: file.path,
           language: file.language,
-          functions: (analysis.functions || []).map((f: any) => ({
+          functions: (analysis.functions || []).map((f: UaFunctionInfo) => ({
             name: f.name,
             startLine: f.lineRange?.[0] ?? 0,
             endLine: f.lineRange?.[1] ?? 0,
             params: f.params || [],
           })),
-          classes: (analysis.classes || []).map((c: any) => ({
+          classes: (analysis.classes || []).map((c: UaClassInfo) => ({
             name: c.name,
             startLine: c.lineRange?.[0] ?? 0,
             endLine: c.lineRange?.[1] ?? 0,
             methods: c.methods || [],
             properties: c.properties || [],
           })),
-          imports: (analysis.imports || []).map((i: any) => ({
+          imports: (analysis.imports || []).map((i: UaImportInfo) => ({
             source: i.source,
             specifiers: i.specifiers || [],
             lineNumber: i.lineNumber || 0,
           })),
-          exports: (analysis.exports || []).map((e: any) => ({
+          exports: (analysis.exports || []).map((e: UaExportInfo) => ({
             name: e.name,
             lineNumber: e.lineNumber || 0,
             isDefault: e.isDefault,
@@ -421,7 +473,7 @@ async function callLLM(prompt: string, config: LLMEnrichConfig, language?: strin
  * Mutates the graph in-place. Controlled by the presence of llmConfig.
  */
 async function enrichWithLLM(
-  graph: any,
+  graph: KnowledgeGraph,
   scanResult: ScanResult,
   extractResult: ExtractResult,
   rootPath: string,
@@ -436,7 +488,7 @@ async function enrichWithLLM(
   let processed = 0
 
   // Build a lookup: file path → nodes (for summary injection)
-  const nodesByFile = new Map<string, any[]>()
+  const nodesByFile = new Map<string, GraphNode[]>()
   for (const node of graph.nodes || []) {
     const fp = node.filePath || ''
     if (!nodesByFile.has(fp)) nodesByFile.set(fp, [])
@@ -553,14 +605,14 @@ async function enrichWithLLM(
  */
 export function mergeIncrementalGraph(
   rootPath: string,
-  partialGraph: { nodes: any[]; edges: any[]; layers?: any[]; tour?: any[] },
+  partialGraph: Pick<KnowledgeGraph, 'nodes' | 'edges' | 'layers' | 'tour'>,
   changedFiles: { path: string }[],
   presentPaths?: string[],
 ): { removedNodes: number; deletedFiles: string[] } {
   const graphPath = join(rootPath, '.understand-anything', 'knowledge-graph.json')
   if (!existsSync(graphPath)) return { removedNodes: 0, deletedFiles: [] } // no existing graph — partial is the full graph
 
-  let existingGraph: any
+  let existingGraph: KnowledgeGraph
   try {
     existingGraph = JSON.parse(readFileSync(graphPath, 'utf-8'))
   } catch {
@@ -584,7 +636,7 @@ export function mergeIncrementalGraph(
 
   // Remove old nodes whose filePath is changed or deleted
   const removedIds = new Set<string>()
-  const keptNodes = existingGraph.nodes.filter((n: any) => {
+  const keptNodes = existingGraph.nodes.filter((n: GraphNode) => {
     if (n.filePath && stalePaths.has(n.filePath)) {
       removedIds.add(n.id)
       return false
@@ -594,7 +646,7 @@ export function mergeIncrementalGraph(
 
   // Remove edges that reference removed nodes
   const keptEdges = (existingGraph.edges || []).filter(
-    (e: any) => !removedIds.has(e.source) && !removedIds.has(e.target),
+    (e: GraphEdge) => !removedIds.has(e.source) && !removedIds.has(e.target),
   )
 
   // Merge: kept nodes/edges + new nodes/edges from changed files

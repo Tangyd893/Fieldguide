@@ -52,20 +52,7 @@ export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpT
   /** Line highlighted by a jump request (content search hit). */
   const [activeJumpLine, setActiveJumpLine] = useState<number | null>(null)
 
-  useEffect(() => {
-    if (!projectId || !filePath) { setContent(''); setNodeRange(null); return }
-    loadFile()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, filePath])
-
-  // Reset per-file view state when the file changes
-  useEffect(() => {
-    setSearch('')
-    setActiveMatch(0)
-    setJumpValue('')
-  }, [filePath])
-
-  async function loadFile() {
+  const loadFile = useCallback(async () => {
     if (!projectId || !filePath) return
     setLoading(true); setError(null)
     try {
@@ -74,7 +61,20 @@ export default function CodeViewer({ projectId, filePath, highlightNodeId, jumpT
       else setError(result.error?.message ?? t('codeMap.readError'))
     } catch (err) { setError(String(err)) }
     finally { setLoading(false) }
-  }
+  }, [projectId, filePath, t])
+
+  // Declared after loadFile: a dependency array is evaluated during render.
+  useEffect(() => {
+    if (!projectId || !filePath) { setContent(''); setNodeRange(null); return }
+    void loadFile()
+  }, [projectId, filePath, loadFile])
+
+  // Reset per-file view state when the file changes
+  useEffect(() => {
+    setSearch('')
+    setActiveMatch(0)
+    setJumpValue('')
+  }, [filePath])
 
   // Resolve the highlighted node's range (debounced against rapid graph clicks).
   useEffect(() => {

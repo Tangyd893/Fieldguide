@@ -1,7 +1,7 @@
 /**
  * CommandPalette — Ctrl+K 命令面板 (ui-spec v0.4 §4.5)
  */
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Search, FileText, Hexagon } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -62,25 +62,35 @@ export default function CommandPalette({ commands, open, onClose, t, searchFiles
     return () => clearTimeout(timer)
   }, [query, searchNodes])
 
-  const filtered = query
-    ? commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()))
-    : commands
+  const filtered = useMemo(
+    () => (query ? commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase())) : commands),
+    [query, commands],
+  )
 
-  const combined: Array<{ kind: 'cmd' | 'file' | 'node'; id: string; label: string; action: () => void }> = [
-    ...filtered.map(c => ({ kind: 'cmd' as const, id: c.id, label: c.label, action: c.action })),
-    ...fileResults.map(f => ({
-      kind: 'file' as const,
-      id: `file:${f.path}`,
-      label: `${f.name} — ${f.path}`,
-      action: () => { onFileSelect?.(f.path); onClose() },
-    })),
-    ...nodeResults.map(n => ({
-      kind: 'node' as const,
-      id: `node:${n.id}`,
-      label: `${n.label} (${n.type})${n.filePath ? ` — ${n.filePath}` : ''}`,
-      action: () => { onNodeSelect?.(n.id); onClose() },
-    })),
-  ]
+  /**
+   * Command + file + node hits in one navigable list.
+   *
+   * Memoised so `onKeyDown`'s dependency list stays stable: rebuilding this array on
+   * every render re-created the handler each time for no reason.
+   */
+  const combined: Array<{ kind: 'cmd' | 'file' | 'node'; id: string; label: string; action: () => void }> = useMemo(
+    () => [
+      ...filtered.map(c => ({ kind: 'cmd' as const, id: c.id, label: c.label, action: c.action })),
+      ...fileResults.map(f => ({
+        kind: 'file' as const,
+        id: `file:${f.path}`,
+        label: `${f.name} — ${f.path}`,
+        action: () => { onFileSelect?.(f.path); onClose() },
+      })),
+      ...nodeResults.map(n => ({
+        kind: 'node' as const,
+        id: `node:${n.id}`,
+        label: `${n.label} (${n.type})${n.filePath ? ` — ${n.filePath}` : ''}`,
+        action: () => { onNodeSelect?.(n.id); onClose() },
+      })),
+    ],
+    [filtered, fileResults, nodeResults, onFileSelect, onNodeSelect, onClose],
+  )
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

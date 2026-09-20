@@ -46,8 +46,8 @@ export default function PdfReader({ pdfPath, paperId, t, onClose, onSelectText }
     }).catch(() => {})
   }, [paperId])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function onDocumentLoadSuccess({ numPages: nextNumPages }: any) {
+  /** react-pdf hands us the loaded document; only the page count is used here. */
+  function onDocumentLoadSuccess({ numPages: nextNumPages }: { numPages: number }) {
     setNumPages(nextNumPages)
     setPageNumber(1)
   }
@@ -217,7 +217,14 @@ export default function PdfReader({ pdfPath, paperId, t, onClose, onSelectText }
         <div className="fixed z-50" style={{ left: selectionPos.x, top: selectionPos.y, transform: 'translateX(-50%)' }}>
           <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg shadow-lg px-2 py-1 flex items-center gap-1">
             <span className="text-[10px] text-[var(--fg-text-secondary)]">"{selectedText.slice(0, 20)}{selectedText.length > 20 ? '…' : ''}"</span>
-            <button onClick={saveHighlight} className="inline-flex items-center gap-1 text-[10px] bg-[var(--fg-status-warning-bg)] px-1.5 py-0.5 rounded">
+            <button
+              onClick={saveHighlight}
+              // Icon-only: without a name this is an unlabelled button for a screen
+              // reader (and for anything that queries by role + name).
+              aria-label={t('pdf.saveHighlight')}
+              title={t('pdf.saveHighlight')}
+              className="inline-flex items-center gap-1 text-[10px] bg-[var(--fg-status-warning-bg)] px-1.5 py-0.5 rounded"
+            >
               <Highlighter size={10} />
             </button>
             {onSelectText && (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { FileText, Clipboard, FolderOpen } from 'lucide-react'
 import FileIcon, { TreeChevron } from '../../components/icons/FileIcon'
 import { Input } from '@/components/ui/input'
@@ -31,9 +31,10 @@ export default function FileTree({ projectId, onFileClick, activeFilePath, t }: 
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
 
-  useEffect(() => { loadTree() }, [projectId])
-
-  async function loadTree() {
+  // `t` is only used for the fallback error message, and react-i18next keeps its
+  // identity stable until the language changes, so the effect below still refetches
+  // on mount and on a project switch — not on ordinary re-renders.
+  const loadTree = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -50,7 +51,9 @@ export default function FileTree({ projectId, onFileClick, activeFilePath, t }: 
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId, t])
+
+  useEffect(() => { void loadTree() }, [loadTree])
 
   function filterTree(entries: FileEntry[], query: string): FileEntry[] {
     if (!query) return entries

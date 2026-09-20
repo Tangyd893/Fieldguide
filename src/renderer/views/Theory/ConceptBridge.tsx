@@ -3,7 +3,7 @@
  *
  * Used inside TheoryView paper detail when a project is selected.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { BookOpen, Bot, Loader2 } from 'lucide-react'
 
 interface Props {
@@ -44,27 +44,16 @@ export default function ConceptBridge({ paperId, projectId, t, initialAnchorText
   const [aiSuggestedNodes, setAiSuggestedNodes] = useState<GraphNode[]>([])
   const [aiSuggestError, setAiSuggestError] = useState('')
 
-  useEffect(() => { loadLinks() }, [paperId, projectId])
-
-  // When initialAnchorText is provided from PDF reader, auto-open the add form with pre-filled text
-  useEffect(() => {
-    if (initialAnchorText) {
-      setShowAdd(true)
-      setAnchorText(initialAnchorText)
-      loadNodes()
-    }
-  }, [initialAnchorText])
-
-  async function loadLinks() {
+  const loadLinks = useCallback(async () => {
     setLoading(true)
     try {
       const r = await window.fieldguide.conceptList(projectId, paperId)
       if (r.ok && r.data) setLinks(r.data)
     } catch { /* ignore */ }
     finally { setLoading(false) }
-  }
+  }, [paperId, projectId])
 
-  async function loadNodes() {
+  const loadNodes = useCallback(async () => {
     try {
       const r = await window.fieldguide.graphGet(projectId)
       if (r.ok && r.data) {
@@ -72,7 +61,25 @@ export default function ConceptBridge({ paperId, projectId, t, initialAnchorText
         setNodes((g.nodes || []).filter(n => n.type === 'function' || n.type === 'class' || n.type === 'file'))
       }
     } catch { /* ignore */ }
-  }
+  }, [projectId])
+
+  useEffect(() => { void loadLinks() }, [loadLinks])
+
+  // When initialAnchorText is provided from PDF reader, auto-open the add form with pre-filled text
+  useEffect(() => {
+    if (initialAnchorText) {
+      setShowAdd(true)
+      setAnchorText(initialAnchorText)
+    }
+  }, [initialAnchorText])
+
+  // The node picker holds per-project data, so it is loaded whenever the form is open —
+  // opened by the button, by a PDF selection above, or left open across a project switch.
+  // Keeping this here (rather than in the anchor effect) leaves that effect scoped to the
+  // anchor text alone.
+  useEffect(() => {
+    if (showAdd) void loadNodes()
+  }, [showAdd, loadNodes])
 
   async function addLink() {
     if (!selectedNode) return
@@ -183,7 +190,7 @@ ${candidateLines}`
     <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-lg p-5">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-[var(--fg-text-primary)]">{t('bridge.conceptBridge')}</h3>
-        <button onClick={() => { setShowAdd(!showAdd); if (!showAdd) loadNodes() }}
+        <button onClick={() => setShowAdd(!showAdd)}
           className="text-xs text-[var(--fg-accent-text)] hover:text-[var(--fg-accent)] font-medium">
           {showAdd ? t('bridge.cancel') : t('bridge.addLink')}
         </button>

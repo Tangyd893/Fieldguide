@@ -5,7 +5,7 @@
  * the references are persisted with the message, so the jump-to-graph chips work
  * again after a restart instead of vanishing with the in-memory state.
  */
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Copy, Check, RotateCw } from 'lucide-react'
 import { renderMarkdown } from '@/lib/markdown'
 
@@ -49,14 +49,14 @@ export default function ChatPanel({
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const messagesEnd = useRef<HTMLDivElement>(null)
 
-  function welcome(): Message {
+  const welcome = useCallback((): Message => {
     return {
       id: 'welcome',
       role: 'assistant',
       content: t('chat.welcomeWithProject', { name: projectName }),
       timestamp: new Date().toISOString(),
     }
-  }
+  }, [projectName, t])
 
   useEffect(() => {
     if (!projectId) {
@@ -86,8 +86,7 @@ export default function ChatPanel({
     }).catch(() => {
       setMessages([welcome()])
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, projectName, t])
+  }, [projectId, projectName, t, welcome])
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' })

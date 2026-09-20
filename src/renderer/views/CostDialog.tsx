@@ -1,7 +1,7 @@
 /**
  * CostDialog — LLM 分析成本确认 (ui-spec §3.6, roadmap 2.8)
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogCloseButton } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
@@ -21,12 +21,7 @@ export default function CostDialog({ open, t, projectId, projectName, onCancel, 
   const [totalBytes, setTotalBytes] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (!open) return
-    loadStats()
-  }, [projectId, open])
-
-  async function loadStats() {
+  const loadStats = useCallback(async () => {
     setLoading(true)
     try {
       const graphResult = await window.fieldguide.graphGet(projectId)
@@ -62,7 +57,12 @@ export default function CostDialog({ open, t, projectId, projectName, onCancel, 
       }
     } catch { /* ignore */ }
     setLoading(false)
-  }
+  }, [projectId])
+
+  useEffect(() => {
+    if (!open) return
+    void loadStats()
+  }, [open, loadStats])
 
   /**
    * Token estimate.
