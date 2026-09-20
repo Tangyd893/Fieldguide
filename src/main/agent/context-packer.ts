@@ -15,6 +15,8 @@ import {
 import { buildCrossSourceContext } from '../ua/cross-tour'
 import { queryPaper } from '../vector'
 import { searchNodesFuzzy, toSearchableNodes, type SearchableNode } from '../ua/search'
+import { vaultToolContext } from '../obsidian/agent'
+import { listProjectNotes } from '../obsidian/read'
 import type { AgentContext } from './types'
 
 // Re-exported for existing importers (agent/tools.ts, ipc); the implementation
@@ -22,7 +24,7 @@ import type { AgentContext } from './types'
 export { toSearchableNodes }
 export type { SearchableNode }
 
-export type CoachIntent = 'overview' | 'paper' | 'code' | 'general'
+export type CoachIntent = 'overview' | 'paper' | 'code' | 'vault' | 'general'
 
 const MAX_PACK_CHARS = 10_000
 const MAX_SLICE_NODES = 12
@@ -34,6 +36,10 @@ export function detectCoachIntent(query: string): CoachIntent {
     /介绍|入口|overview|architecture|架构|分层|是什么项目|这个项目|what is this project|entry\s*point|introduce|guide me|导览/.test(q)
   ) {
     return 'overview'
+  }
+  // Vault questions are about the reader's own notes, not about the code graph.
+  if (/obsidian|vault|卡片|我的笔记|批注|笔记里|annotation|my notes?/i.test(q)) {
+    return 'vault'
   }
   if (/论文|paper|arxiv|rag|chunk|这篇|对照|概念桥/.test(q)) {
     return 'paper'
@@ -318,6 +324,35 @@ export async function packCoachContext(
     )
   }
 
+  // Obsidian vault (F-17): what was exported, and what the reader added to it.
+  const vault = vaultToolContext(ctx.projectId)
+  if (vault) {
+    sections.push('\n## Project vault (Obsidian)')
+    sections.push(
+      `Vault: ${vault.vaultName || vault.vaultPath} · folder: ${vault.folderRel} · ${vault.notesCount} synced notes`,
+    )
+    sections.push(
+      'Vault tools are available (vault_list_cards / vault_read_note / vault_search / vault_upsert_card / vault_backlinks).',
+    )
+    try {
+      const notes = listProjectNotes(ctx.projectId)
+      const annotated = notes.filter((note) => note.userChars > 0)
+      if (annotated.length > 0) {
+        sections.push(`Reader annotations exist on ${annotated.length} card(s):`)
+        sections.push(
+          annotated.slice(0, 8).map((note) =>
+            `- ${note.notePath} (${note.title}, ${note.userChars} chars written by the reader)`,
+          ).join('\n'),
+        )
+      } else if (notes.length > 0) {
+        sections.push('Most recent cards:')
+        sections.push(notes.slice(0, 8).map((note) => `- ${note.notePath} (${note.title})`).join('\n'))
+      }
+    } catch {
+      /* the vault view is additive; never fail the turn over it */
+    }
+  }
+
   if (intent === 'paper' || /论文|paper|概念|chunk|rag/i.test(userQuery)) {
     try {
       const hits = await queryPaper(userQuery, undefined, 3)
@@ -364,6 +399,13 @@ export function coachPolicyHints(intent: CoachIntent): string {
     return [
       ...common,
       'Connect paper excerpts to code nodes and concept bridges when possible.',
+    ].join('\n')
+  }
+  if (intent === 'vault') {
+    return [
+      ...common,
+      'This is about the reader\'s Obsidian notes: start from vault_list_cards, read the relevant notes (including their own annotations), and answer from what they wrote — not from a generic summary.',
+      'Quote the note path you used so they can find it again.',
     ].join('\n')
   }
   return common.join('\n')

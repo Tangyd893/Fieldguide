@@ -16,11 +16,12 @@ import { queryPaper } from '../vector'
 import { buildCrossSourceContext } from '../ua/cross-tour'
 import { flattenTourSteps, toSearchableNodes } from './context-packer'
 import { searchNodesDetailed } from '../ua/search'
+import { executeVaultTool, vaultToolContext, VAULT_TOOL_NAMES, VAULT_TOOL_SCHEMAS } from '../obsidian/agent'
 import type { ToolSchema } from '../llm/client'
 import type { AgentContext } from './types'
 
-/** Typed as OpenAI-style tool schemas so they can be handed to the LLM client as-is. */
-export const AGENT_TOOLS: ToolSchema[] = [
+/** Graph / paper tools. Typed as OpenAI-style schemas so they can be handed to the LLM client as-is. */
+const GRAPH_TOOLS: ToolSchema[] = [
   {
     type: 'function' as const,
     function: {
@@ -134,6 +135,19 @@ export const AGENT_TOOLS: ToolSchema[] = [
 ]
 
 /**
+ * Tools for one turn.
+ *
+ * The vault tools (F-17) are only present when a vault is bound, so the model can
+ * never plan around a capability the user has not enabled.
+ */
+export function buildAgentTools(opts: { vault?: boolean } = {}): ToolSchema[] {
+  return opts.vault ? [...GRAPH_TOOLS, ...VAULT_TOOL_SCHEMAS] : [...GRAPH_TOOLS]
+}
+
+/** Default tool set — graph and papers only. Kept for callers that want a constant. */
+export const AGENT_TOOLS: ToolSchema[] = buildAgentTools()
+
+/**
  * Rank graph nodes for a query. Uses the shared UA search (semantic when the UA
  * engine loads, substring otherwise) and keeps the engine's score order; falls
  * back to raw label/summary substring only when nothing matched.
@@ -163,6 +177,18 @@ export async function executeTool(
 ): Promise<string> {
   const project = getProject(ctx.projectId)
   if (!project) return JSON.stringify({ error: 'Project not found' })
+
+  // Vault tools (F-17): resolved per call, because the binding can change while a
+  // session is open and the agent must not act on a stale one.
+  if (VAULT_TOOL_NAMES.has(name)) {
+    const vault = vaultToolContext(ctx.projectId)
+    if (!vault) {
+      return JSON.stringify({
+        error: 'No Obsidian vault is bound for this project. The user can enable it in Settings → Obsidian.',
+      })
+    }
+    return executeVaultTool(name, args, vault)
+  }
 
   switch (name) {
     case 'search_nodes': {

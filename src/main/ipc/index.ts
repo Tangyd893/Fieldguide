@@ -7,7 +7,7 @@
 import { ipcMain, BrowserWindow, shell, app, type IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs'
-import { loadConfig, updateConfig } from '../config'
+import { loadConfig, updateConfig, type AppConfig } from '../config'
 import { chatCompletion, LlmError } from '../llm/client'
 import {
   listProjects,
@@ -93,8 +93,27 @@ import { logInfo, logError, logIndexStart, logIndexComplete, logIndexError, logC
 import { v4 as uuid } from './uuid'
 import type { IpcResult } from '../../shared/ipc'
 import { ipcOk, ipcErr } from '../../shared/ipc'
+import { probeCli, resetCliCache, openNote } from '../obsidian/cli'
+import { launchObsidian, waitForCli } from '../obsidian/launch'
+import { fetchVaults, getObsidianStatus } from '../obsidian/status'
+import { classifyBinding, createVaultDirectory, validateVaultDirectory } from '../obsidian/binding'
+import { cleanupProject, resolveNote, syncProject, VaultError } from '../obsidian/sync'
+import { listProjectNotes, projectFolderRel, readProjectNote } from '../obsidian/read'
+import { frontmatterValue, parseInlineList, splitFrontmatter, splitManaged, userAnnotationText } from '../obsidian/render'
+import type { VaultBinding, VaultConflictAction, VaultUnbindMode } from '../../shared/obsidian'
 
 /* ──────────── Config ──────────── */
+
+/** Localised reason for a rejected vault path (the UI maps codes for its own text). */
+function vaultPathReason(reason: string | undefined): string {
+  switch (reason) {
+    case 'empty': return '请先选择 vault 目录'
+    case 'missing': return '目录不存在或无法访问'
+    case 'not-a-directory': return '该路径不是文件夹'
+    case 'overlaps-project': return 'vault 目录不能与项目目录互相包含'
+    default: return 'vault 目录不可用'
+  }
+}
 
 ipcMain.handle('config:get', (): IpcResult<unknown> => {
   try {
@@ -107,10 +126,27 @@ ipcMain.handle('config:get', (): IpcResult<unknown> => {
 ipcMain.handle('config:set', (_e, patch: Record<string, unknown>): IpcResult<unknown> => {
   try {
     const prev = loadConfig()
+
+    // A vault path is a promise to write into someone else's directory, so it is
+    // validated *before* it can reach config.json — the settings page saves the
+    // whole form, and an invalid path must not be persisted just because another
+    // field changed in the same click.
+    const obsidianPatch = patch.obsidian as Partial<AppConfig['obsidian']> | undefined
+    if (obsidianPatch && 'vaultPath' in obsidianPatch) {
+      const next = String(obsidianPatch.vaultPath ?? '').trim()
+      if (next) {
+        const check = validateVaultDirectory(next, listProjects().map((p) => p.root_path))
+        if (!check.ok) {
+          return ipcErr('VAULT_PATH_INVALID', vaultPathReason(check.reason))
+        }
+      }
+    }
+
     const next = updateConfig(patch as never)
     if ('locale' in patch && patch.locale !== prev.locale) {
       setApplicationMenu(next.locale)
     }
+    if (obsidianPatch) resetCliCache()
     return ipcOk(next)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
@@ -249,6 +285,23 @@ ipcMain.handle('dialog:openFolder', async (): Promise<IpcResult<string | null>> 
     if (result.canceled || result.filePaths.length === 0) {
       return ipcOk(null)
     }
+    return ipcOk(result.filePaths[0])
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('dialog:openFile', async (_e, { title, filters }: { title?: string; filters?: Electron.FileFilter[] } = {}): Promise<IpcResult<string | null>> => {
+  const { dialog } = await import('electron')
+  const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  if (!win) return ipcErr('UNKNOWN', '没有可用窗口')
+  try {
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openFile'],
+      title: title || '选择文件',
+      filters: filters?.length ? filters : undefined,
+    })
+    if (result.canceled || result.filePaths.length === 0) return ipcOk(null)
     return ipcOk(result.filePaths[0])
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
@@ -1695,5 +1748,300 @@ ipcMain.handle('paper:removeHighlight', (_e, { id }: { id: string }): IpcResult<
     return ipcOk(null)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Obsidian vault integration (F-17) ──────────── */
+
+/**
+ * The CLI is a hard gate: it is the only way to know which folders Obsidian
+ * treats as vaults, and to open/search notes in the running app. Every handler
+ * that needs it checks it first and reports the *specific* state, so the UI can
+ * offer the matching remedy instead of a generic failure.
+ */
+function cliGate(status: { state: string }): IpcResult<never> | null {
+  if (status.state === 'ok') return null
+  if (status.state === 'app-not-running') {
+    return ipcErr('OBSIDIAN_APP_NOT_RUNNING', '检测到 Obsidian CLI，但 Obsidian 未运行，请先启动 Obsidian', true)
+  }
+  if (status.state === 'cli-missing') {
+    return ipcErr('OBSIDIAN_CLI_MISSING', '未检测到可用的 Obsidian CLI，请先按设置页指引启用', true)
+  }
+  if (status.state === 'unsupported-version') {
+    return ipcErr('OBSIDIAN_CLI_MISSING', 'Obsidian 版本过低，请升级到 1.12.7 或以上', true)
+  }
+  return ipcErr('OBSIDIAN_CLI_ERROR', 'Obsidian CLI 调用失败，请在设置页重新检测', true)
+}
+
+ipcMain.handle('obsidian:status', async (_e, { projectId }: { projectId?: string } = {}): Promise<IpcResult<unknown>> => {
+  try {
+    return ipcOk(await getObsidianStatus({ projectId }))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('obsidian:detectCli', async (_e, { cliPath }: { cliPath?: string } = {}): Promise<IpcResult<unknown>> => {
+  try {
+    resetCliCache()
+    const config = loadConfig()
+    return ipcOk(await probeCli({ force: true, cliPath: cliPath ?? config.obsidian.cliPath }))
+  } catch (err) {
+    return ipcErr('OBSIDIAN_CLI_ERROR', String(err), true)
+  }
+})
+
+ipcMain.handle('obsidian:launchApp', async (): Promise<IpcResult<unknown>> => {
+  try {
+    const config = loadConfig()
+    const before = await probeCli({ force: true, cliPath: config.obsidian.cliPath })
+    if (before.state === 'ok') return ipcOk(before)
+    if (!before.cliPath) return ipcErr('OBSIDIAN_CLI_MISSING', '未检测到可用的 Obsidian CLI', true)
+
+    const launched = await launchObsidian(before.cliPath)
+    if (!launched.launched) {
+      return ipcErr('OBSIDIAN_CLI_ERROR', `无法启动 Obsidian: ${launched.detail ?? '未知原因'}`, true)
+    }
+    // Obsidian registers its IPC endpoint during start-up; give it a bounded window.
+    await waitForCli(async () => probeCli({ force: true, cliPath: config.obsidian.cliPath }))
+    return ipcOk(await probeCli({ force: true, cliPath: config.obsidian.cliPath }))
+  } catch (err) {
+    return ipcErr('OBSIDIAN_CLI_ERROR', String(err), true)
+  }
+})
+
+ipcMain.handle('obsidian:listVaults', async (): Promise<IpcResult<unknown>> => {
+  try {
+    const { cli, vaults } = await fetchVaults()
+    return ipcOk({ cli, vaults })
+  } catch (err) {
+    return ipcErr('OBSIDIAN_CLI_ERROR', String(err), true)
+  }
+})
+
+/** Pick a directory, then classify it against the vault registry (warnings, not hard failures). */
+ipcMain.handle('obsidian:chooseVault', async (): Promise<IpcResult<unknown>> => {
+  const { dialog } = await import('electron')
+  const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  if (!win) return ipcErr('UNKNOWN', '没有可用窗口')
+
+  const { cli, vaults } = await fetchVaults()
+  const gate = cliGate(cli)
+  if (gate) return gate
+
+  const picked = await dialog.showOpenDialog(win, {
+    properties: ['openDirectory', 'createDirectory'],
+    title: '选择 Obsidian vault 目录',
+    buttonLabel: '选择 vault',
+  })
+  if (picked.canceled || picked.filePaths.length === 0) return ipcOk(null)
+
+  const dir = picked.filePaths[0]
+  const check = validateVaultDirectory(dir, listProjects().map((p) => p.root_path))
+  if (!check.ok) {
+    return ipcErr('VAULT_PATH_INVALID', vaultPathReason(check.reason))
+  }
+  const binding: VaultBinding = classifyBinding(dir, '', vaults)
+  return ipcOk(binding)
+})
+
+/** Create a vault directory (folder + empty `.obsidian/`); registration stays with the user. */
+ipcMain.handle('obsidian:createVault', async (_e, { parentDir, name }: { parentDir: string; name: string }): Promise<IpcResult<unknown>> => {
+  try {
+    const { cli, vaults } = await fetchVaults()
+    const gate = cliGate(cli)
+    if (gate) return gate
+
+    const scaffold = createVaultDirectory(parentDir, name)
+    const check = validateVaultDirectory(scaffold.path, listProjects().map((p) => p.root_path))
+    if (!check.ok) return ipcErr('VAULT_PATH_INVALID', vaultPathReason(check.reason))
+
+    logInfo('obsidian:vault-created', { path: scaffold.path, created: scaffold.created })
+    return ipcOk({ ...classifyBinding(scaffold.path, '', vaults), created: scaffold.created })
+  } catch (err) {
+    return ipcErr('VAULT_PATH_INVALID', err instanceof Error ? err.message : String(err))
+  }
+})
+
+/** Open Obsidian's vault manager so the user can confirm the new folder as a vault. */
+ipcMain.handle('obsidian:openVaultManager', async (): Promise<IpcResult<null>> => {
+  try {
+    await shell.openExternal('obsidian://choose-vault')
+    return ipcOk(null)
+  } catch (err) {
+    return ipcErr('OBSIDIAN_CLI_ERROR', String(err), true)
+  }
+})
+
+/** Map a `VaultError` onto its IPC code; anything else is an unknown failure. */
+function vaultErrorToIpc(err: unknown): IpcResult<never> {
+  if (err instanceof VaultError) return ipcErr(err.code, err.message, err.retryable)
+  return ipcErr('UNKNOWN', err instanceof Error ? err.message : String(err))
+}
+
+ipcMain.handle('obsidian:sync', async (_e, {
+  projectId,
+  dryRun,
+  openAfter,
+}: {
+  projectId: string
+  dryRun?: boolean
+  openAfter?: boolean
+}): Promise<IpcResult<unknown>> => {
+  try {
+    // `openAfterSync` is the user's standing preference; an explicit `openAfter`
+    // from a button overrides it. Resolved here so every caller (panel confirm,
+    // post-index auto-sync) honours the setting without repeating the rule.
+    const open = openAfter ?? loadConfig().obsidian.openAfterSync
+    return ipcOk(await syncProject({ projectId, dryRun, openAfter: open }))
+  } catch (err) {
+    return vaultErrorToIpc(err)
+  }
+})
+
+ipcMain.handle('obsidian:notes', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    return ipcOk({
+      notes: listProjectNotes(projectId),
+      folder: projectFolderRel(projectId),
+      vaultPath: loadConfig().obsidian.vaultPath,
+    })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+ipcMain.handle('obsidian:readNote', (_e, { projectId, notePath }: { projectId: string; notePath: string }): IpcResult<unknown> => {
+  try {
+    const note = readProjectNote(projectId, notePath)
+    if (!note) return ipcErr('VAULT_NOT_FOUND', '笔记不存在或已被删除')
+    return ipcOk(note)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/**
+ * Open one note in the running Obsidian.
+ *
+ * Needs the app (that is what the CLI talks to); when it is unavailable the caller
+ * falls back to handing the file to the OS, which still opens the user's editor.
+ */
+ipcMain.handle('obsidian:openNote', async (_e, { projectId, notePath }: { projectId: string; notePath: string }): Promise<IpcResult<unknown>> => {
+  try {
+    const note = readProjectNote(projectId, notePath)
+    if (!note) return ipcErr('VAULT_NOT_FOUND', '笔记不存在或已被删除')
+    const { cliPath, vaultName } = loadConfig().obsidian
+    const cli = await probeCli({ cliPath })
+
+    if (cli.state === 'ok' && cli.cliPath) {
+      const result = await openNote({
+        cliPath: cli.cliPath,
+        vaultName: vaultName || undefined,
+        notePath,
+      })
+      if (result.ok) return ipcOk({ via: 'cli' })
+    }
+    if (!isAllowedOpenPath(note.absolutePath)) {
+      return ipcErr('VAULT_NOT_FOUND', '该文件不在允许打开的范围内')
+    }
+    const failure = await shell.openPath(note.absolutePath)
+    if (failure) return ipcErr('UNKNOWN', failure)
+    return ipcOk({ via: 'system' })
+  } catch (err) {
+    return vaultErrorToIpc(err)
+  }
+})
+
+ipcMain.handle('obsidian:resolveNote', async (_e, {
+  projectId,
+  notePath,
+  action,
+}: {
+  projectId: string
+  notePath: string
+  action: VaultConflictAction
+}): Promise<IpcResult<unknown>> => {
+  try {
+    return ipcOk(await resolveNote(projectId, notePath, action))
+  } catch (err) {
+    return vaultErrorToIpc(err)
+  }
+})
+
+ipcMain.handle('obsidian:cleanup', async (_e, { projectId }: { projectId: string }): Promise<IpcResult<unknown>> => {
+  try {
+    return ipcOk(await cleanupProject(projectId))
+  } catch (err) {
+    return vaultErrorToIpc(err)
+  }
+})
+
+/**
+ * Turn a note the reader annotated into an in-app code note.
+ *
+ * `code_notes.file_path` is required, so a note can only be adopted when it points
+ * at a graph node — the alternative (inventing a path) would create notes that the
+ * code viewer cannot open.
+ */
+ipcMain.handle('obsidian:adoptNote', (_e, { projectId, notePath }: { projectId: string; notePath: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const note = readProjectNote(projectId, notePath)
+    if (!note) return ipcErr('VAULT_NOT_FOUND', '笔记不存在或已被删除')
+
+    const { body: frontmatter, rest } = splitFrontmatter(note.content)
+    const nodeIds = parseInlineList(frontmatterValue(frontmatter, 'fieldguide-node-ids') ?? '')
+    const graph = loadGraph(project.root_path)
+    const node = graph ? nodeIds.map((id) => getNode(graph, id)).find(Boolean) : undefined
+    if (!node?.filePath) {
+      return ipcErr('VAULT_WRITE_CONFLICT', '该笔记没有可定位的代码节点，无法转为应用内笔记', false)
+    }
+
+    const text = userAnnotationText(note.content) || splitManaged(rest).managed.trim()
+    if (!text) return ipcErr('VAULT_WRITE_CONFLICT', '该笔记没有可采纳的内容', false)
+
+    const created = insertCodeNote({
+      project_id: projectId,
+      node_id: node.id,
+      file_path: node.filePath,
+      line_start: Array.isArray(node.lineRange) ? node.lineRange[0] : null,
+      line_end: Array.isArray(node.lineRange) ? node.lineRange[1] : null,
+      body: text.slice(0, 4000),
+      tags: 'obsidian',
+    })
+    logInfo('obsidian:adopt-note', { projectId, notePath, nodeId: node.id })
+    return ipcOk(created)
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/** Unbind the vault; optionally remove the notes we generated (never the user's edits). */
+ipcMain.handle('obsidian:unbind', async (_e, { mode }: { mode: VaultUnbindMode }): Promise<IpcResult<unknown>> => {
+  try {
+    let removed = 0
+    const kept: string[] = []
+    if (mode === 'cleanup') {
+      for (const project of listProjects()) {
+        try {
+          const result = await cleanupProject(project.id)
+          removed += result.removed
+          kept.push(...result.kept)
+        } catch (err) {
+          // A removed project root is not a reason to keep the binding around.
+          logError('obsidian:unbind-cleanup-failed', { projectId: project.id, message: String(err) })
+        }
+      }
+    }
+    updateConfig({ obsidian: { vaultPath: '', vaultName: '' } as AppConfig['obsidian'] })
+    resetCliCache()
+    logInfo('obsidian:unbind', { mode, removed, kept: kept.length })
+    return ipcOk({ removed, kept })
+  } catch (err) {
+    return vaultErrorToIpc(err)
   }
 })

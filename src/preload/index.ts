@@ -177,6 +177,44 @@ const api = {
     ipcRenderer.invoke('shell:openFile', { filePath }),
   openFolderDialog: (): Promise<IpcResult<string | null>> =>
     ipcRenderer.invoke('dialog:openFolder'),
+  openFileDialog: (opts?: { title?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<IpcResult<string | null>> =>
+    ipcRenderer.invoke('dialog:openFile', opts ?? {}),
+
+  // Obsidian vault integration (F-17)
+  obsidianStatus: (projectId?: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:status', { projectId }),
+  obsidianDetectCli: (cliPath?: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:detectCli', { cliPath }),
+  obsidianLaunchApp: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:launchApp'),
+  obsidianListVaults: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:listVaults'),
+  obsidianChooseVault: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:chooseVault'),
+  obsidianCreateVault: (parentDir: string, name: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:createVault', { parentDir, name }),
+  obsidianOpenVaultManager: (): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('obsidian:openVaultManager'),
+  obsidianSync: (projectId: string, opts?: { dryRun?: boolean; openAfter?: boolean }): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:sync', { projectId, dryRun: opts?.dryRun, openAfter: opts?.openAfter }),
+  obsidianNotes: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:notes', { projectId }),
+  obsidianReadNote: (projectId: string, notePath: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:readNote', { projectId, notePath }),
+  obsidianOpenNote: (projectId: string, notePath: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:openNote', { projectId, notePath }),
+  obsidianResolveNote: (
+    projectId: string,
+    notePath: string,
+    action: 'keep-user' | 'overwrite' | 'save-copy',
+  ): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:resolveNote', { projectId, notePath, action }),
+  obsidianCleanup: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:cleanup', { projectId }),
+  obsidianAdoptNote: (projectId: string, notePath: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:adoptNote', { projectId, notePath }),
+  obsidianUnbind: (mode: 'keep' | 'cleanup'): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('obsidian:unbind', { mode }),
 
   // Chat
   chatSend: (

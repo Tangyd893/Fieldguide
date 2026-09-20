@@ -4,8 +4,9 @@
  * and deduplicates identical tool calls.
  */
 import { loadConfig } from '../config'
-import { AGENT_TOOLS, executeTool, extractNodeRefsFromObservation, toolCallKey } from './tools'
+import { buildAgentTools, executeTool, extractNodeRefsFromObservation, toolCallKey } from './tools'
 import { packCoachContext, coachPolicyHints } from './context-packer'
+import { vaultToolContext } from '../obsidian/agent'
 import type { AgentContext, AgentResult, AgentStep } from './types'
 import { chatCompletion, type ChatMessage, type ToolCall } from '../llm/client'
 
@@ -51,6 +52,11 @@ export async function runAgent(
   })
   for (const id of packed.seedNodeIds) nodeRefs.add(id)
 
+  // The vault tool set is decided once per turn: a tool list that changes mid-loop
+  // would invalidate the cached prefix of the conversation for no benefit.
+  const vaultBound = Boolean(vaultToolContext(ctx.projectId))
+  const tools = buildAgentTools({ vault: vaultBound })
+
   const systemPrompt = [
     coachPolicyHints(packed.intent),
     `Project: "${ctx.projectName}".`,
@@ -60,6 +66,9 @@ export async function runAgent(
     'Use tools only when the injected context is insufficient.',
     'Never call the same tool with the same arguments twice.',
     'When referencing code nodes, include their node id like [node:fn:handleRequest].',
+    vaultBound
+      ? 'Obsidian vault tools are available: the reader keeps their own notes next to the synced cards, so check vault_list_cards / vault_read_note before writing, and cite the note path when you use something from it.'
+      : '',
     localeHint(ctx.locale),
   ].filter(Boolean).join('\n')
 
@@ -87,7 +96,7 @@ export async function runAgent(
       { baseUrl: config.llm.baseUrl, apiKey: config.llm.apiKey, chatModel: config.llm.chatModel },
       {
         messages,
-        tools: isLast ? undefined : AGENT_TOOLS,
+        tools: isLast ? undefined : tools,
         toolChoice: isLast ? undefined : 'auto',
         temperature: 0.3,
         maxTokens: 2048,
