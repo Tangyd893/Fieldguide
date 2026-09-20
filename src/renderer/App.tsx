@@ -23,6 +23,7 @@ import NodeSearchBar from './views/CodeMap/NodeSearchBar'
 import OnboardingWizard from './views/OnboardingWizard'
 import CommandPalette from './views/CommandPalette'
 import SettingsView from './views/SettingsPanel'
+import VaultPanel from './views/CodeMap/VaultPanel'
 import CostDialog from './views/CostDialog'
 import AboutDialog from './views/AboutDialog'
 import TheoryView from './views/Theory/TheoryView'
@@ -437,8 +438,58 @@ export default function App() {
         setProjects(list.data as Project[])
       }
       showToast('success', `索引完成 — ${(result.data as Record<string, unknown>)?.nodeCount ?? '?'} 个节点`)
+      void offerVaultSync(projectId)
     } catch (err) {
       showToast('error', String(err))
+    }
+  }
+
+  /**
+   * After an index run, offer (or run) the vault sync.
+   *
+   * Opt-in only: the integration must already be bound, and writing into someone's
+   * vault without a click is exactly the kind of thing that should require an
+   * explicit setting (`autoSyncOnIndex`).
+   */
+  async function offerVaultSync(projectId: string) {
+    try {
+      const configResult = await window.fieldguide.configGet()
+      if (!configResult.ok || !configResult.data) return
+      const obsidianConfig = (configResult.data as Record<string, unknown>).obsidian as
+        | { vaultPath?: string; autoSyncOnIndex?: boolean }
+        | undefined
+      if (!obsidianConfig?.vaultPath) return
+
+      if (obsidianConfig.autoSyncOnIndex) {
+        const result = await window.fieldguide.obsidianSync(projectId, { dryRun: false })
+        if (result.ok && result.data) {
+          showToast('success', t('vault.autoSynced', {
+            created: result.data.created,
+            updated: result.data.updated,
+            conflicts: result.data.conflicts.length,
+          }))
+        } else if (!result.ok) {
+          showToast('error', result.error?.message ?? t('vault.syncFailed'))
+        }
+        return
+      }
+      showToast('info', t('vault.syncPrompt'), {
+        label: t('vault.sync'),
+        action: async () => {
+          const result = await window.fieldguide.obsidianSync(projectId, { dryRun: false })
+          if (result.ok && result.data) {
+            showToast('success', t('vault.synced', {
+              created: result.data.created,
+              updated: result.data.updated,
+              conflicts: result.data.conflicts.length,
+            }))
+          } else if (!result.ok) {
+            showToast('error', result.error?.message ?? t('vault.syncFailed'))
+          }
+        },
+      })
+    } catch {
+      /* the vault offer is a nicety; indexing must not fail because of it */
     }
   }
 
@@ -929,6 +980,9 @@ function CodeMapLayout({
           }}
           onOpenNode={(nodeId) => onNodeRefClick?.(nodeId)}
         />
+      )}
+      renderVault={() => (
+        <VaultPanel projectId={project.id} t={t} onNoteSaved={() => onNoteSaved?.()} />
       )}
       layout={workspaceLayout}
       t={t}

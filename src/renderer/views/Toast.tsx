@@ -1,20 +1,35 @@
 /**
  * Toast — lightweight notification system.
- * Auto-dismiss after 3 seconds.
+ * Auto-dismiss after 3 seconds (8 when it carries an action, so the offer is
+ * still there when the user looks up).
  */
 import { useState, useEffect, useCallback } from 'react'
+
+export interface ToastAction {
+  label: string
+  run: () => void
+}
 
 export interface ToastItem {
   id: string
   type: 'success' | 'error' | 'info' | 'warning'
   message: string
+  action?: ToastAction
 }
 
 let toastId = 0
 let globalAddToast: ((item: Omit<ToastItem, 'id'>) => void) | null = null
 
-export function showToast(type: ToastItem['type'], message: string) {
-  globalAddToast?.({ type, message })
+export function showToast(
+  type: ToastItem['type'],
+  message: string,
+  action?: { label: string; action: () => void },
+) {
+  globalAddToast?.({
+    type,
+    message,
+    action: action ? { label: action.label, run: action.action } : undefined,
+  })
 }
 
 export function useToast() {
@@ -61,15 +76,24 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
 
 function Toast({ item, onRemove }: { item: ToastItem; onRemove: (id: string) => void }) {
   useEffect(() => {
-    const timer = setTimeout(() => onRemove(item.id), 3000)
+    // An actionable toast is an offer, not a receipt — give it time to be read.
+    const timer = setTimeout(() => onRemove(item.id), item.action ? 8000 : 3000)
     return () => clearTimeout(timer)
-  }, [item.id, onRemove])
+  }, [item.id, item.action, onRemove])
 
   return (
     <div
       className={`${typeStyles[item.type]} px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium pointer-events-auto flex items-center gap-2 min-w-[200px] max-w-[400px] animate-slide-up`}
     >
       <span className="flex-1">{item.message}</span>
+      {item.action && (
+        <button
+          onClick={() => { item.action!.run(); onRemove(item.id) }}
+          className="shrink-0 px-2 py-0.5 rounded border border-white/50 hover:bg-white/20 transition-colors"
+        >
+          {item.action.label}
+        </button>
+      )}
       <button onClick={() => onRemove(item.id)} className="opacity-70 hover:opacity-100 text-lg leading-none">×</button>
     </div>
   )

@@ -1,6 +1,8 @@
 /**
  * FieldGuide understanding-workbench models & panel catalog.
- * Knowledge stays in-app — no external PKB / Obsidian coupling.
+ *
+ * Knowledge is authored in-app; the Obsidian export (F-17) is an optional,
+ * explicitly bound sink — never a dependency.
  */
 
 /** V1 fixed panel types for Code Map split workspace */
@@ -16,6 +18,7 @@ export type PanelTab =
   | 'progress'
   | 'notes'
   | 'tutor'
+  | 'vault'
 
 export const ALL_PANEL_TABS: PanelTab[] = [
   'overview',
@@ -29,6 +32,7 @@ export const ALL_PANEL_TABS: PanelTab[] = [
   'progress',
   'notes',
   'tutor',
+  'vault',
 ]
 
 /** Product analysis stages (distinct from UA index phases) */
@@ -104,6 +108,7 @@ export type LayoutPresetId =
   | 'explore-code'
   | 'notes-code'
   | 'progress-review'
+  | 'vault-code'
 
 export interface LayoutPresetDef {
   id: LayoutPresetId
@@ -122,6 +127,7 @@ export const LAYOUT_PRESETS: LayoutPresetDef[] = [
   { id: 'explore-code', labelKey: 'split.preset.exploreCode', left: 'explore', right: 'code' },
   { id: 'notes-code', labelKey: 'split.preset.notesCode', left: 'notes', right: 'code' },
   { id: 'progress-review', labelKey: 'split.preset.progressReview', left: 'progress', right: 'code' },
+  { id: 'vault-code', labelKey: 'split.preset.vaultCode', left: 'vault', right: 'code' },
 ]
 
 /** Normalize saved panel tabs to the full V1 catalog (canonical order). */

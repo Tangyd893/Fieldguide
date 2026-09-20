@@ -1,5 +1,22 @@
 /// <reference types="vite/client" />
 
+import type {
+  ObsidianStatus,
+  VaultBinding,
+  VaultCliStatus,
+  VaultConflictAction,
+  VaultInfo,
+  VaultNoteView,
+  VaultSyncReport,
+  VaultUnbindMode,
+} from '../shared/obsidian'
+
+/** A note as the panel and the agent read it. */
+interface VaultNoteContent extends VaultNoteView {
+  content: string
+  absolutePath: string
+}
+
 interface FileEntry {
   name: string
   path: string
@@ -317,6 +334,24 @@ interface FieldguideAPI {
   openInExplorer(projectId: string, filePath: string): Promise<{ ok: boolean; error?: { message: string } }>
   openFile(filePath: string): Promise<{ ok: boolean; error?: { message: string } }>
   openFolderDialog(): Promise<{ ok: boolean; data?: string | null; error?: { message: string } }>
+  openFileDialog(opts?: { title?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<{ ok: boolean; data?: string | null; error?: { message: string } }>
+
+  // Obsidian vault integration (F-17)
+  obsidianStatus(projectId?: string): Promise<{ ok: boolean; data?: ObsidianStatus; error?: { message: string } }>
+  obsidianDetectCli(cliPath?: string): Promise<{ ok: boolean; data?: VaultCliStatus; error?: { message: string } }>
+  obsidianLaunchApp(): Promise<{ ok: boolean; data?: VaultCliStatus; error?: { message: string } }>
+  obsidianListVaults(): Promise<{ ok: boolean; data?: { cli: VaultCliStatus; vaults: VaultInfo[] }; error?: { message: string } }>
+  obsidianChooseVault(): Promise<{ ok: boolean; data?: VaultBinding | null; error?: { message: string } }>
+  obsidianCreateVault(parentDir: string, name: string): Promise<{ ok: boolean; data?: VaultBinding & { created?: boolean }; error?: { message: string } }>
+  obsidianOpenVaultManager(): Promise<{ ok: boolean; error?: { message: string } }>
+  obsidianSync(projectId: string, opts?: { dryRun?: boolean; openAfter?: boolean }): Promise<{ ok: boolean; data?: VaultSyncReport; error?: { message: string; code?: string } }>
+  obsidianNotes(projectId: string): Promise<{ ok: boolean; data?: { notes: VaultNoteView[]; folder: string; vaultPath: string }; error?: { message: string } }>
+  obsidianReadNote(projectId: string, notePath: string): Promise<{ ok: boolean; data?: VaultNoteContent; error?: { message: string } }>
+  obsidianOpenNote(projectId: string, notePath: string): Promise<{ ok: boolean; data?: { via: 'cli' | 'system' }; error?: { message: string } }>
+  obsidianResolveNote(projectId: string, notePath: string, action: VaultConflictAction): Promise<{ ok: boolean; data?: { notePath: string; status: string }; error?: { message: string } }>
+  obsidianCleanup(projectId: string): Promise<{ ok: boolean; data?: { removed: number; kept: string[] }; error?: { message: string } }>
+  obsidianAdoptNote(projectId: string, notePath: string): Promise<{ ok: boolean; data?: CodeNoteRow; error?: { message: string } }>
+  obsidianUnbind(mode: VaultUnbindMode): Promise<{ ok: boolean; data?: { removed: number; kept: string[] }; error?: { message: string } }>
 
   // Chat
   chatSend(

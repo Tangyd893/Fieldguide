@@ -17,6 +17,7 @@ interface Props {
   renderProgress?: () => ReactNode
   renderNotes?: () => ReactNode
   renderTutor?: () => ReactNode
+  renderVault?: () => ReactNode
   t: (key: string) => string
   layout: ReturnType<typeof useWorkspaceLayout>
   /** When true, layout buttons live in the title bar instead. */
@@ -35,6 +36,7 @@ export default function SplitPanel({
   renderProgress,
   renderNotes,
   renderTutor,
+  renderVault,
   t,
   layout: ctrl,
   hideChromeControls,
@@ -86,6 +88,7 @@ export default function SplitPanel({
     progress: t('panels.progress'),
     notes: t('panels.notes'),
     tutor: t('panels.tutor'),
+    vault: t('panels.vault'),
   }
 
   function renderContent(panelIndex: number) {
@@ -110,6 +113,8 @@ export default function SplitPanel({
         return renderNotes?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.notesUnavailable')}</div>
       case 'tutor':
         return renderTutor?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.tutorUnavailable')}</div>
+      case 'vault':
+        return renderVault?.() ?? <div className="p-4 text-[var(--fg-text-tertiary)] text-sm">{t('panels.vaultUnavailable')}</div>
     }
   }
 

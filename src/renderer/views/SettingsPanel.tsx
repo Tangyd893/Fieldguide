@@ -1,10 +1,11 @@
 /**
  * Settings — VS Code–style full page with left category nav.
  */
-import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Cpu, FolderOpen, Globe, Palette, Wrench, ZoomIn, Type, Plug, Check, X, Database, Info, RefreshCw,
+  NotebookPen, Library, Copy, FolderPlus, Play, Unlink,
 } from 'lucide-react'
 import { applyTheme } from '../App'
 import {
@@ -28,8 +29,47 @@ import { syncDashboardTheme } from '@/lib/dashboard-theme'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import type { VaultBinding, VaultCliStatus, VaultInfo } from '@shared/obsidian'
 
-type Category = 'general' | 'appearance' | 'llm' | 'data' | 'about'
+type Category = 'general' | 'appearance' | 'llm' | 'obsidian' | 'data' | 'about'
+
+/** Obsidian config as this page edits it. */
+interface ObsidianState {
+  vaultPath: string
+  vaultName: string
+  cliPath: string
+  folder: string
+  autoSyncOnIndex: boolean
+  mirrorNotes: boolean
+  agentWrite: boolean
+  openAfterSync: boolean
+}
+
+const DEFAULT_OBSIDIAN: ObsidianState = {
+  vaultPath: '',
+  vaultName: '',
+  cliPath: '',
+  folder: 'Fieldguide',
+  autoSyncOnIndex: false,
+  mirrorNotes: true,
+  agentWrite: true,
+  openAfterSync: false,
+}
+
+/**
+ * Same directory, ignoring separator style and case.
+ *
+ * The vault list comes back from the CLI with whatever casing the OS reported, so
+ * a naive comparison would keep reporting "not registered" for a vault that is.
+ */
+function sameVaultPath(a: string, b: string): boolean {
+  const norm = (p: string) => p.replace(/[\\/]+/g, '/').replace(/\/+$/, '').toLowerCase()
+  return norm(a) === norm(b)
+}
+
+/** Registration polling budget after creating a vault. */
+const REGISTER_POLL_MS = 2_500
+const REGISTER_POLL_TRIES = 12
 
 interface Props {
   t: (key: string, opts?: Record<string, unknown>) => string
@@ -64,6 +104,210 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
   const [logLoading, setLogLoading] = useState(false)
   const [dataMsg, setDataMsg] = useState<string | null>(null)
   const [exportingReport, setExportingReport] = useState(false)
+
+  // ── Obsidian vault integration (F-17) ──
+  const [obsidian, setObsidian] = useState<ObsidianState>(() => ({ ...DEFAULT_OBSIDIAN }))
+  const [cliStatus, setCliStatus] = useState<VaultCliStatus | null>(null)
+  const [cliBusy, setCliBusy] = useState(false)
+  const [vaults, setVaults] = useState<VaultInfo[]>([])
+  const [vaultBinding, setVaultBinding] = useState<VaultBinding | null>(null)
+  const [newVaultOpen, setNewVaultOpen] = useState(false)
+  const [newVaultParent, setNewVaultParent] = useState('')
+  const [newVaultName, setNewVaultName] = useState('')
+  const [vaultBusy, setVaultBusy] = useState(false)
+  const [vaultMsg, setVaultMsg] = useState<string | null>(null)
+  const [unbindOpen, setUnbindOpen] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
+  /** Path produced by 「新建 vault」, watched until Obsidian registers it. */
+  const [pendingVault, setPendingVault] = useState<string | null>(null)
+  const [registerState, setRegisterState] = useState<'idle' | 'waiting' | 'done' | 'timeout'>('idle')
+  const registerTries = useRef(0)
+
+  const patchObsidian = useCallback((patch: Partial<ObsidianState>) => {
+    setObsidian((prev) => ({ ...prev, ...patch }))
+  }, [])
+
+  /** One patch object shared by save()/testConnection() so a new field cannot be wired into only one. */
+  const configPatch = useCallback(() => ({
+    llm: { baseUrl, apiKey, chatModel, embedModel },
+    projectsRoot,
+    locale,
+    theme,
+    appearance,
+    obsidian,
+  }), [baseUrl, apiKey, chatModel, embedModel, projectsRoot, locale, theme, appearance, obsidian])
+
+  const refreshVaults = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setCliBusy(true)
+    try {
+      const result = await window.fieldguide.obsidianListVaults()
+      if (result.ok && result.data) {
+        const data = result.data as { cli: VaultCliStatus; vaults: VaultInfo[] }
+        setCliStatus(data.cli)
+        setVaults(Array.isArray(data.vaults) ? data.vaults : [])
+        if (data.cli.state === 'ok' && obsidian.vaultPath) {
+          const hit = data.vaults.find((v) => sameVaultPath(v.path, obsidian.vaultPath))
+          setVaultBinding(hit ? { path: hit.path, name: hit.name, kind: 'registered' } : null)
+        }
+        return data
+      }
+      return null
+    } finally {
+      if (!opts?.silent) setCliBusy(false)
+    }
+  }, [obsidian.vaultPath])
+
+  const detectCli = useCallback(async (cliPathOverride?: string) => {
+    setCliBusy(true)
+    try {
+      const result = await window.fieldguide.obsidianDetectCli(cliPathOverride ?? obsidian.cliPath)
+      if (result.ok && result.data) {
+        setCliStatus(result.data as VaultCliStatus)
+        await refreshVaults({ silent: true })
+      } else if (!result.ok) {
+        setCliStatus({
+          state: 'error', cliPath: '', version: '', detail: result.error?.message ?? '',
+          cached: false, checkedAt: new Date().toISOString(),
+        })
+      }
+    } finally {
+      setCliBusy(false)
+    }
+  }, [obsidian.cliPath, refreshVaults])
+
+  const launchObsidian = useCallback(async () => {
+    setCliBusy(true)
+    setCliStatus((prev) => (prev ? { ...prev, state: 'app-not-running', detail: '' } : prev))
+    try {
+      const result = await window.fieldguide.obsidianLaunchApp()
+      if (result.ok && result.data) setCliStatus(result.data as VaultCliStatus)
+      await refreshVaults({ silent: true })
+    } finally {
+      setCliBusy(false)
+    }
+  }, [refreshVaults])
+
+  async function chooseVault() {
+    setVaultBusy(true)
+    setVaultMsg(null)
+    try {
+      const result = await window.fieldguide.obsidianChooseVault()
+      if (!result.ok) { setVaultMsg(result.error?.message ?? null); return }
+      if (!result.data) return // cancelled
+      const binding = result.data as VaultBinding
+      patchObsidian({ vaultPath: binding.path, vaultName: binding.name })
+      setVaultBinding(binding)
+      setPendingVault(null)
+      setRegisterState('idle')
+    } finally {
+      setVaultBusy(false)
+    }
+  }
+
+  async function createVault() {
+    setVaultBusy(true)
+    setVaultMsg(null)
+    try {
+      const result = await window.fieldguide.obsidianCreateVault(newVaultParent, newVaultName)
+      if (!result.ok) { setVaultMsg(result.error?.message ?? null); return }
+      const data = result.data as VaultBinding & { created?: boolean }
+      patchObsidian({ vaultPath: data.path, vaultName: data.name })
+      setVaultBinding(data)
+      setNewVaultOpen(false)
+      setNewVaultName('')
+      setPendingVault(data.path)
+      registerTries.current = 0
+      setRegisterState('waiting')
+    } finally {
+      setVaultBusy(false)
+    }
+  }
+
+  /**
+   * A freshly created folder is not a vault until Obsidian opens it as one, which
+   * only the user can confirm. Poll the registry instead of pretending it worked.
+   */
+  useEffect(() => {
+    if (registerState !== 'waiting' || !pendingVault) return
+    const timer = setTimeout(async () => {
+      const data = await refreshVaults({ silent: true })
+      const registered = data?.vaults.some((v) => sameVaultPath(v.path, pendingVault))
+      if (registered) {
+        setRegisterState('done')
+        const hit = data!.vaults.find((v) => sameVaultPath(v.path, pendingVault))
+        if (hit) {
+          patchObsidian({ vaultPath: hit.path, vaultName: hit.name })
+          setVaultBinding({ path: hit.path, name: hit.name, kind: 'registered' })
+        }
+        return
+      }
+      registerTries.current += 1
+      if (registerTries.current >= REGISTER_POLL_TRIES) setRegisterState('timeout')
+    }, REGISTER_POLL_MS)
+    return () => clearTimeout(timer)
+  }, [registerState, pendingVault, refreshVaults, patchObsidian])
+
+  /**
+   * Unbind the vault.
+   *
+   * The main process clears the binding itself (it owns the config), so the local
+   * state is reset to match instead of relying on a later Save. `cleanup` only
+   * removes notes that are still byte-identical to what Fieldguide wrote — the
+   * reader's own edits are reported back as "kept" rather than deleted.
+   */
+  async function unbindVault(mode: 'keep' | 'cleanup') {
+    setVaultBusy(true)
+    setVaultMsg(null)
+    try {
+      const result = await window.fieldguide.obsidianUnbind(mode)
+      if (!result.ok) { setVaultMsg(result.error?.message ?? null); return }
+      patchObsidian({ vaultPath: '', vaultName: '' })
+      setVaultBinding(null)
+      setPendingVault(null)
+      setRegisterState('idle')
+      setUnbindOpen(false)
+      const removed = result.data?.removed ?? 0
+      const kept = result.data?.kept.length ?? 0
+      setVaultMsg(mode === 'cleanup'
+        ? t('settings.obsidian.unbindCleaned', { removed, kept })
+        : t('settings.obsidian.unbindDone'))
+      setTimeout(() => setVaultMsg(null), 6000)
+    } finally {
+      setVaultBusy(false)
+    }
+  }
+
+  async function copyPath(value: string) {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(value)
+      setTimeout(() => setCopied(null), 1500)
+    } catch { /* clipboard unavailable — ignore */ }
+  }
+
+  /**
+   * Manual CLI override picker.
+   *
+   * Registering the CLI edits the *user* PATH, which an already-running Explorer
+   * never reloads — so an app launched from Explorer can miss a CLI that works
+   * fine in a fresh terminal. Picking the file explicitly is the way out.
+   */
+  async function pickCliFile() {
+    const result = await window.fieldguide.openFileDialog({
+      title: t('settings.obsidian.cliPathLabel'),
+      filters: [{ name: 'Obsidian CLI', extensions: ['com', 'exe', 'cmd', 'bat'] }],
+    })
+    if (result.ok && result.data) {
+      patchObsidian({ cliPath: result.data })
+      await detectCli(result.data)
+    }
+  }
+
+  // Probe once when the section is first opened; the main process caches the answer.
+  useEffect(() => {
+    if (category !== 'obsidian' || cliStatus !== null) return
+    void refreshVaults()
+  }, [category, cliStatus, refreshVaults])
 
   const getProvider = useCallback(
     (id: string) => providers.find((p) => p.id === id) ?? providers[providers.length - 1] ?? LLM_PROVIDERS[LLM_PROVIDERS.length - 1],
@@ -153,6 +397,11 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
         setLocale((c.locale as string) || 'zh-CN')
         setTheme((c.theme as string) || 'system')
         setAppearance(normalizeAppearance(c.appearance as Record<string, unknown> | undefined))
+        const obs = (c.obsidian as Partial<ObsidianState>) || {}
+        setObsidian({ ...DEFAULT_OBSIDIAN, ...obs })
+        if (obs.vaultPath && !obs.vaultName) {
+          setVaultBinding({ path: obs.vaultPath, name: '', kind: 'unregistered' })
+        }
 
         // Live models when key present (or Ollama without key)
         if (url && (key || pid === 'ollama')) {
@@ -185,13 +434,7 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
 
   async function save() {
     setSaving(true)
-    await window.fieldguide.configSet({
-      llm: { baseUrl, apiKey, chatModel, embedModel },
-      projectsRoot,
-      locale,
-      theme,
-      appearance,
-    })
+    await window.fieldguide.configSet(configPatch())
     i18n.changeLanguage(locale)
     applyTheme(theme, appearance.themePreset === 'none' ? undefined : appearance.themePreset)
     applyAppearance(appearance)
@@ -206,12 +449,7 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
       setTestResult('fail')
       return
     }
-    await window.fieldguide.configSet({
-      llm: { baseUrl, apiKey, chatModel, embedModel },
-      projectsRoot,
-      locale,
-      theme,
-    })
+    await window.fieldguide.configSet(configPatch())
     setTesting(true)
     setTestResult(null)
     try {
@@ -236,10 +474,14 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
     setLogLoading(false)
   }
 
+  /** The CLI is a hard gate: neither vault action is offered without it. */
+  const cliOk = cliStatus?.state === 'ok'
+
   const nav: { id: Category; label: string; icon: ReactNode }[] = [
     { id: 'general', label: t('settings.nav.general'), icon: <Globe size={16} /> },
     { id: 'appearance', label: t('settings.nav.appearance'), icon: <Palette size={16} /> },
     { id: 'llm', label: t('settings.nav.llm'), icon: <Cpu size={16} /> },
+    { id: 'obsidian', label: t('settings.nav.obsidian'), icon: <NotebookPen size={16} /> },
     { id: 'data', label: t('settings.nav.data'), icon: <Database size={16} /> },
     { id: 'about', label: t('settings.nav.about'), icon: <Info size={16} /> },
   ]
@@ -620,6 +862,275 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
             </Section>
           )}
 
+          {category === 'obsidian' && (
+            <>
+              <Section icon={<NotebookPen size={16} />} title={t('settings.obsidian.cliTitle')} hint={t('settings.obsidian.cliHint')}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <CliStatePill state={cliStatus?.state ?? null} t={t} />
+                  {cliStatus?.cliPath && (
+                    <code className="text-[11px] text-[var(--fg-text-secondary)] bg-[var(--fg-tree-hover)] px-1.5 py-0.5 rounded break-all">
+                      {cliStatus.cliPath}
+                    </code>
+                  )}
+                  {cliStatus?.version && (
+                    <span className="text-[11px] text-[var(--fg-text-tertiary)]">Obsidian {cliStatus.version}</span>
+                  )}
+                  <Button variant="outline" size="sm" disabled={cliBusy} onClick={() => void detectCli()}>
+                    <RefreshCw size={12} className={cliBusy ? 'animate-spin' : undefined} />
+                    {cliBusy ? t('settings.obsidian.detecting') : t('settings.obsidian.recheck')}
+                  </Button>
+                  {cliStatus?.state === 'app-not-running' && (
+                    <Button size="sm" disabled={cliBusy} onClick={() => void launchObsidian()}>
+                      <Play size={12} />
+                      {cliBusy ? t('settings.obsidian.launching') : t('settings.obsidian.launch')}
+                    </Button>
+                  )}
+                </div>
+
+                {cliStatus && cliStatus.state !== 'ok' && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-[var(--fg-text-secondary)]">{t('settings.obsidian.fixTitle')}</p>
+                    <ol className="mt-1 text-xs text-[var(--fg-text-tertiary)] list-decimal pl-5 space-y-0.5">
+                      <li>{t('settings.obsidian.fix1')}</li>
+                      <li>{t('settings.obsidian.fix2')}</li>
+                      <li>{t('settings.obsidian.fix3')}</li>
+                      <li>{t('settings.obsidian.fix4')}</li>
+                    </ol>
+                  </div>
+                )}
+
+                {cliStatus?.detail && (
+                  <p className="mt-2 text-[11px] text-[var(--fg-text-tertiary)] break-all">
+                    {t('settings.obsidian.detailLabel')}: {cliStatus.detail}
+                  </p>
+                )}
+
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">
+                    {t('settings.obsidian.cliPathLabel')}
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={obsidian.cliPath}
+                      onChange={(e) => patchObsidian({ cliPath: e.target.value })}
+                      onBlur={() => { if (obsidian.cliPath) void detectCli(obsidian.cliPath) }}
+                      placeholder={t('settings.obsidian.cliPathPlaceholder')}
+                    />
+                    <Button variant="outline" size="sm" onClick={() => void pickCliFile()}>
+                      {t('common.browseFile')}
+                    </Button>
+                  </div>
+                </div>
+              </Section>
+
+              <Section icon={<Library size={16} />} title={t('settings.obsidian.vaultTitle')} hint={t('settings.obsidian.vaultHint')}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-medium text-[var(--fg-text-tertiary)]">{t('settings.obsidian.currentVault')}</span>
+                  {obsidian.vaultPath ? (
+                    <>
+                      <code className="text-[11px] text-[var(--fg-text-secondary)] bg-[var(--fg-tree-hover)] px-1.5 py-0.5 rounded break-all">
+                        {obsidian.vaultPath}
+                      </code>
+                      <Button variant="ghost" size="sm" onClick={() => void copyPath(obsidian.vaultPath)}>
+                        <Copy size={12} />
+                        {copied === obsidian.vaultPath ? t('common.copied') : t('settings.obsidian.copyPath')}
+                      </Button>
+                      <VaultKindBadge kind={vaultBinding?.kind ?? null} t={t} />
+                    </>
+                  ) : (
+                    <span className="text-xs text-[var(--fg-text-tertiary)]">{t('settings.obsidian.noVault')}</span>
+                  )}
+                </div>
+
+                <div className="mt-3 flex gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" disabled={!cliOk || vaultBusy} onClick={() => void chooseVault()}>
+                    <FolderOpen size={12} /> {t('settings.obsidian.chooseDir')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!cliOk || vaultBusy}
+                    onClick={() => {
+                      setNewVaultOpen((open) => !open)
+                      if (!newVaultParent) setNewVaultParent(projectsRoot || '')
+                    }}
+                  >
+                    <FolderPlus size={12} /> {t('settings.obsidian.createVault')}
+                  </Button>
+                  {obsidian.vaultPath && (
+                    <Button variant="outline" size="sm" onClick={() => void window.fieldguide.obsidianOpenVaultManager()}>
+                      {t('settings.obsidian.openVaultManager')}
+                    </Button>
+                  )}
+                  {obsidian.vaultPath && (
+                    <Button variant="ghost" size="sm" disabled={vaultBusy} onClick={() => setUnbindOpen(true)}>
+                      <Unlink size={12} /> {t('settings.obsidian.unbind')}
+                    </Button>
+                  )}
+                </div>
+
+                {unbindOpen && (
+                  <div className="mt-3 p-3 rounded-lg border border-[var(--fg-border)] space-y-2">
+                    <p className="text-xs text-[var(--fg-text-secondary)]">{t('settings.obsidian.unbindHint')}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" disabled={vaultBusy} onClick={() => void unbindVault('keep')}>
+                        {t('settings.obsidian.unbindKeep')}
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={vaultBusy} onClick={() => void unbindVault('cleanup')}>
+                        {t('settings.obsidian.unbindCleanup')}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setUnbindOpen(false)}>
+                        {t('settings.obsidian.cancel')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {!cliOk && (
+                  <p className="mt-2 text-xs text-[var(--fg-status-error)]">{t('settings.obsidian.gateBlocked')}</p>
+                )}
+
+                {newVaultOpen && (
+                  <div className="mt-3 p-3 rounded-lg border border-[var(--fg-border)] space-y-2">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">
+                        {t('settings.obsidian.newVaultParent')}
+                      </label>
+                      <FolderPathField
+                        value={newVaultParent}
+                        onChange={setNewVaultParent}
+                        placeholder="D:\\Obsidian"
+                        browseLabel={t('common.browseFolder')}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">
+                        {t('settings.obsidian.newVaultName')}
+                      </label>
+                      <Input
+                        type="text"
+                        value={newVaultName}
+                        onChange={(e) => setNewVaultName(e.target.value)}
+                        placeholder={t('settings.obsidian.newVaultNamePlaceholder')}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={vaultBusy || !newVaultParent.trim() || !newVaultName.trim()}
+                        onClick={() => void createVault()}
+                      >
+                        {t('settings.obsidian.newVaultCreate')}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setNewVaultOpen(false)}>
+                        {t('settings.obsidian.cancel')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {registerState !== 'idle' && (
+                  <p className={cn(
+                    'mt-2 text-xs',
+                    registerState === 'done' ? 'text-[var(--fg-status-success)]' : 'text-[var(--fg-text-tertiary)]',
+                  )}>
+                    {registerState === 'waiting' && t('settings.obsidian.waitingRegister')}
+                    {registerState === 'done' && (
+                      <span className="inline-flex items-center gap-1"><Check size={12} /> {t('settings.obsidian.registered')}</span>
+                    )}
+                    {registerState === 'timeout' && t('settings.obsidian.registerTimeout')}
+                  </p>
+                )}
+
+                {obsidian.vaultPath && vaultBinding?.kind === 'unregistered' && cliOk && (
+                  <p className="mt-2 text-xs text-[var(--fg-text-tertiary)]">{t('settings.obsidian.registerHint')}</p>
+                )}
+                {vaultBinding?.kind === 'nested' && (
+                  <p className="mt-2 text-xs text-[var(--fg-text-tertiary)]">
+                    {t('settings.obsidian.nestedHint', { name: vaultBinding.parentVault?.name ?? '' })}
+                  </p>
+                )}
+                {obsidian.vaultPath && (
+                  <p className="mt-2 text-[11px] text-[var(--fg-text-tertiary)]">{t('settings.obsidian.rebindHint')}</p>
+                )}
+                {vaultMsg && <p className="mt-2 text-xs text-[var(--fg-status-error)]">{vaultMsg}</p>}
+
+                {vaults.length > 0 && (
+                  <div className="mt-4">
+                    <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">
+                      {t('settings.obsidian.knownVaults')}
+                    </label>
+                    <div className="space-y-1">
+                      {vaults.map((vault) => {
+                        const active = obsidian.vaultPath ? sameVaultPath(vault.path, obsidian.vaultPath) : false
+                        return (
+                          <button
+                            key={vault.path}
+                            type="button"
+                            onClick={() => {
+                              patchObsidian({ vaultPath: vault.path, vaultName: vault.name })
+                              setVaultBinding({ path: vault.path, name: vault.name, kind: 'registered' })
+                              setPendingVault(null)
+                              setRegisterState('idle')
+                            }}
+                            className={cn(
+                              'w-full text-left px-2.5 py-1.5 rounded-md border transition-colors',
+                              active
+                                ? 'border-[var(--fg-accent)] bg-[var(--fg-accent-muted)]'
+                                : 'border-[var(--fg-border)] hover:bg-[var(--fg-tree-hover)]',
+                            )}
+                          >
+                            <span className="text-sm text-[var(--fg-text-primary)]">{vault.name}</span>
+                            <span className="block text-[11px] text-[var(--fg-text-tertiary)] break-all">{vault.path}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </Section>
+
+              <Section icon={<NotebookPen size={16} />} title={t('settings.obsidian.syncTitle')}>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--fg-text-tertiary)] mb-1">
+                      {t('settings.obsidian.folderLabel')}
+                    </label>
+                    <Input
+                      type="text"
+                      value={obsidian.folder}
+                      onChange={(e) => patchObsidian({ folder: e.target.value })}
+                      placeholder="Fieldguide"
+                    />
+                    <p className="text-[11px] text-[var(--fg-text-tertiary)] mt-1">{t('settings.obsidian.folderHint')}</p>
+                  </div>
+                  <Toggle
+                    checked={obsidian.autoSyncOnIndex}
+                    onChange={(v) => patchObsidian({ autoSyncOnIndex: v })}
+                    label={t('settings.obsidian.autoSync')}
+                  />
+                  <Toggle
+                    checked={obsidian.mirrorNotes}
+                    onChange={(v) => patchObsidian({ mirrorNotes: v })}
+                    label={t('settings.obsidian.mirrorNotes')}
+                  />
+                  <Toggle
+                    checked={obsidian.agentWrite}
+                    onChange={(v) => patchObsidian({ agentWrite: v })}
+                    label={t('settings.obsidian.agentWrite')}
+                  />
+                  <Toggle
+                    checked={obsidian.openAfterSync}
+                    onChange={(v) => patchObsidian({ openAfterSync: v })}
+                    label={t('settings.obsidian.openAfterSync')}
+                  />
+                  <p className="text-[11px] text-[var(--fg-text-tertiary)]">{t('settings.obsidian.saveHint')}</p>
+                </div>
+              </Section>
+            </>
+          )}
+
           {category === 'data' && (
             <>
               <Section icon={<Database size={16} />} title={t('settings.data')}>
@@ -741,5 +1252,61 @@ function ChoiceChip({ active, onClick, label }: { active: boolean; onClick: () =
     >
       {label}
     </button>
+  )
+}
+
+type Translate = (key: string, opts?: Record<string, unknown>) => string
+
+/** CLI gate state, colour-coded: only `ok` unlocks the vault pickers. */
+function CliStatePill({ state, t }: { state: VaultCliStatus['state'] | null; t: Translate }) {
+  const label = state === null
+    ? t('settings.obsidian.detecting')
+    : t(`settings.obsidian.state.${STATE_KEY[state]}`)
+  const tone = state === 'ok'
+    ? 'text-[var(--fg-status-success)] border-[var(--fg-status-success)]'
+    : state === null
+      ? 'text-[var(--fg-text-tertiary)] border-[var(--fg-border)]'
+      : 'text-[var(--fg-status-error)] border-[var(--fg-status-error)]'
+  return (
+    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs', tone)}>
+      <span className={cn('w-1.5 h-1.5 rounded-full', state === 'ok' ? 'bg-[var(--fg-status-success)]' : 'bg-current')} />
+      {label}
+    </span>
+  )
+}
+
+const STATE_KEY: Record<VaultCliStatus['state'], string> = {
+  ok: 'ok',
+  'cli-missing': 'cliMissing',
+  'app-not-running': 'appNotRunning',
+  'unsupported-version': 'unsupported',
+  error: 'error',
+}
+
+/** Whether Obsidian has this folder open as a vault (only known when the CLI answers). */
+function VaultKindBadge({ kind, t }: { kind: VaultBinding['kind'] | null; t: Translate }) {
+  // The "not registered yet" and "nested" cases get a full explanation under the
+  // row, so the badge only marks the good case and stays silent otherwise.
+  if (kind !== 'registered') return null
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded text-[var(--fg-status-success)] bg-[var(--fg-tree-hover)]">
+      <Check size={11} /> {t('settings.obsidian.registered')}
+    </span>
+  )
+}
+
+function Toggle({
+  checked, onChange, label,
+}: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="w-3.5 h-3.5 accent-[var(--fg-accent)]"
+      />
+      <span className="text-sm text-[var(--fg-text-secondary)]">{label}</span>
+    </label>
   )
 }
