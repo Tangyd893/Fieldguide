@@ -48,6 +48,8 @@ clone 一个热门仓库下来，打开后对着目录发呆——入口在哪�
 
 **没有 LLM Key 也能用**：图谱退化成纯结构图，节点和源码照样能看；配了 Key 之后摘要、架构分层和 Tour 会更完整（也有启发式兜底）。LLM Key 在设置页配，向导里不强制。
 
+**Obsidian 联动完全可选**：想把项目拆解导出成 Obsidian 卡片，需要官方的 **Obsidian CLI** —— Obsidian **1.12.7+**（安装器版本），在 Obsidian 里「设置 → 通用」启用「命令行界面（Command line interface）」，并保持 Obsidian 在运行（CLI 是运行中应用的客户端）。条件不满足时绑定入口会置灰并给出四步修复指引；不绑定 vault 的话，其余功能完全不受影响。
+
 <details>
 <summary>打包（Windows NSIS）</summary>
 
@@ -129,6 +131,7 @@ npx electron-builder --win --publish never --config.directories.output=dist-buil
 - 🔍 **全库内容搜索** —— `Ctrl+Shift+F` 搜文件内容（跳过二进制与超大文件），命中可直接跳到对应行；代码面板内 `Ctrl+F` 搜索当前文件。
 - 🧠 **洞察面板** —— 图谱统计与类型分布、邻居浏览（1/2 跳）、**两点路径查找**（「A 怎么调到 B」）、**技术债扫描**（TODO/FIXME、超大文件、高扇入节点）。
 - 📄 **学习报告导出** —— 一键把架构映射、知识卡片、面试题与论文桥接汇总成 Markdown。
+- 🔗 **Obsidian 联动** —— 设置里绑定一个 vault，把架构、分层、Tour、知识卡片、面试题与论文桥接同步成卡片 + 索引笔记；生成块之外你自己的批注永不被覆盖，冲突会在 Vault 面板里让你决定。
 - 🚀 **增量索引** —— 指纹合并，改一个文件不会把整张图重画；索引过程非阻塞，状态栏有进度。
 - 🎨 **主题与外观** —— 5 套主题预设（parchment / forest / slate / midnight / paper-dark）、50%–200% 缩放、UI 与代码字体分开。
 - 🌐 **三语界面** —— 简体中文 / 繁體中文 / English (US)，UI 和系统菜单即时切换。
@@ -192,6 +195,7 @@ Fieldguide/
   src/
     main/                     Electron 主进程
       ua/                     UA 集成层（client / dashboard / config-bridge / graph-reader / diff / cross-tour）
+      obsidian/               Obsidian 联动（CLI 探测 / 卡片与索引同步 / Agent 工具）
       agent/                  学习教练（ReAct 循环 + 工具）
       vector/                 PDF 分块 + 论文向量检索
       ipc/                    IPC handler 聚合

@@ -1,6 +1,6 @@
 # Fieldguide 文档索引与一致性检查表
 
-> 版本：v0.1 | 状态：设计定稿（Phase 0）  
+> 版本：v0.2 | 状态：设计定稿（Phase 0）  
 > 用途：动工前与每次改设计时对照，确保各文档仍指向**同一产品**。
 
 ---
@@ -42,7 +42,7 @@ doc-index（本文）
 
 | 文档 | 权威内容 | 不重复定义 |
 |------|----------|------------|
-| [product-spec.md](./product-spec.md) | 愿景、用户场景、功能 F-01–F-15、非目标 | IPC 字段、SQL schema |
+| [product-spec.md](./product-spec.md) | 愿景、用户场景、功能 F-01–F-17、非目标 | IPC 字段、SQL schema |
 | [understand-anything-integration.md](./understand-anything-integration.md) | UA/FG 边界、数据流、Spike、禁止重复实现 | UI 像素级规格 |
 | [architecture.md](./architecture.md) | 进程模型、目录结构、IPC、SQLite 表、Agent 工具表 | Phase 排期 |
 | [ui-spec.md](./ui-spec.md) | 布局、文件树、可分隔面板、面板 Tab 分工 | graph schema |
@@ -101,6 +101,7 @@ flowchart TD
 | concept_links / 概念桥接 | | ✅ | 3 |
 | 跨论文+代码 Agent | | ✅ | 3 |
 | 论文向量 RAG（SQLite） | | ✅ | 3 ✅ |
+| Obsidian vault 联动（CLI 探测 / 卡片与索引同步 / Agent 回读） | | ✅ | 6 |
 
 **禁止**：Fieldguide 自研 parser、FileAnalyzer、独立 `@xyflow/react` 全图画布（除非放弃 Dashboard 嵌入且经设计评审）。
 
@@ -121,6 +122,7 @@ flowchart TD
 | D-09 | EPUB/Markdown Phase 3 不做 | product-spec §九 |
 | D-10 | Fieldguide MIT + [NOTICE.md](../NOTICE.md) 保留 UA 归属 | README、NOTICE |
 | D-11 | 布局改为 VSCode/Obsidian 风格（左文件树 + 右可分隔面板），替代 v0.3 三栏布局 | ui-spec v0.4 §二 |
+| D-12 | Obsidian 联动为**单向导出 + Agent 回读**，CLI 硬门禁，不接管 Obsidian 自身配置（product-spec F-17） | product-spec §4.2、architecture §四/§7 |
 
 ---
 
@@ -223,6 +225,14 @@ flowchart TD
 - [ ] README 设计文档表仍完整
 - [ ] 本文 §四 决策表无需新增行时，在 PR/提交说明中注明
 
+### 7.6 若改了 Obsidian 联动（F-17）
+
+- [ ] `product-spec.md` F-17 与非目标 §4.2 未矛盾
+- [ ] `architecture.md` 的 config / SQLite（`vault_notes`）/ IPC 三处已同步
+- [ ] `ui-spec.md` 面板目录含 vault
+- [ ] `src/shared/obsidian.ts` 与 IPC 错误码未漂移
+- [ ] `README.md` 特性表已更新
+
 ---
 
 ## 八、已知张力（文档已接受，实现时处理）
@@ -241,17 +251,18 @@ flowchart TD
 | 文档 | 当前版本 |
 |------|----------|
 | README | Phase 0 v0.3 叙述 |
-| product-spec | v0.3 |
-| architecture | v0.4 |
-| ui-spec | v0.4 |
-| roadmap | v0.3 |
-| todos | 2026-06-30（实现期维护） |
+| product-spec | v0.5 |
+| architecture | v0.5 |
+| ui-spec | v0.6 |
+| roadmap | v0.7 |
+| todos | 2026-09-20（实现期维护） |
+| gap-analysis | v2.4 |
 | design-review | v0.3 |
 | getting-started | v0.3 |
 | testing-strategy | v0.3 |
 | onboarding-spec | v0.2 |
 | understand-anything-integration | v0.1 |
-| doc-index | v0.1 |
+| doc-index | v0.2 |
 | spike-ua | 模板（Spike 后填写） |
 | fixtures-tiny-go-spec | v0.1 |
 | NOTICE.md | v0.1 |

@@ -1,6 +1,6 @@
 # Fieldguide 待办清单
 
-> 最后更新：2026-09-19（**E2E 端到端测试层落地**；审计 A/B/C 三档 + P0 缺陷已全部完成，见下文分节）  
+> 最后更新：2026-09-20（**Obsidian 联动 F-17 落地**；E2E 端到端测试层 + 审计 A/B/C 三档 + P0 缺陷已全部完成，见下文分节）  
 > 来源：UA 图谱未落地根因排查落地 + `qa:graph` / bridge runtime / `prepare-pack` + 差距审计（[gap-analysis-and-feature-roadmap.md](./gap-analysis-and-feature-roadmap.md)）  
 > **壳层 / UX ~98%**；**UA 图谱能力 ~85%**（结构索引 + Dashboard + 增量合并 + **点击开文件闭环已签收**）；完整六 Agent / domain **明确延期**；发布链路（自动更新 / 代码签名）未做  
 > 产品分阶段任务见 [roadmap.md](./roadmap.md)；UA 集成见 [understand-anything-integration.md](./understand-anything-integration.md)；本文跟踪**下一步工程待办**。
@@ -348,6 +348,34 @@ flowchart TD
   - `agent/tools.ts` 的 `AGENT_TOOLS` 显式标注为 `ToolSchema[]`：顺带消掉了 `react.ts` 里为了塞进 fetch body 而加的 `as` 断言
   - 删除 `src/main/understand/llm-utils.ts`，测试迁到 [`src/main/llm/__tests__/client.test.ts`](../src/main/llm/__tests__/client.test.ts) 并扩到 **26 例**（新增：429 重试后成功、5xx 用尽重试、401 不重试、连接重置重试、退避函数与 jitter 上下界、`Retry-After` 两种格式与封顶、token 计量含缺字段回退、失败计数、调用方取消不重试、工具调用轮次）
   - 验收：单测 279 → **294 例**；`pnpm typecheck` / `lint`（0 error）/ `build`（0 警告）/ QA 三项 / `eval:agent`（关键词 Recall@5 仍 68.0%，未回归）/ E2E 8/8 全绿
+
+### P1 — Obsidian 联动（F-17）· Phase 6 ✅ 已实现（P0–P4）（2026-09-20）
+
+> 依据：[product-spec.md](./product-spec.md) F-17（P1 · Phase 6）。定位是**单向导出**：默认不与外部笔记应用耦合，唯一例外是用户**显式绑定**的那一个 vault 目录，随时可解绑。不做双向同步、不接管 Obsidian 自身配置、不依赖 Dataview/Bases、不支持每项目独立 vault（见 product-spec §4.2 / §七 非目标）。
+
+- [x] **obsidian-settings-gate** · 设置页 Obsidian 分类 + CLI 硬门禁  
+  - 探测三态 + 两类异常：`ok` / `cli-missing` / `app-not-running`（另有 `unsupported-version`、`error`）。解析顺序「显式覆盖 → PATH×PATHEXT → 常见安装目录」，结果有短缓存（[`cli.ts`](../src/main/obsidian/cli.ts) / [`parse.ts`](../src/main/obsidian/parse.ts) / [`spawn-spec.ts`](../src/main/obsidian/spawn-spec.ts) / [`status.ts`](../src/main/obsidian/status.ts)）  
+  - **修复指引**四步（升级到 1.12.7+ **安装器**版本 → Obsidian「设置 → 通用」启用命令行界面并完成注册 → 重启终端 → 重新检测）+ 诊断信息 + **手动 CLI 路径覆盖**（带文件选择器）；「启动 Obsidian」两条路径（CLI 同级 GUI 二进制 → `obsidian://`，见 [`launch.ts`](../src/main/obsidian/launch.ts)）  
+  - **硬门禁**：CLI 不可用时「选择目录」「新建 vault」置灰并给出原因；IPC 侧 `obsidian:chooseVault` / `obsidian:createVault` 同样先过 `cliGate`，UI 被绕过也拿不到半可用状态  
+- [x] **obsidian-binding** · vault 选择 / 新建 / 登记引导  
+  - 「选择目录」→ `validateVaultDirectory`（必须存在、是目录、**不与任何项目根重叠**）+ `classifyBinding` 三分类 `registered` / `nested` / `unregistered`（[`binding.ts`](../src/main/obsidian/binding.ts)）  
+  - 「新建 vault」只建目录 + 空 `.obsidian/` 标记 + 一份 README，**登记留给用户在 Obsidian 里确认**；未登记时给出引导并**轮询 `obsidian vaults`**，登记成功自动确认（超时提示稍后重检）  
+- [x] **obsidian-sync-engine** · 同步引擎（dry-run / 托管块 / 内容 hash）  
+  - 卡片映射在 [`cards.ts`](../src/main/obsidian/cards.ts)：架构、分层、模块、Tour、知识卡片、面试题、论文桥接、学习路径、代码笔记、学习报告 + 索引 MOC（**不是**每节点一张卡）；正文由 [`render.ts`](../src/main/obsidian/render.ts) 渲染为 frontmatter + `%% fieldguide:begin %% … %% fieldguide:end %%` **托管块**，块外文本与自有 frontmatter 键字节级保留  
+  - 决策表是纯函数 [`plan.ts`](../src/main/obsidian/plan.ts)：托管块在 → 合并；标记被删或文件本就属于别人 → `conflict`；来源消失且文件未改 → `delete`，用户改过 → `orphan-kept`  
+  - [`sync.ts`](../src/main/obsidian/sync.ts) 编排「先计划后执行」：**dry-run 与实际写入共用同一份计划**，写入一律 `fs-atomic` 原子写；`vault_notes` 只记路径 / kind / 来源 id / 内容 hash / 上次同步时间，**不存正文、不存图谱节点与边**  
+  - 验收：二次同步 0 写入（计划里全是 `unchanged`）；用户批注只被读取、从不被覆盖  
+- [x] **obsidian-panel** · Vault 面板 + 冲突三选一 + 清理  
+  - [`VaultPanel.tsx`](../src/renderer/views/CodeMap/VaultPanel.tsx)：卡片列表（`kind` 标签 + 状态标签 `已同步` / `你已修改` / `需要处理` / `文件缺失` + 「你写了 N 字」）、「仅看问题」过滤、预览、「打开」、「采纳为代码笔记」  
+  - 同步走 **dry-run 预览 → 确认** 两步；冲突卡片给三选一 `保留我的版本` / `用 Fieldguide 版本覆盖` / `另存为副本`；「清理生成的卡片」二次确认后只删 Fieldguide 生成的，**改过的保留**并回报「删除 N / 保留 M」  
+  - 漂移状态由 [`read.ts`](../src/main/obsidian/read.ts) 比较「磁盘内容 vs 记账 hash」得出；面板 Tab 由目录 `ALL_PANEL_TABS` 重建，老用户自动获得 `vault`（新增布局预设 `vault-code`）  
+- [x] **obsidian-agent-tools** · Agent vault 工具（5 个）  
+  - `vault_list_cards` / `vault_read_note` / `vault_search` / `vault_backlinks` / `vault_upsert_card`（[`agent.ts`](../src/main/obsidian/agent.ts)）：读宽写窄，**未绑定 vault 时整组不注入**（模型看不到就不会编造 vault 内容）  
+  - 写入只允许项目自己的子目录、无托管块的文件拒写、受「允许问答 Agent 写入卡片」开关约束，违反一律 `VAULT_WRITE_CONFLICT`  
+- [x] **obsidian-docs-e2e** · 文档一致性 + E2E  
+  - 文档：[`architecture.md`](./architecture.md)（`obsidian` 配置块 / `vault_notes` 表 / `obsidian:*` 契约 / 9 个错误码 / 外部落点说明）、[`ui-spec.md`](./ui-spec.md)（`vault` 面板 + 设置分类 + 门禁文案）、README（核心特性 + `src/main/obsidian/` + CLI 前提）、[`gap-analysis-and-feature-roadmap.md`](./gap-analysis-and-feature-roadmap.md)（F-17 登记）  
+  - E2E [`obsidian.spec.ts`](../e2e/obsidian.spec.ts) **4 例**：① 无可用 CLI → 动作置灰且给出修复指引；② 绑定 vault 并同步 Demo（卡片与索引落盘、含托管块与 frontmatter）；③ 新建 vault → 生成 `.obsidian/` 标记并等待 Obsidian 登记；④ **幂等**：二次同步计划全是「未变」，不重写任何文件  
+  - 桩 CLI 由 [`e2e/harness.ts`](../e2e/harness.ts) 的 `writeFakeObsidianCli()` 生成（`.cmd`，顺带覆盖 `cmd.exe` 回退路径）；单测 7 文件 / **127 例**（[`src/main/obsidian/__tests__/`](../src/main/obsidian/__tests__/)），覆盖 plan 决策表、render 托管块合并、parse 容错、cli 解析、binding 校验、cards 映射、spawn-spec 分平台
 
 
 

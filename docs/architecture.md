@@ -1,6 +1,7 @@
 # Fieldguide 技术架构
 
-> 版本：v0.4 | 状态：设计修订（Phase 1，VSCode/Obsidian 风格布局）  
+> 版本：v0.5 | 状态：设计修订（Phase 1，VSCode/Obsidian 风格布局；外部笔记联动见 F-17）  
+> v0.5 变更：新增 `obsidian` 配置块、`vault_notes` 表、`obsidian:*` IPC 契约与 9 个错误码（F-17 Obsidian vault 联动，2026-09-20）  
 > v0.4 变更：三栏布局 → 左文件树 + 右可分隔面板（2026-07-01）  
 > 集成细节见 [understand-anything-integration.md](./understand-anything-integration.md)
 
@@ -52,6 +53,8 @@ flowchart TB
 
 **刻意不采用**：微服务、gRPC、Redis、RabbitMQ、Docker、外部 Qdrant。  
 **刻意不自研**：Tree-sitter 解析管线、UA 已有六类 Agent、独立图谱渲染引擎（复用 UA Dashboard）。
+
+**外部笔记联动（F-17）**：Obsidian vault 在图里是**外部落点（external sink）**，不在 Main Process 的数据链路中间——Fieldguide 把它当普通目录**直接写文件系统**（`fs-atomic` 的 temp + rename 原子写），不经 IPC、不经 Obsidian 应用；官方 Obsidian CLI 只用于**探测 / 列 vault / 打开笔记 / 检索**这些只有应用本身才能做的事。Fieldguide **不写 Obsidian 自身的配置**（`obsidian.json`、workspace、插件、缓存），也不接管它的库管理；单向导出，不做双向同步。
 
 ---
 
@@ -109,7 +112,8 @@ Fieldguide/
 │   │   ├── db/
 │   │   │   ├── schema.ts        # projects, papers, concept_links, chat
 │   │   │   └── migrations/
-│   │   ├── agent/               # Fieldguide 扩展 Agent（跨论文+代码）
+│   │   ├── agent/               # Fieldguide 扩展 Agent（跨论文+代码 + F-17 vault 工具）
+│   │   ├── obsidian/            # Obsidian 联动（F-17）：CLI 探测 / 卡片与索引同步 / 漂移状态
 │   │   ├── vector/              # 论文 LanceDB（Phase 3）
 │   │   └── theory/
 │   ├── preload/
@@ -174,6 +178,16 @@ Windows 路径：`%APPDATA%/Fieldguide/`
   "ua": {
     "language": "zh",
     "incremental": true
+  },
+  "obsidian": {
+    "vaultPath": "",
+    "vaultName": "",
+    "cliPath": "",
+    "folder": "Fieldguide",
+    "autoSyncOnIndex": false,
+    "mirrorNotes": true,
+    "agentWrite": true,
+    "openAfterSync": false
   }
 }
 ```
@@ -184,6 +198,19 @@ Windows 路径：`%APPDATA%/Fieldguide/`
 | `ua.language` | UA pipeline 语言：`zh` \| `zh-TW` \| `en` 等 |
 | `projectsRoot` | Git clone 与 demo 的默认父目录 |
 | `onboardingCompleted` | 首次引导是否已完成 |
+
+**`obsidian` 块（F-17，默认关闭）**：`vaultPath` 为空即整体停用——`src/main/obsidian/` 之外没有任何代码会去碰 vault 目录（取值与默认值以 `src/main/config.ts` 的 `ObsidianConfig` / `DEFAULT_CONFIG.obsidian` 为准）。
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `obsidian.vaultPath` | `""` | vault 绝对目录；`""` = 集成关闭（不绑定任何目录） |
+| `obsidian.vaultName` | `""` | Obsidian 侧的 vault 名（CLI 的 `vault=`）；未登记时可为空 |
+| `obsidian.cliPath` | `""` | CLI 路径覆盖；`""` = 自动探测（覆盖值 → PATH×PATHEXT → 常见安装目录） |
+| `obsidian.folder` | `"Fieldguide"` | Fieldguide 在 vault 内独占的根目录，每个项目一个子目录 |
+| `obsidian.autoSyncOnIndex` | `false` | 索引完成后自动同步该项目（否则只在 Vault 面板手动触发） |
+| `obsidian.mirrorNotes` | `true` | 把应用内代码笔记一起镜像成 vault 卡片 |
+| `obsidian.agentWrite` | `true` | 允许教练 Agent 在项目子目录内新建/更新卡片 |
+| `obsidian.openAfterSync` | `false` | 同步完成后在 Obsidian 打开索引笔记（需要 CLI 可用） |
 
 ---
 
@@ -337,7 +364,23 @@ CREATE TABLE chat_messages (
   tool_trace JSON,
   created_at TEXT NOT NULL
 );
+
+-- F-17：Obsidian vault 生成笔记的记账表（不含笔记正文）
+CREATE TABLE vault_notes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  note_path TEXT NOT NULL,              -- vault 相对路径（posix）
+  vault_path TEXT NOT NULL DEFAULT '',  -- 写入时的 vault 根；换绑后据此识别孤儿
+  kind TEXT NOT NULL,                   -- index | architecture | layer | module | tour | knowledge | interview | bridge | path | note | report
+  source_id TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL,
+  content_hash TEXT NOT NULL,           -- 上次写入时的内容哈希（判「用户是否改过」）
+  synced_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id)
+);
 ```
+
+**`vault_notes`（F-17）**：只记「笔记路径 / kind / 来源 id / 内容哈希 / 上次同步时间」，**不存笔记正文**，也不存图谱节点与边；API 为 `listVaultNotes` / `getVaultNote` / `upsertVaultNote` / `removeVaultNote` / `removeVaultNotesForProject`（索引 `idx_vault_notes_project`），`removeProject()` 随项目级联删除。
 
 ---
 
@@ -412,10 +455,41 @@ interface IpcError {
 | `LLM_NOT_CONFIGURED` | 无 API Key 却请求 Analyze | false |
 | `PARSE_ERROR` | Tree-sitter 解析失败 | false |
 | `SOURCE_UNAVAILABLE` | root_path 不存在或不可读 | false |
+| `OBSIDIAN_CLI_MISSING` | 未检测到可用的 Obsidian CLI（或安装器版本低于 1.12.7） | true |
+| `OBSIDIAN_APP_NOT_RUNNING` | CLI 在，但 Obsidian 未运行（CLI 是运行中应用的客户端） | true |
+| `OBSIDIAN_CLI_ERROR` | CLI 调用失败（超时 / 异常退出码 / 应用无法启动） | true |
+| `VAULT_NOT_BOUND` | 尚未绑定 vault（`config.obsidian.vaultPath` 为空） | false |
+| `VAULT_NOT_FOUND` | vault 目录、笔记文件或笔记来源已不存在 | false |
+| `VAULT_NOT_REGISTERED` | 目录未被 Obsidian 登记为库（UI 侧以绑定类型 `unregistered` + 登记引导呈现） | false |
+| `VAULT_PATH_INVALID` | vault 路径非法（不存在 / 与项目根重叠 / 笔记路径越界） | false |
+| `VAULT_SYNC_IN_PROGRESS` | 已有同步任务在进行（同步与 Agent 写卡片不可交错） | true |
+| `VAULT_WRITE_CONFLICT` | 目标文件不属于 Fieldguide（无托管块 / 属其他项目），或 Agent 写入已被设置关闭 | false |
 
 流式事件（`index:progress`, `chat:stream`）保持 event 通道，payload 内嵌 `type` 字段；错误步在 `chat:stream` 中以 `{ type: 'error', error: IpcError }` 推送。
 
 Renderer 侧统一 `unwrapIpc(result)` 辅助函数：失败时 toast + 可选重试按钮（当 `retryable === true`）。
+
+### 7.6 Obsidian vault 联动（F-17）
+
+Channel / payload 与 `src/main/ipc/index.ts` 的实现一致，Renderer 侧经 preload 的 `obsidian*` 方法调用（`src/preload/index.ts`）。写卡片**不需要 CLI**：vault 是普通目录，Fieldguide 直接写文件系统（`fs-atomic` 的 temp + rename 原子写，写入前先出计划、用户确认的计划就是实际执行的计划）；CLI 只用于探测 / 列 vault / 打开笔记 / 检索。
+
+| Channel | 方向 | 请求 → 响应 |
+|---------|------|-------------|
+| `obsidian:status` | invoke | `{ projectId? }` → `ObsidianStatus`（`cli` / `binding` / `folder` / `notesCount` / `lastSyncAt` / `syncInFlight`） |
+| `obsidian:detectCli` | invoke | `{ cliPath? }` → `VaultCliStatus`（强制重探并刷新探测缓存） |
+| `obsidian:launchApp` | invoke | — → `VaultCliStatus`（先试 CLI 同级的 GUI 二进制，再试 `obsidian://` URI，随后有界等待复探） |
+| `obsidian:listVaults` | invoke | — → `{ cli, vaults }`（`obsidian vaults verbose` 的解析结果） |
+| `obsidian:chooseVault` | invoke | — → `VaultBinding \| null`（目录选择器 + 校验；用户取消返回 `null`） |
+| `obsidian:createVault` | invoke | `{ parentDir, name }` → `VaultBinding & { created }`（只建目录 + 空 `.obsidian/` 标记，库登记留给用户） |
+| `obsidian:openVaultManager` | invoke | — → `null`（打开 `obsidian://choose-vault` 让用户确认登记） |
+| `obsidian:sync` | invoke | `{ projectId, dryRun?, openAfter? }` → `VaultSyncReport`（`dryRun` 只出计划不落盘；`openAfter` 同步后在 Obsidian 打开索引） |
+| `obsidian:notes` | invoke | `{ projectId }` → `{ notes, folder, vaultPath }`（每张卡片的漂移状态） |
+| `obsidian:readNote` | invoke | `{ projectId, notePath }` → 笔记正文 + 状态（面板预览） |
+| `obsidian:openNote` | invoke | `{ projectId, notePath }` → `{ via: 'cli' \| 'system' }`（CLI 不可用时回退交给系统打开） |
+| `obsidian:resolveNote` | invoke | `{ projectId, notePath, action }`（`keep-user` \| `overwrite` \| `save-copy`）→ `{ notePath, status }` |
+| `obsidian:cleanup` | invoke | `{ projectId }` → `{ removed, kept }`（用户改过的笔记只保留、不删除） |
+| `obsidian:adoptNote` | invoke | `{ projectId, notePath }` → 新建的 `code_notes` 行（卡片「采纳为代码笔记」） |
+| `obsidian:unbind` | invoke | `{ mode }`（`keep` \| `cleanup`）→ `{ removed, kept }`，并清空 `vaultPath` / `vaultName` |
 
 ---
 
@@ -427,37 +501,36 @@ Renderer 侧统一 `unwrapIpc(result)` 辅助函数：失败时 toast + 可选�
 
 ### 8.2 Fieldguide 扩展 Agent（Phase 3）
 
-跨论文 + 代码 + 概念桥接的统一 Agent，在 UA 工具集之上扩展：
+跨论文 + 代码 + 概念桥接的统一 Agent。工具集由 `src/main/agent/tools.ts` 的 `buildAgentTools()` 产出，**每轮会话构建一次**（中途改工具列表会让缓存前缀失效）；导出的 `AGENT_TOOLS` 是不含 vault 工具的默认集合。
 
 ```typescript
-interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: JSONSchema;
-  execute: (args: unknown, ctx: AgentContext) => Promise<string>;
-}
-
 interface AgentContext {
-  projectId?: string;
-  focusedNodeId?: string;
-  tourId?: string;
-  tourStepIndex?: number;
-  paperId?: string;
-  paperChunkId?: string;
+  projectId: string;
+  projectName: string;
+  projectRoot: string;
+  locale: string;
+  focusedNodeId?: string | null;   // Dashboard 当前选中节点
+  tourStepIndex?: number | null;   // 当前 Tour 步骤
 }
 ```
 
 | Tool | 来源 | 说明 |
 |------|------|------|
-| `get_graph_overview` | UA | 分层统计、Tour 列表 |
-| `explain_node` | UA | 节点详情 |
-| `search_code` | UA | 语义 + 关键词 |
-| `find_call_path` | UA | 路径查找 |
-| `analyze_diff` | UA | diff 影响 |
-| `search_arxiv` | FG | arXiv 检索 |
-| `query_paper` | FG | 论文 RAG |
-| `link_concept` | FG | 创建 concept_link |
-| `index_project` | FG→UA | 触发 UA pipeline |
+| `search_nodes` | FG→UA | 模糊/语义检索图谱节点（名称、标签、摘要） |
+| `get_neighbors` | FG | N 跳邻居（默认 1，上限 2） |
+| `list_layers` | FG | 架构分层 + 每层样例节点 |
+| `get_tour_step` | FG | 按 0 基序号（缺省用当前步骤）取 Tour 步骤 |
+| `query_paper` | FG | 论文 RAG 片段检索 |
+| `get_node_source` | FG | 读取节点源码片段 |
+| `find_call_path` | FG | 两节点间最短路径（imports / calls / contains） |
+| `list_concept_links` | FG | 当前项目的论文段落 ↔ 代码节点桥接 |
+| `vault_list_cards` | FG（F-17） | 本项目已同步的 vault 卡片（路径 / kind / 漂移状态 / 用户批注量） |
+| `vault_read_note` | FG（F-17） | 读单张卡片，含托管块之外用户自己写的内容 |
+| `vault_search` | FG（F-17） | 项目 vault 子目录内全文检索（需 Obsidian 在运行） |
+| `vault_upsert_card` | FG（F-17） | 新建/更新一张卡片（受 `agentWrite` 与项目子目录约束） |
+| `vault_backlinks` | FG（F-17） | 指向某张卡片的反链（需 Obsidian 在运行） |
+
+**vault 工具的条件注入（F-17）**：仅当 `config.obsidian.vaultPath` 非空且目录存在时，5 个 `vault_*` 工具才进入 tool schema——模型看不到就用不到，避免围绕不存在的能力编排。读取只依赖文件系统（Obsidian 没开也能读上次同步的结果）；`vault_search` / `vault_backlinks` 依赖 CLI，不可用时返回结构化错误并提示改用 `vault_list_cards` + `vault_read_note`；写入经 `upsertAgentCard()`，路径钉在 `<vault>/<folder>/<项目>/` 内，目标文件不属于本项目或 `agentWrite=false` 时拒绝。
 
 ### 8.3 System Prompt 要点
 

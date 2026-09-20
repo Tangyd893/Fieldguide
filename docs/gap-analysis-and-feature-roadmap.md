@@ -1,6 +1,6 @@
 # Fieldguide 差距分析 & 功能点扩展路线图
 
-> 版本：v2.3（**P0 八项 + A 档 + B 档九项 + C1/C2/C3 + ESLint/CI 门禁 + Playwright E2E 全部落地**；剩余为自动更新/代码签名、lint warning 清零） | 基线 commit：`e9fb5e6`（README 重写 + understanding workbench）
+> 版本：v2.4（**在 v2.3 基础上新增 F-17 Obsidian vault 联动**：CLI 硬门禁 + 卡片/索引同步 + Agent 回读，落地于 Phase 6） | 基线 commit：`e9fb5e6`（README 重写 + understanding workbench）
 > 审计方式：全量阅读 `src/**`（含 main / preload / renderer / shared）、`docs/**`；实跑 `tsc` 三份 tsconfig + `vitest`；grep 交叉验证文档承诺与代码实现
 >
 > **实测基线**：`pnpm typecheck` ✅（renderer / node / vitest 三份全过）· `pnpm test:unit` ✅ 21 文件 · **128 passed / 2 skipped**
@@ -78,6 +78,10 @@
 ⑥ 数据层（9 张业务表 + 1 张运行期表）
    projects · index_jobs(⚠️ 死表) · papers · concept_links · paper_highlights · chat_messages
    architecture_summaries · knowledge_nodes · interview_questions · paper_chunks
+
+⑦ 外部笔记联动（F-17 · Phase 6 · ✅ 已实现 2026-09-20）
+   └ Obsidian vault 单向导出：设置页 CLI 硬门禁（三态 + 修复指引 + 手动 CLI 路径）→ 绑定 / 新建一个 vault → 把架构、分层、Tour、知识卡、面试题、论文桥接、学习路径与代码笔记同步成卡片 + 索引 MOC；托管块之外的用户批注永不覆盖，冲突在 Vault 面板里三选一
+     闭合缺口：**拆解产物无法带走 / 无法与既有笔记体系结合**（此前只有 `project:exportGraph` 的图谱 JSON 与学习报告 Markdown，产物进不了用户自己的笔记库）
 ```
 
 ### 1.3 质量基线（本次实测）

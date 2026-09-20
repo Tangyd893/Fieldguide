@@ -28,6 +28,8 @@ interface LaunchOptions {
   onboarding?: boolean
   /** UI language for the seeded config. */
   locale?: 'zh-CN' | 'en-US'
+  /** Value for `FIELDGUIDE_OBSIDIAN_CLI` — a stub CLI, or a path that does not exist. */
+  obsidianCli?: string
 }
 
 export async function launchApp(options: LaunchOptions = {}): Promise<AppHandle> {
@@ -67,6 +69,7 @@ export async function launchApp(options: LaunchOptions = {}): Promise<AppHandle>
       FIELDGUIDE_DATA_DIR: dataDir,
       // Keep the graph engine offline and deterministic.
       NO_PROXY: '*',
+      ...(options.obsidianCli ? { FIELDGUIDE_OBSIDIAN_CLI: options.obsidianCli } : {}),
     },
   })
 
@@ -85,6 +88,50 @@ export async function launchApp(options: LaunchOptions = {}): Promise<AppHandle>
       rmSync(projectsRoot, { recursive: true, force: true })
     },
   }
+}
+
+/**
+ * Write a stub Obsidian CLI that answers the commands Fieldguide uses.
+ *
+ * A batch file (not a JS script) on purpose: that also exercises the `.cmd`
+ * fallback path in `buildSpawnSpec`, which no real install reaches on Windows —
+ * the genuine CLI is `Obsidian.com`.
+ *
+ * `logFile` makes every invocation append its arguments, so a test can assert on
+ * *how* the CLI was called (e.g. that a sync opened the index note) and not merely
+ * that the sync succeeded.
+ */
+export function writeFakeObsidianCli(
+  dir: string,
+  vaultPath: string,
+  options: { version?: string; logFile?: string } = {},
+): string {
+  const { version = '1.12.7', logFile } = options
+  const file = join(dir, 'fake-obsidian.cmd')
+  writeFileSync(
+    file,
+    [
+      '@echo off',
+      ...(logFile ? [`echo %*>> "${logFile}"`] : []),
+      'if "%~1"=="version" goto :version',
+      'if "%~1"=="vaults" goto :vaults',
+      'if "%~1"=="vault" goto :vault',
+      'rem open/backlinks/search: succeed quietly with no output',
+      'exit /b 0',
+      ':version',
+      `echo ${version}`,
+      'exit /b 0',
+      ':vaults',
+      `echo ${vaultPath}`,
+      'exit /b 0',
+      ':vault',
+      `echo ${vaultPath}`,
+      'exit /b 0',
+      '',
+    ].join('\r\n'),
+    'utf-8',
+  )
+  return file
 }
 
 /**

@@ -1,6 +1,6 @@
 # Fieldguide 路线图
 
-> 版本：v0.6 | 状态：Phase 1–3 完成，Phase 4 发布验收中；Phase 5+ 理解工作台（分屏面板 + 架构/知识/面试）进行中
+> 版本：v0.7 | 状态：Phase 1–3 完成，Phase 4 发布验收中；Phase 5 理解工作台（分屏面板 + 架构/知识/面试）与 Phase 6 Obsidian 联动（F-17）进行中
 
 ---
 
@@ -14,10 +14,36 @@
 | 3 | 理论 + 桥接 | 论文/PDF 与代码对照 | 4–5 周 | 🔵 核心已通 |
 | 4 | 发布 | 安装包、体验 polish、上游同步 | 持续 | 🔵 进行中（与 Phase 5 错峰） |
 | 5 | 理解工作台 | 架构总览 / 知识 / 面试面板 + 布局预设 + 渐进分析 | 6–8 周 | 🔵 进行中 |
+| 6 | Obsidian 联动 | vault CLI 门禁 + 卡片/索引单向同步 + Agent 回读（F-17） | 3–4 周 | 🔵 进行中（已实现 P0–P3，文档 P4） |
 
-**原则**：体验打磨优先；**复用 UA 已有能力，不重复造轮子**；Fieldguide **保持产品独立**（不耦合 Obsidian / 外部 PKB）；每 Phase 结束有可演示的完整用户路径。
+**原则**：体验打磨优先；**复用 UA 已有能力，不重复造轮子**；Fieldguide **保持产品独立**（默认不耦合 Obsidian / 外部 PKB；Phase 6 起可由用户显式绑定一个 vault 做单向导出，随时可解绑）；每 Phase 结束有可演示的完整用户路径。
 
 **相对 v0.2 的变化**：Phase 1/2 周期缩短——索引、图谱 UI、多 Agent 由 [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) 提供。
+
+---
+
+## Phase 6 — Obsidian 联动（F-17）
+
+### 目标
+
+用户在设置页**显式绑定**一个 Obsidian vault，把项目拆解产物单向导出为 Markdown 卡片与索引（MOC）到 `<vault>/<folder>/<project>/`；应用内知识仍是唯一事实来源。绑定与新建 vault 均以**官方 Obsidian CLI** 可用为前提（`obsidian` / `Obsidian.com`，需 1.12.7+ 安装器、设置 → General 中启用 CLI、且 Obsidian 正在运行）。
+
+### 任务
+
+| ID | 任务 | 验收标准 |
+|----|------|---------|
+| 6.0 | 设置页 Obsidian 分类 + CLI 门禁 | CLI 三态（可用/未安装/Obsidian 未运行）可见；不可用时「选择目录」「新建 vault」禁用并给出修复步骤 |
+| 6.1 | vault 选择 / 新建 / 注册引导 | 选择目录与新建 vault 均先校验 CLI；新建后轮询 `obsidian vaults` 直到 Obsidian 识别 |
+| 6.2 | 卡片与索引同步引擎 | dry-run 预览；托管块 + 内容 hash；用户改动不被覆盖；二次同步 0 写入 |
+| 6.3 | Vault 面板 + 冲突处理 | 卡片状态（已同步/你已修改/需要处理/缺失）可见；冲突三选一；清理只删未被改动的文件 |
+| 6.4 | Agent vault 工具与回读 | 未绑定 vault 时工具不出现在 tool schema；批注可被引用 |
+
+### 刻意不做
+
+- 双向同步（Obsidian 侧改动只回读为上下文，不合并进 SQLite）
+- 接管 Obsidian 自身配置（`obsidian.json` 等）
+- Dataview / Bases / 插件依赖
+- 移动端、每项目独立 vault、每个图节点一条笔记
 
 ---
 
@@ -39,7 +65,7 @@
 
 ### 刻意不做
 
-- Obsidian vault / 双向同步
+- 双向同步 / Dataview 依赖 / 移动端 / 每项目独立 vault
 - 无限面板插件生态
 - 完整 UA domain / graph-reviewer（除非直接服务 overview）
 
