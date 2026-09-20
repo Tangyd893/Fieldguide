@@ -71,7 +71,7 @@ flowchart TB
 | i18n | i18next + react-i18next | 简中 / 繁中 / en-US；与 UA language 映射 |
 | 主进程 | Node.js + TypeScript | |
 | 关系库 | better-sqlite3 | **Fieldguide 扩展数据**（projects、papers、concept_links、chat） |
-| 向量库 | LanceDB | 论文 chunk RAG（Phase 3）；代码语义搜索由 UA 负责 |
+| 向量库 | SQLite（`paper_chunks`，向量以 JSON 数组存、TS 内做余弦相似度） | 论文 chunk RAG（Phase 3）；代码语义搜索由 UA 负责 |
 | Git | simple-git | clone、status、diff |
 | LLM | OpenAI 兼容 HTTP | config 单一来源，桥接至 UA runtime |
 | 打包 | electron-builder + NSIS | `.exe` 安装包 |
@@ -83,52 +83,66 @@ flowchart TB
 ```
 Fieldguide/
 ├── README.md
-├── docs/
-├── package.json
+├── package.json                 # 亦承载 electron-builder 的 build 段（无独立 yml）
 ├── pnpm-workspace.yaml
-├── vendor/
-│   └── Understand-Anything/     # git submodule（若 core 未发布 npm）
 ├── electron.vite.config.ts
-├── electron-builder.yml
+├── playwright.config.ts         # E2E（驱动本仓库 Electron 二进制）
+├── vitest.config.ts / tsconfig{,.node,.vitest}.json
 ├── src/
-│   ├── shared/
-│   │   ├── ipc.ts
+│   ├── shared/                  # 三端共用类型与契约
+│   │   ├── ipc.ts               # IpcResult / IpcErrorCode
 │   │   ├── graph.ts             # re-export UA KnowledgeGraph + FG 扩展类型
-│   │   └── errors.ts
-│   ├── main/
-│   │   ├── index.ts
-│   │   ├── window.ts
-│   │   ├── ipc/
-│   │   │   ├── projects.ts
-│   │   │   ├── graph.ts         # 读 UA knowledge-graph.json
-│   │   │   ├── index.ts
-│   │   │   ├── chat.ts
-│   │   │   └── theory.ts
+│   │   ├── understand.ts        # 面板目录 / 分析阶段 / 架构·知识·面试模型
+│   │   ├── obsidian.ts          # F-17 跨进程类型（状态 / 绑定 / 同步报告）
+│   │   ├── llm-catalog.ts · llm-url.ts · index.ts
+│   ├── main/                    # Electron 主进程
+│   │   ├── index.ts · window.ts · menu.ts          # 启动 / 窗口 / 菜单
+│   │   ├── config.ts · paths.ts · logger.ts · fs-atomic.ts
+│   │   ├── file-tree.ts · content-search.ts · project-ignore.ts · git.ts
+│   │   ├── insights.ts · evolution.ts · communities.ts · review-cards.ts · srs.ts · coach-plus.ts
+│   │   ├── sample-project.ts    # 内置 Demo 安装
+│   │   ├── ipc/                 # index.ts（全部 handler 聚合）+ uuid.ts
 │   │   ├── ua/                  # ★ UA 集成层
-│   │   │   ├── client.ts        # 调用 core pipeline
+│   │   │   ├── client.ts        # 调用 core pipeline / 索引
 │   │   │   ├── config-bridge.ts # locale / LLM 同步
-│   │   │   ├── graph-reader.ts  # 读 .understand-anything/
-│   │   │   └── dashboard.ts     # Dashboard 静态资源路径
-│   │   ├── db/
-│   │   │   ├── schema.ts        # projects, papers, concept_links, chat
-│   │   │   └── migrations/
-│   │   ├── agent/               # Fieldguide 扩展 Agent（跨论文+代码 + F-17 vault 工具）
-│   │   ├── obsidian/            # Obsidian 联动（F-17）：CLI 探测 / 卡片与索引同步 / 漂移状态
-│   │   ├── vector/              # 论文 LanceDB（Phase 3）
-│   │   └── theory/
-│   ├── preload/
-│   └── renderer/
-│       ├── App.tsx
-│       ├── views/
-│       │   ├── ProjectLibrary/
-│       │   ├── CodeMap/         # 文件树 + 可分隔面板 + 图谱/代码/问答
-│       │   ├── Theory/
-│       │   └── Bridge/
-│       └── locales/
-└── resources/
+│   │   │   ├── graph-reader.ts · ensure-layers.ts · search.ts
+│   │   │   ├── dashboard.ts     # Dashboard 静态资源 + 自定义协议
+│   │   │   ├── diff.ts · cross-tour.ts · file-content.ts
+│   │   ├── db/                  # index.ts（连接 + 全部查询）+ migrations.ts（纯迁移规则）
+│   │   ├── agent/               # 学习教练：react.ts（ReAct 循环）· tools.ts · context-packer.ts · types.ts
+│   │   ├── obsidian/            # F-17：cli/spawn-spec/parse（探测）· render/cards/plan/sync（同步）
+│   │   │                        #       read（漂移状态）· agent（工具）· binding/status/launch/state
+│   │   ├── understand/          # 渐进分析：pipeline.ts · architecture.ts · knowledge.ts · interview.ts
+│   │   ├── vector/              # 论文分块与向量检索（SQLite 存储，非 LanceDB）：index/chunk/embed
+│   │   ├── llm/                 # 统一 LLM 客户端（client.ts）+ 供应商目录（catalog.ts）
+│   │   └── eval/                # 离线评测：harness.ts · metrics.ts · usability.ts
+│   ├── preload/                 # contextBridge 暴露的 window.fieldguide
+│   └── renderer/                # React UI
+│       ├── App.tsx · main.tsx · i18n.ts · env.d.ts
+│       ├── components/          # ActivityBar · AppTitleBar · ErrorBoundary · FolderPathField · SteppedSlider · icons/ · ui/
+│       ├── hooks/               # useWorkspaceLayout · useIndexProgress · useDashboardThemeSync
+│       ├── lib/                 # appearance · dashboard-bridge · dashboard-theme · llm-providers · markdown · resize-drag · utils
+│       ├── theme/tokens.css     # 5 套主题预设的 CSS 变量
+│       ├── locales/             # zh-CN · zh-TW · en-US（键集合由单测守卫）
+│       └── views/
+│           ├── ProjectLibrary/ · CodeMap/   # 文件树 + 可分隔面板（15 个面板组件）
+│           ├── Theory/ · Bridge/
+│           ├── SettingsPanel.tsx · OnboardingWizard.tsx · CommandPalette.tsx
+│           └── ContentSearch.tsx · CostDialog.tsx · ShortcutsDialog.tsx · AboutDialog.tsx · Toast.tsx
+├── resources/                   # icon · dashboard（UA 构建产物）· sample-project
+├── scripts/                     # bootstrap-ua · prepare-pack · prepare-e2e · qa-baseline · scenario-smoke
+│                                # · graph-e2e-smoke · his-go-smoke · clean-dist（+ vitest.tools.config.ts）
+├── tests/fixtures/tiny-go/      # 单测 fixture 仓库
+├── e2e/                         # Playwright：boot · codemap · obsidian（+ harness.ts）
+├── eval/datasets/               # 离线评测数据集
+└── picture/ · docs/
 ```
 
 **已移除**（相对 v0.2）：自研 `engine/parser/`、`llm/agents/*`——由 UA 提供。
+
+> v0.5 校正：本节早先是一份「实现期」草图，本次按仓库实际结构重写（原图里的
+> `vendor/`、`shared/errors.ts`、`db/schema.ts`、`db/migrations/`、`main/ipc/{projects,graph,chat,theory}.ts`、
+> `main/theory/`、`electron-builder.yml` 均不存在；`vector/` 用的是 SQLite 而非 LanceDB）。
 
 ---
 
@@ -444,7 +458,7 @@ interface IpcError {
 }
 ```
 
-**错误码**（`src/shared/errors.ts`）：
+**错误码**（`src/shared/ipc.ts` 的 `IpcErrorCode`）：
 
 | Code | 场景 | retryable |
 |------|------|-----------|
@@ -543,8 +557,8 @@ interface AgentContext {
 
 ## 九、向量检索
 
-- **代码语义搜索**：由 UA 负责（Fieldguide 不建代码 LanceDB collection）
-- **论文 RAG**（Phase 3）：LanceDB collection 按 `paperId`；chunk 512 token 重叠 64
+- **代码语义搜索**：由 UA 负责（Fieldguide 不建自己的代码向量库）
+- **论文 RAG**（Phase 3，已实现）：SQLite `paper_chunks` 表按 `paperId` 组织；chunk 512 token、重叠 64；向量以 JSON 数组落库，查询时在 TS 内算余弦相似度（单机规模足够，避免引入外部向量库）
 - **Embedding**：与 `config.llm` 共用 OpenAI 兼容 `/embeddings`
 
 ---
