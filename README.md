@@ -19,7 +19,7 @@
 
 > ### 🆕 当前状态：v0.2.0
 >
-> 核心闭环已经通了：知识图谱、学习教练、论文桥接都能用；Phase 4 发布准备中（约 70%），干净机器实测还没做完。当前只支持 Windows 10/11。
+> 核心闭环已经通了：知识图谱、学习教练、论文桥接、Obsidian 卡片同步都能用；Phase 4 发布准备中（约 70%），干净机器实测还没做完。当前只支持 Windows 10/11。
 
 ## 10 秒看懂 Fieldguide
 
@@ -122,6 +122,13 @@ npx electron-builder --win --publish never --config.directories.output=dist-buil
       <sub>多项目管理、索引状态与 stale 提示，首次启动向导三选一</sub>
     </td>
   </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <img src="picture/gdd03.png" width="1128" alt="同步到 Obsidian：生成的索引笔记与关系图谱" /><br/>
+      <b>同步到 Obsidian</b><br/>
+      <sub>左侧是同步生成的 <code>Fieldguide Demo · 项目索引</code>，右侧是 Obsidian 的关系图谱 —— 卡片之间的 <code>[[wikilink]]</code> 自动连成一张图</sub>
+    </td>
+  </tr>
 </table>
 
 ## ✨ 核心特性
@@ -129,7 +136,7 @@ npx electron-builder --win --publish never --config.directories.output=dist-buil
 - 🗺️ **知识图谱** —— 交互式代码地图、架构分层、引导 Tour、节点 ↔ 源码联动。没有 LLM Key 也能看结构图（[设计](docs/product-spec.md)）。
 - 🧑‍🏫 **问答教练** —— 注入项目身份、layers、Tour、当前焦点和图谱检索结果；工具可查邻居、层、Tour 步骤；回答里能引用论文段落。图上点到哪，它就围着哪讲。
 - 📚 **理论与桥接** —— arXiv 搜索、PDF 导入与阅读、论文 RAG；论文段落 ↔ 代码节点的概念桥接，AI 推荐 + 一键生成「论文概念 → 代码实现」对照 Tour。
-- 🧩 **分屏工作台** —— VS Code 风格布局：左文件树 + 右可分隔面板（总览 / 图谱 / 代码 / 问答 / 导览 / 知识 / 面试 / 探索八种），布局可持久化（[界面规格](docs/ui-spec.md)）。
+- 🧩 **分屏工作台** —— VS Code 风格布局：左文件树 + 右可分隔面板（总览 / 图谱 / 代码 / 问答 / 导览 / 知识 / 面试 / 探索 / 进度 / 笔记 / 导师 / Vault 十二种），布局可持久化（[界面规格](docs/ui-spec.md)）。
 - 🔍 **全库内容搜索** —— `Ctrl+Shift+F` 搜文件内容（跳过二进制与超大文件），命中可直接跳到对应行；代码面板内 `Ctrl+F` 搜索当前文件。
 - 🧠 **洞察面板** —— 图谱统计与类型分布、邻居浏览（1/2 跳）、**两点路径查找**（「A 怎么调到 B」）、**技术债扫描**（TODO/FIXME、超大文件、高扇入节点）。
 - 📄 **学习报告导出** —— 一键把架构映射、知识卡片、面试题与论文桥接汇总成 Markdown。
@@ -176,14 +183,15 @@ macOS / Linux 暂时不做，我只有 Windows 开发机，先把自己平台的
 
 ## 当前状态与路线
 
-Phase 0 设计 ✅ · Phase 1 桌面壳 + UA 集成 ✅ · Phase 2 智能层 ✅ · Phase 3 理论 + 桥接 ✅ · Phase 4 发布 🔵（约 70%）
+Phase 0 设计 ✅ · Phase 1 桌面壳 + UA 集成 ✅ · Phase 2 智能层 ✅ · Phase 3 理论 + 桥接 ✅ · Phase 5 理解工作台 ✅ · Phase 6 Obsidian 联动 ✅（F-17）· Phase 4 发布 🔵（约 70%）
 
 - [x] 命名与设计文档全套（入口：docs/doc-index.md）
 - [x] Electron 脚手架 + UA 集成层 + postMessage 双向通信
 - [x] LLM 索引（摘要 / 架构层 / Tour / heuristic fallback）+ 增量合并
-- [x] 学习教练 Agent（ReAct，工具：搜索节点 / 查论文 / 取源码 / 列桥接）
+- [x] 学习教练 Agent（ReAct，工具：搜索节点 / 查论文 / 取源码 / 列桥接；绑定 vault 后还能读写 Obsidian 卡片）
 - [x] 理论 Tab（arXiv / PDF 阅读 / RAG）与概念桥接（AI 推荐 + 对照 Tour）
-- [x] 七种面板 + 分屏布局 + 5 套主题 + 三语 i18n + NSIS 安装包
+- [x] 十二种面板 + 分屏布局 + 5 套主题 + 三语 i18n + NSIS 安装包
+- [x] Obsidian 联动：CLI 硬门禁 → 绑定 / 新建 vault → 卡片与索引同步（dry-run 预览、托管块、冲突保留）、Agent 回读批注
 - [x] 单测与冒烟脚本全绿（`pnpm qa:graph` 含打包产物校验）
 - [ ] Phase 4：干净机器实测 + 场景 A 用户自测（见 [docs/todos.md](docs/todos.md)）
 
