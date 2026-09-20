@@ -59,13 +59,45 @@ export function resolveProjectPath(projectRoot: string, userPath: string): PathC
 }
 
 /**
+ * Resolve a vault-relative path, refusing anything that escapes the vault.
+ *
+ * Same contract as `resolveProjectPath`: the renderer and the agent hand us note
+ * paths, and a vault is somebody else's directory — a note path must never be a
+ * way to write outside it.
+ */
+export function resolveVaultPath(vaultPath: string, userPath: string): PathCheckResult {
+  if (typeof vaultPath !== 'string' || vaultPath.length === 0) {
+    return { ok: false, reason: 'no vault bound' }
+  }
+  if (typeof userPath !== 'string' || userPath.length === 0) {
+    return { ok: false, reason: 'empty path' }
+  }
+  if (userPath.includes('\0')) {
+    return { ok: false, reason: 'invalid path' }
+  }
+  if (isAbsolute(userPath)) {
+    return { ok: false, reason: 'absolute paths are not allowed' }
+  }
+
+  const normalized = normalize(userPath).replace(/^([/\\])+/, '')
+  if (normalized === '..' || normalized.startsWith(`..${sep}`) || normalized.split(/[/\\]/).includes('..')) {
+    return { ok: false, reason: 'path escapes the vault' }
+  }
+
+  const fullPath = join(vaultPath, normalized)
+  if (!isInside(vaultPath, fullPath)) {
+    return { ok: false, reason: 'path escapes the vault' }
+  }
+  return { ok: true, fullPath }
+}
+
+/**
  * Roots that the shell is allowed to hand to the OS.
  *
  * `shell.openFile` opens an arbitrary path with the system default handler, so
  * it is limited to places this app owns: its own data directory, the configured
- * projects root, and every registered project root. PDFs downloaded from arXiv
- * live under the projects root and exports under the data directory, so all
- * legitimate callers stay inside.
+ * projects root, every registered project root, and the bound Obsidian vault
+ * (notes the user asked us to manage, and may want to open in their editor).
  */
 export function allowedOpenRoots(): string[] {
   const roots: string[] = []
@@ -73,8 +105,9 @@ export function allowedOpenRoots(): string[] {
     roots.push(join(app.getPath('appData'), 'Fieldguide'))
   } catch { /* app not ready */ }
   try {
-    const { projectsRoot } = loadConfig()
+    const { projectsRoot, obsidian } = loadConfig()
     if (projectsRoot) roots.push(projectsRoot)
+    if (obsidian?.vaultPath) roots.push(obsidian.vaultPath)
   } catch { /* config unavailable */ }
   try {
     for (const project of listProjects()) {

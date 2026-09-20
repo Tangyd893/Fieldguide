@@ -239,6 +239,23 @@ function migrate(db: Database.Database): void {
       created_at TEXT NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id)
     );
+
+    -- F-17: bookkeeping for the Obsidian vault notes Fieldguide wrote.
+    -- The content hash is what makes a re-sync safe: anything the user edited
+    -- since our last write is detected instead of overwritten. vault_path is
+    -- stored per row so re-binding to another vault leaves detectable orphans.
+    CREATE TABLE IF NOT EXISTS vault_notes (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      note_path TEXT NOT NULL,
+      vault_path TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL,
+      source_id TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      synced_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
   `)
 
   // ── Additive migrations ──
@@ -269,6 +286,8 @@ function migrate(db: Database.Database): void {
       ON review_cards(project_id, due_at);
     CREATE INDEX IF NOT EXISTS idx_review_findings_project
       ON review_findings(project_id, severity);
+    CREATE INDEX IF NOT EXISTS idx_vault_notes_project
+      ON vault_notes(project_id, note_path);
   `)
 
   if (from !== SCHEMA_VERSION) {
@@ -345,6 +364,7 @@ export function removeProject(id: string): void {  const db = getDb()
   db.prepare('DELETE FROM knowledge_nodes WHERE project_id = ?').run(id)
   db.prepare('DELETE FROM interview_questions WHERE project_id = ?').run(id)
   db.prepare('DELETE FROM chat_messages WHERE project_id = ?').run(id)
+  db.prepare('DELETE FROM vault_notes WHERE project_id = ?').run(id)
   db.prepare('DELETE FROM projects WHERE id = ?').run(id)
 }
 
@@ -1012,6 +1032,75 @@ export function insertLearningPath(
 
 export function removeLearningPaths(projectId: string): void {
   getDb().prepare('DELETE FROM learning_paths WHERE project_id = ?').run(projectId)
+}
+
+/* ──────────── F-17: Obsidian vault notes ──────────── */
+
+export interface VaultNoteRow {
+  id: string
+  project_id: string
+  note_path: string
+  vault_path: string
+  kind: string
+  source_id: string
+  title: string
+  content_hash: string
+  synced_at: string
+}
+
+export interface VaultNoteInput {
+  project_id: string
+  note_path: string
+  vault_path: string
+  kind: string
+  source_id?: string
+  title: string
+  content_hash: string
+  synced_at: string
+}
+
+export function listVaultNotes(projectId: string): VaultNoteRow[] {
+  return getDb().prepare(
+    'SELECT * FROM vault_notes WHERE project_id = ? ORDER BY note_path ASC',
+  ).all(projectId) as VaultNoteRow[]
+}
+
+export function getVaultNote(projectId: string, notePath: string): VaultNoteRow | undefined {
+  return getDb().prepare(
+    'SELECT * FROM vault_notes WHERE project_id = ? AND note_path = ?',
+  ).get(projectId, notePath) as VaultNoteRow | undefined
+}
+
+/** Insert or refresh the bookkeeping row for one note (path is the identity). */
+export function upsertVaultNote(note: VaultNoteInput): VaultNoteRow {
+  const db = getDb()
+  const existing = getVaultNote(note.project_id, note.note_path)
+  if (existing) {
+    db.prepare(`
+      UPDATE vault_notes
+         SET vault_path = ?, kind = ?, source_id = ?, title = ?, content_hash = ?, synced_at = ?
+       WHERE id = ?
+    `).run(note.vault_path, note.kind, note.source_id ?? '', note.title, note.content_hash, note.synced_at, existing.id)
+    return getVaultNote(note.project_id, note.note_path)!
+  }
+  const id = `vault-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  db.prepare(`
+    INSERT INTO vault_notes
+      (id, project_id, note_path, vault_path, kind, source_id, title, content_hash, synced_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, note.project_id, note.note_path, note.vault_path, note.kind,
+    note.source_id ?? '', note.title, note.content_hash, note.synced_at,
+  )
+  return getVaultNote(note.project_id, note.note_path)!
+}
+
+export function removeVaultNote(id: string): void {
+  getDb().prepare('DELETE FROM vault_notes WHERE id = ?').run(id)
+}
+
+export function removeVaultNotesForProject(projectId: string): void {
+  getDb().prepare('DELETE FROM vault_notes WHERE project_id = ?').run(projectId)
 }
 
 export function closeDb(): void {

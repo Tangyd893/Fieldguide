@@ -13,6 +13,16 @@ export type IpcErrorCode =
   | 'SOURCE_UNAVAILABLE'
   | 'EMBED_API_ERROR'
   | 'INDEX_CANCELLED'
+  /* ── Obsidian vault integration (F-17) ── */
+  | 'OBSIDIAN_CLI_MISSING'
+  | 'OBSIDIAN_APP_NOT_RUNNING'
+  | 'OBSIDIAN_CLI_ERROR'
+  | 'VAULT_NOT_BOUND'
+  | 'VAULT_NOT_FOUND'
+  | 'VAULT_NOT_REGISTERED'
+  | 'VAULT_PATH_INVALID'
+  | 'VAULT_SYNC_IN_PROGRESS'
+  | 'VAULT_WRITE_CONFLICT'
   | 'UNKNOWN';
 
 export interface IpcError {

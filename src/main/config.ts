@@ -30,6 +30,33 @@ export interface UAConfig {
   incremental: boolean
 }
 
+/**
+ * Obsidian vault integration (docs/product-spec F-17).
+ *
+ * Everything here is opt-in: an empty `vaultPath` means "integration off" and no
+ * code outside `main/obsidian/` should touch the filesystem for a vault. The
+ * user's vault is somebody else's data directory, so the binding is explicit,
+ * single, and validated before it is persisted (see `validateVaultDirectory`).
+ */
+export interface ObsidianConfig {
+  /** Absolute vault directory; '' disables the integration. */
+  vaultPath: string
+  /** Vault name as Obsidian knows it (used for CLI `vault=`); may be ''. */
+  vaultName: string
+  /** Explicit CLI path override; '' = auto-resolve from PATH / install dirs. */
+  cliPath: string
+  /** Root folder Fieldguide owns inside the vault. */
+  folder: string
+  /** Sync automatically once an index run completes. */
+  autoSyncOnIndex: boolean
+  /** Mirror in-app code notes into the vault. */
+  mirrorNotes: boolean
+  /** Let the coach agent create/update cards inside the project folder. */
+  agentWrite: boolean
+  /** Open the index note in Obsidian after a sync. */
+  openAfterSync: boolean
+}
+
 export interface AppearanceConfig {
   themePreset: 'parchment' | 'forest' | 'slate' | 'midnight' | 'paper-dark' | 'none'
   /** Shell / chrome zoom (50–200). Legacy field `zoom` is migrated on load. */
@@ -55,6 +82,7 @@ export interface AppConfig {
   projectsRoot: string
   onboardingCompleted: boolean
   ua: UAConfig
+  obsidian: ObsidianConfig
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -82,6 +110,27 @@ const DEFAULT_CONFIG: AppConfig = {
     language: 'zh',
     incremental: true,
   },
+  obsidian: {
+    vaultPath: '',
+    vaultName: '',
+    cliPath: '',
+    folder: 'Fieldguide',
+    autoSyncOnIndex: false,
+    mirrorNotes: true,
+    agentWrite: true,
+    openAfterSync: false,
+  },
+}
+
+/** Fresh copy of the defaults, so a caller mutating one cannot poison the constant. */
+function freshDefaults(): AppConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    llm: { ...DEFAULT_CONFIG.llm },
+    appearance: { ...DEFAULT_CONFIG.appearance },
+    ua: { ...DEFAULT_CONFIG.ua },
+    obsidian: { ...DEFAULT_CONFIG.obsidian },
+  }
 }
 
 /**
@@ -127,6 +176,40 @@ function normalizeAppearance(raw: Partial<AppearanceConfig> | undefined): Appear
   }
 }
 
+/**
+ * The vault folder is a path segment Fieldguide appends to the user's vault, so
+ * it must never be able to escape it: absolute paths, drive letters and `..`
+ * segments are stripped rather than "fixed up", and an unusable value falls back
+ * to the default.
+ */
+export function normalizeVaultFolder(raw: unknown): string {
+  const fallback = DEFAULT_CONFIG.obsidian.folder
+  if (typeof raw !== 'string') return fallback
+  const cleaned = raw
+    .trim()
+    .replace(/^[a-zA-Z]:/, '')
+    .split(/[/\\]+/)
+    .map((part) => part.trim())
+    .filter((part) => part && part !== '.' && part !== '..' && !/[\0<>:"|?*]/.test(part))
+    .join('/')
+  return cleaned || fallback
+}
+
+function normalizeObsidian(raw: Partial<ObsidianConfig> | undefined): ObsidianConfig {
+  const base = { ...DEFAULT_CONFIG.obsidian }
+  if (!raw) return base
+  return {
+    vaultPath: typeof raw.vaultPath === 'string' ? raw.vaultPath.trim() : base.vaultPath,
+    vaultName: typeof raw.vaultName === 'string' ? raw.vaultName.trim() : base.vaultName,
+    cliPath: typeof raw.cliPath === 'string' ? raw.cliPath.trim() : base.cliPath,
+    folder: normalizeVaultFolder(raw.folder ?? base.folder),
+    autoSyncOnIndex: raw.autoSyncOnIndex ?? base.autoSyncOnIndex,
+    mirrorNotes: raw.mirrorNotes ?? base.mirrorNotes,
+    agentWrite: raw.agentWrite ?? base.agentWrite,
+    openAfterSync: raw.openAfterSync ?? base.openAfterSync,
+  }
+}
+
 function mergeConfig(raw: Partial<AppConfig>): AppConfig {
   const llm = { ...DEFAULT_CONFIG.llm, ...(raw.llm || {}) }
   llm.chatModel = migrateLegacyChatModel(llm.chatModel || DEFAULT_CONFIG.llm.chatModel)
@@ -136,6 +219,7 @@ function mergeConfig(raw: Partial<AppConfig>): AppConfig {
     llm,
     appearance: normalizeAppearance(raw.appearance),
     ua: { ...DEFAULT_CONFIG.ua, ...(raw.ua || {}) },
+    obsidian: normalizeObsidian(raw.obsidian),
   }
 }
 
@@ -143,7 +227,7 @@ export function loadConfig(): AppConfig {
   const p = configPath()
   if (!existsSync(p)) {
     saveConfig(DEFAULT_CONFIG)
-    return { ...DEFAULT_CONFIG, llm: { ...DEFAULT_CONFIG.llm }, appearance: { ...DEFAULT_CONFIG.appearance }, ua: { ...DEFAULT_CONFIG.ua } }
+    return freshDefaults()
   }
   try {
     const parsed = JSON.parse(readFileSync(p, 'utf-8')) as Partial<AppConfig> & {
@@ -164,7 +248,7 @@ export function loadConfig(): AppConfig {
     }
     return merged
   } catch {
-    return { ...DEFAULT_CONFIG, llm: { ...DEFAULT_CONFIG.llm }, appearance: { ...DEFAULT_CONFIG.appearance }, ua: { ...DEFAULT_CONFIG.ua } }
+    return freshDefaults()
   }
 }
 
@@ -229,6 +313,7 @@ export function updateConfig(patch: Partial<AppConfig>): AppConfig {
       ? { ...current.appearance, ...patch.appearance }
       : current.appearance,
     ua: patch.ua ? { ...current.ua, ...patch.ua } : current.ua,
+    obsidian: patch.obsidian ? { ...current.obsidian, ...patch.obsidian } : current.obsidian,
   })
   saveConfig(next)
   return next
