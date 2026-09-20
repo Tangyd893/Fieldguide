@@ -250,7 +250,7 @@ flowchart TD
 
 | 文档 | 当前版本 |
 |------|----------|
-| README | Phase 0 v0.3 叙述 |
+| README | 功能与用法（面向使用者，不含进度叙述） |
 | product-spec | v0.5 |
 | architecture | v0.5 |
 | ui-spec | v0.6 |
