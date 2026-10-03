@@ -506,6 +506,12 @@
     "clearCache": "清除匯出快取",
     "exportGraph": "匯出目前專案圖譜",
     "cacheCleared": "已清除 {{count}} 個匯出檔案",
+    "usage": "使用日誌（本機）",
+    "usageHint": "預設關閉。開啟後只記錄事件名、專案 id、節點／檔案識別與數值（例如面板切換、筆記數、複習評分），**不記錄筆記正文、提問內容或原始碼**。日誌只寫在本機資料目錄，可隨時匯出或刪除。",
+    "usageToggle": "開啟本機使用日誌",
+    "usageSummary": "近 {{days}} 天：{{events}} 個事件 · 面板切換 {{panels}} · 新增筆記 {{notes}} · 複習 {{reviews}}",
+    "usageExport": "匯出使用日誌",
+    "usageExported": "已匯出 {{count}} 筆記錄並開啟檔案",
     "obsidian": {
       "cliTitle": "Obsidian CLI",
       "cliHint": "Fieldguide 透過官方 Obsidian CLI 驗證 vault、開啟筆記與檢索。CLI 需要 Obsidian 正在執行，且要求 1.12.7 或以上的安裝程式版本。",

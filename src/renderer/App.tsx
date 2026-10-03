@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Folder } from 'lucide-react'
+import { trackPanel } from './lib/usage'
 import ProjectLibrary from './views/ProjectLibrary/ProjectLibrary'
 import FileTree from './views/CodeMap/FileTree'
 import SplitPanel from './views/CodeMap/SplitPanel'
@@ -366,7 +367,10 @@ export default function App() {
     if (activeTab !== 'settings') {
       window.fieldguide.configSet({ lastTab: activeTab } as never).catch(() => {})
     }
-  }, [activeTab])
+    // Panel switches are a UI-only signal: the main process can see that a node was
+    // read, but not which panel the reader was in when they read it.
+    trackPanel(activeTab, selectedProjectId ?? undefined)
+  }, [activeTab, selectedProjectId])
 
   useEffect(() => {
     if (selectedProjectId) {

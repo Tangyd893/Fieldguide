@@ -86,6 +86,7 @@ import type { AnalysisStage, ArchitectureSummary, InterviewQuestion, KnowledgeNo
 const chatRuns = new Map<string, AbortController>()
 import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
 import { isLLMConfigured, llmKeySource, maskedApiKey } from '../ua/config-bridge'
+import { recordUsage, summarizeUsage, exportUsageMarkdown } from '../usage-log'
 import { getLlmProviderCatalog, fetchProviderModels } from '../llm/catalog'
 import {
   loadGraph,
@@ -169,6 +170,48 @@ ipcMain.handle('config:set', (_e, patch: Record<string, unknown>): IpcResult<unk
 ipcMain.handle('config:llmStatus', (): IpcResult<unknown> => {
   try {
     return ipcOk({ configured: isLLMConfigured(), maskedKey: maskedApiKey(), ...llmKeySource() })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── Local usage log (opt-in, no free text) ──────────── */
+
+ipcMain.handle('usage:summary', (_e, { days }: { days?: number } = {}): IpcResult<unknown> => {
+  try {
+    const window = Math.max(1, Math.min(90, Number(days) || 7))
+    return ipcOk(summarizeUsage(window))
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/** Record one UI event; a no-op unless the reader enabled logging. */
+ipcMain.handle('usage:record', (_e, event: unknown): IpcResult<null> => {
+  try {
+    recordUsage(event)
+    return ipcOk(null)
+  } catch (err) {
+    // Instrumentation must never break the action that triggered it.
+    console.warn(`[usage] record failed: ${String(err)}`)
+    return ipcOk(null)
+  }
+})
+
+/**
+ * Export the local log to a Markdown file the reader keeps.
+ *
+ * Written into the app data directory like every other export, and only ever
+ * triggered by an explicit click — there is no automatic upload path.
+ */
+ipcMain.handle('usage:export', (): IpcResult<unknown> => {
+  try {
+    const { content, files, events } = exportUsageMarkdown()
+    const outDir = join(dataDir(), 'exports')
+    if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true })
+    const outPath = join(outDir, `使用日志-${new Date().toISOString().slice(0, 10)}.md`)
+    writeFileSync(outPath, content, 'utf-8')
+    return ipcOk({ exportPath: outPath, files, events })
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }
@@ -1491,7 +1534,10 @@ ipcMain.handle('progress:set', (_e, {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
   try {
-    return ipcOk(setLearnProgress(projectId, nodeId, status, confidence))
+    const row = setLearnProgress(projectId, nodeId, status, confidence)
+    // RQ4: progress marks are the coverage signal for the learning loop.
+    recordUsage({ event: 'progress_marked', project: projectId, target: nodeId })
+    return ipcOk(row)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }
@@ -1533,7 +1579,15 @@ ipcMain.handle('notes:add', (_e, note: CodeNoteInput): IpcResult<unknown> => {
   const check = resolveProjectPath(project.root_path, note.file_path)
   if (!check.ok) return ipcErr('SOURCE_UNAVAILABLE', `非法路径: ${check.reason}`)
   try {
-    return ipcOk(insertCodeNote({ ...note, body: note.body.trim() }))
+    const row = insertCodeNote({ ...note, body: note.body.trim() })
+    // RQ4: how often the reader leaves a trace (length, not content).
+    recordUsage({
+      event: 'note_added',
+      project: note.project_id,
+      target: note.node_id || note.file_path,
+      value: note.body.trim().length,
+    })
+    return ipcOk(row)
   } catch (err) {
     return ipcErr('UNKNOWN', String(err))
   }
@@ -1606,6 +1660,10 @@ ipcMain.handle('review:grade', (_e, {
   try {
     const card = getReviewCard(cardId)
     if (!card) return ipcErr('UNKNOWN', '卡片不存在')
+
+    // RQ4 data point: a graded review is the strongest signal that the spaced
+    // repetition loop is actually used (rating only, never the card text).
+    recordUsage({ event: 'review_graded', project: card.project_id, target: cardId, value: rating })
 
     const result = schedule(
       { intervalDays: card.interval_days, ease: card.ease, reps: card.reps, lapses: card.lapses },

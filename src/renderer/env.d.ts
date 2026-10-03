@@ -39,8 +39,19 @@ interface ProjectRow {
   indexed_at: string | null
 }
 
-/** One recorded index run, as surfaced by `index:jobList`. */
-interface IndexJobView {
+/** Aggregate of the local usage log, as surfaced by `usage:summary`. */
+interface UsageSummary {
+  days: number
+  enabled: boolean
+  totalEvents: number
+  byEvent: Record<string, number>
+  projects: number
+  distinctTargets: number
+  perDay: Array<{ date: string; count: number }>
+  policy: { freeText: false; offByDefault: true; localOnly: true }
+}
+
+/** One recorded index run, as surfaced by `index:jobList`. */interface IndexJobView {
   id: string
   status: 'running' | 'succeeded' | 'failed' | 'cancelled'
   kind: string
@@ -461,6 +472,11 @@ interface FieldguideAPI {
   diagnosticsOpenLogDir(): Promise<{ ok: boolean; error?: { message: string } }>
   dataOpenDir(): Promise<{ ok: boolean; data?: { path?: string }; error?: { message: string } }>
   dataClearCache(): Promise<{ ok: boolean; data?: { removed?: number }; error?: { message: string } }>
+
+  // Local usage log (opt-in; no free text is recorded)
+  usageSummary(days?: number): Promise<{ ok: boolean; data?: UsageSummary; error?: { message: string } }>
+  usageRecord(event: { event: string; project?: string; target?: string; value?: number }): Promise<{ ok: boolean }>
+  usageExport(): Promise<{ ok: boolean; data?: { exportPath: string; files: number; events: number }; error?: { message: string } }>
 }
 
 declare global {

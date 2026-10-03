@@ -114,6 +114,16 @@ export interface AppearanceConfig {
   zoom?: number
 }
 
+/**
+ * Local learning-behaviour logging (see `usage-log.ts`).
+ *
+ * Off by default: the log exists to answer "is the learning loop actually used?",
+ * which is a question worth answering only with the reader's consent.
+ */
+export interface UsageConfig {
+  enabled: boolean
+}
+
 export interface AppConfig {
   llm: LLMConfig
   locale: 'zh-CN' | 'zh-TW' | 'en-US'
@@ -123,6 +133,7 @@ export interface AppConfig {
   onboardingCompleted: boolean
   ua: UAConfig
   obsidian: ObsidianConfig
+  usage: UsageConfig
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -160,6 +171,9 @@ const DEFAULT_CONFIG: AppConfig = {
     agentWrite: true,
     openAfterSync: false,
   },
+  usage: {
+    enabled: false,
+  },
 }
 
 /** Fresh copy of the defaults, so a caller mutating one cannot poison the constant. */
@@ -170,6 +184,7 @@ function freshDefaults(): AppConfig {
     appearance: { ...DEFAULT_CONFIG.appearance },
     ua: { ...DEFAULT_CONFIG.ua },
     obsidian: { ...DEFAULT_CONFIG.obsidian },
+    usage: { ...DEFAULT_CONFIG.usage },
   }
 }
 
@@ -260,6 +275,7 @@ function mergeConfig(raw: Partial<AppConfig>): AppConfig {
     appearance: normalizeAppearance(raw.appearance),
     ua: { ...DEFAULT_CONFIG.ua, ...(raw.ua || {}) },
     obsidian: normalizeObsidian(raw.obsidian),
+    usage: { enabled: raw.usage?.enabled === true },
   }
 }
 

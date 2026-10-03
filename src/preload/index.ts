@@ -403,6 +403,14 @@ const api = {
     ipcRenderer.invoke('data:openDir'),
   dataClearCache: (): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('data:clearCache'),
+
+  // Local usage log (opt-in; never records free text)
+  usageSummary: (days?: number): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('usage:summary', { days }),
+  usageRecord: (event: { event: string; project?: string; target?: string; value?: number }): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('usage:record', event),
+  usageExport: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('usage:export'),
 }
 
 contextBridge.exposeInMainWorld('fieldguide', api)

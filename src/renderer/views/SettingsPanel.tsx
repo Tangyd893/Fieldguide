@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Cpu, FolderOpen, Globe, Palette, Wrench, ZoomIn, Type, Plug, Check, X, Database, Info, RefreshCw,
-  NotebookPen, Library, Copy, FolderPlus, Play, Unlink,
+  NotebookPen, Library, Copy, FolderPlus, Play, Unlink, BarChart3,
 } from 'lucide-react'
 import { applyTheme } from '../App'
 import {
@@ -43,6 +43,18 @@ interface ObsidianState {
   mirrorNotes: boolean
   agentWrite: boolean
   openAfterSync: boolean
+}
+
+/** Aggregate of the local usage log (mirrors `UsageSummary` in the main process). */
+interface UsageSummary {
+  days: number
+  enabled: boolean
+  totalEvents: number
+  byEvent: Record<string, number>
+  projects: number
+  distinctTargets: number
+  perDay: Array<{ date: string; count: number }>
+  policy: { freeText: boolean; offByDefault: boolean; localOnly: boolean }
 }
 
 const DEFAULT_OBSIDIAN: ObsidianState = {
@@ -106,6 +118,10 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
   const [logLoading, setLogLoading] = useState(false)
   const [dataMsg, setDataMsg] = useState<string | null>(null)
   const [exportingReport, setExportingReport] = useState(false)
+
+  // ── Local usage log (opt-in) ──
+  const [usageEnabled, setUsageEnabled] = useState(false)
+  const [usage, setUsage] = useState<UsageSummary | null>(null)
 
   // ── Obsidian vault integration (F-17) ──
   const [obsidian, setObsidian] = useState<ObsidianState>(() => ({ ...DEFAULT_OBSIDIAN }))
@@ -365,6 +381,12 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
     [providerId, baseUrl, apiKey, applyFetchedModels, t],
   )
 
+  /** Read the local usage aggregate (all zeros while logging is off). */
+  const refreshUsage = useCallback(async () => {
+    const result = await window.fieldguide.usageSummary(7)
+    setUsage(result.ok ? (result.data ?? null) : null)
+  }, [])
+
   useEffect(() => {
     void Promise.all([
       window.fieldguide.configGet(),
@@ -413,6 +435,8 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
         if (obs.vaultPath && !obs.vaultName) {
           setVaultBinding({ path: obs.vaultPath, name: '', kind: 'unregistered' })
         }
+        setUsageEnabled((c.usage as { enabled?: boolean } | undefined)?.enabled === true)
+        void refreshUsage()
 
         // Live models when key present (or Ollama without key)
         if (url && (key || pid === 'ollama')) {
@@ -425,10 +449,9 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
         }
       }
     })
-  }, [applyFetchedModels, t])
+  }, [applyFetchedModels, refreshUsage, t])
 
-  const patchAppearance = useCallback((patch: Partial<AppearanceState>) => {
-    setAppearance((prev) => {
+  const patchAppearance = useCallback((patch: Partial<AppearanceState>) => {    setAppearance((prev) => {
       const next = { ...prev, ...patch }
       if (patch.shellZoom != null || patch.uiFontSize != null) {
         applyShellZoom(next.shellZoom, next.uiFontSize)
@@ -1152,6 +1175,51 @@ export default function SettingsView({ t, onAbout, selectedProjectId, onAppearan
 
           {category === 'data' && (
             <>
+              <Section icon={<BarChart3 size={16} />} title={t('settings.usage')}>
+                <p className="text-xs text-[var(--fg-text-tertiary)] mb-3">{t('settings.usageHint')}</p>
+                <label className="flex items-center gap-2 text-sm text-[var(--fg-text-primary)]">
+                  <input
+                    type="checkbox"
+                    checked={usageEnabled}
+                    onChange={async (e) => {
+                      const enabled = e.target.checked
+                      setUsageEnabled(enabled)
+                      await window.fieldguide.configSet({ usage: { enabled } } as never)
+                      await refreshUsage()
+                    }}
+                  />
+                  {t('settings.usageToggle')}
+                </label>
+                {usage && (
+                  <p className="text-xs text-[var(--fg-text-secondary)] mt-2">
+                    {t('settings.usageSummary', {
+                      days: usage.days,
+                      events: usage.totalEvents,
+                      panels: usage.byEvent.panel_opened ?? 0,
+                      notes: usage.byEvent.note_added ?? 0,
+                      reviews: usage.byEvent.review_graded ?? 0,
+                    })}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!usage || usage.totalEvents === 0}
+                    onClick={async () => {
+                      const result = await window.fieldguide.usageExport()
+                      if (result.ok && result.data) {
+                        setDataMsg(t('settings.usageExported', { count: result.data.events }))
+                        await window.fieldguide.openFile(result.data.exportPath)
+                        setTimeout(() => setDataMsg(null), 4000)
+                      }
+                    }}
+                  >
+                    {t('settings.usageExport')}
+                  </Button>
+                </div>
+              </Section>
+
               <Section icon={<Database size={16} />} title={t('settings.data')}>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={() => window.fieldguide.dataOpenDir()}>{t('settings.openDataDir')}</Button>

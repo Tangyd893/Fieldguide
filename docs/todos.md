@@ -483,6 +483,19 @@ flowchart TD
 >    本机无 Key，因此 `docs/eval/agent-answers.md` 当前如实显示"尚未录制"。
 > 4. 已知局限 10 条见 [`项目介绍.md`](./项目介绍.md) §8。
 
+- [x] **W5 本地使用日志**（RQ4 的数据来源，隐私按承诺写测试）
+  - [`usage-log.ts`](../src/main/usage-log.ts)：事件名走闭集（10 个）、`sanitizeEvent` 丢弃未知字段与自由文本、
+    标识符字段做形状校验且超长整字段丢弃、按天写 JSONL、`summarizeUsage` 聚合、`exportUsageMarkdown` 可导出
+  - 配置新增 `usage.enabled`（**默认关闭**）；IPC `usage:summary` / `usage:record` / `usage:export`；
+    设置 → 数据与诊断加开关、摘要与导出按钮；面板切换在渲染层埋点（唯一 UI-only 信号）
+  - 主进程埋点：笔记新增、进度标记、复习评分（都是主进程能看见的学习行为）
+  - 验证：单测 10 例（敌意载荷 / 标识符形状 / 关闭不写盘 / 截断行容错）+ **E2E 2 例**
+    （开启后记录、关闭不写盘；并**读取磁盘上真实导出的 Markdown** 断言不含提问文本与笔记正文）
+
+> **本批规模**：单测 51 文件 / **508 通过**；E2E 5 文件 / **21 例**；lint 0 error / 0 warning。
+> **仍未完成**：**W7 真人用户研究**（协议与工具齐备，数据必须由真实参与者产生，仓库不预置模拟结果）；
+> 答案级录制需要一次带 API Key 的运行（`pnpm eval:record-answers`）。
+
 ---
 
 ## P1 — UA 图谱能力补齐（管线 / 桥接）

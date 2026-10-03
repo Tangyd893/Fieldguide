@@ -506,6 +506,12 @@
     "clearCache": "清除导出缓存",
     "exportGraph": "导出当前项目图谱",
     "cacheCleared": "已清除 {{count}} 个导出文件",
+    "usage": "使用日志（本地）",
+    "usageHint": "默认关闭。开启后只记录事件名、项目 id、节点/文件标识与数值（例如面板切换、笔记条数、复习评分），**不记录笔记正文、提问内容或源码**。日志只写在本机数据目录，可随时导出或删除。",
+    "usageToggle": "开启本地使用日志",
+    "usageSummary": "近 {{days}} 天：{{events}} 个事件 · 面板切换 {{panels}} · 新增笔记 {{notes}} · 复习 {{reviews}}",
+    "usageExport": "导出使用日志",
+    "usageExported": "已导出 {{count}} 条记录并打开文件",
     "obsidian": {
       "cliTitle": "Obsidian CLI",
       "cliHint": "Fieldguide 通过官方 Obsidian CLI 校验 vault、打开笔记与检索。CLI 需要 Obsidian 正在运行，且要求 1.12.7 或以上安装器版本。",

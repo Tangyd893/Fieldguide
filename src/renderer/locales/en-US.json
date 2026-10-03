@@ -506,6 +506,12 @@
     "clearCache": "Clear Export Cache",
     "exportGraph": "Export Project Graph",
     "cacheCleared": "Cleared {{count}} export file(s)",
+    "usage": "Usage log (local)",
+    "usageHint": "Off by default. When enabled it records only event names, project ids, node/file identifiers and numbers (panel switches, note counts, review ratings) — **never note text, questions or source code**. The log stays in the local data directory and can be exported or deleted at any time.",
+    "usageToggle": "Enable the local usage log",
+    "usageSummary": "Last {{days}} days: {{events}} events · {{panels}} panel switches · {{notes}} notes · {{reviews}} reviews",
+    "usageExport": "Export usage log",
+    "usageExported": "Exported {{count}} records and opened the file",
     "obsidian": {
       "cliTitle": "Obsidian CLI",
       "cliHint": "Fieldguide uses the official Obsidian CLI to validate vaults, open notes, and search. The CLI requires Obsidian to be running and installer version 1.12.7 or newer.",
