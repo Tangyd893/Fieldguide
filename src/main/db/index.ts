@@ -71,6 +71,9 @@ function migrate(db: Database.Database): void {
       phase TEXT,
       progress REAL DEFAULT 0,
       error TEXT,
+      kind TEXT NOT NULL DEFAULT 'full',
+      stages_json TEXT NOT NULL DEFAULT '[]',
+      node_count INTEGER DEFAULT 0,
       started_at TEXT,
       finished_at TEXT,
       FOREIGN KEY (project_id) REFERENCES projects(id)
@@ -338,6 +341,108 @@ export function updateProjectStatus(id: string, status: ProjectRow['status'], no
   } else {
     db.prepare('UPDATE projects SET status = ? WHERE id = ?').run(status, id)
   }
+}
+
+/* ──────────── Index jobs (the job centre) ──────────── */
+
+export type IndexJobStatus = 'running' | 'succeeded' | 'failed' | 'cancelled'
+
+/**
+ * One recorded index run.
+ *
+ * The row exists so the app can answer three questions the UI used to guess at:
+ * what the last run actually did, which stages produced results, and whether a
+ * failed run can simply be retried.
+ */
+export interface IndexJobRow {
+  id: string
+  project_id: string
+  status: IndexJobStatus
+  phase: string | null
+  progress: number
+  error: string | null
+  /** 'full' | 'incremental' — the mode the run was started with. */
+  kind: string
+  /** Serialized `IndexStageOutcome[]`: per-stage ok/skipped/failed + duration. */
+  stages_json: string
+  node_count: number
+  started_at: string | null
+  finished_at: string | null
+}
+
+export function insertIndexJob(job: {
+  id: string
+  project_id: string
+  kind: string
+  status?: IndexJobStatus
+}): IndexJobRow {
+  const db = getDb()
+  db.prepare(`
+    INSERT INTO index_jobs (id, project_id, status, phase, progress, kind, stages_json, node_count, started_at)
+    VALUES (?, ?, ?, 'scan', 0, ?, '[]', 0, ?)
+  `).run(job.id, job.project_id, job.status ?? 'running', job.kind, new Date().toISOString())
+  return getIndexJob(job.id)!
+}
+
+export function getIndexJob(id: string): IndexJobRow | undefined {
+  const db = getDb()
+  return db.prepare('SELECT * FROM index_jobs WHERE id = ?').get(id) as IndexJobRow | undefined
+}
+
+export function updateIndexJob(
+  id: string,
+  patch: Partial<Pick<IndexJobRow, 'status' | 'phase' | 'progress' | 'error' | 'stages_json' | 'node_count' | 'finished_at'>>,
+): void {
+  const db = getDb()
+  const fields: string[] = []
+  const values: unknown[] = []
+  for (const key of ['status', 'phase', 'progress', 'error', 'stages_json', 'node_count', 'finished_at'] as const) {
+    if (patch[key] === undefined) continue
+    fields.push(`${key} = ?`)
+    values.push(patch[key])
+  }
+  if (fields.length === 0) return
+  values.push(id)
+  db.prepare(`UPDATE index_jobs SET ${fields.join(', ')} WHERE id = ?`).run(...(values as never[]))
+}
+
+/** Most recent jobs for a project (newest first). */
+export function listIndexJobs(projectId: string, limit = 10): IndexJobRow[] {
+  const db = getDb()
+  return db
+    .prepare('SELECT * FROM index_jobs WHERE project_id = ? ORDER BY started_at DESC LIMIT ?')
+    .all(projectId, limit) as IndexJobRow[]
+}
+
+/**
+ * Keep the history bounded: a long-lived project can accumulate thousands of rows,
+ * and only the recent ones are ever shown.
+ */
+export function pruneIndexJobs(projectId: string, keep = 20): number {
+  const db = getDb()
+  const result = db.prepare(`
+    DELETE FROM index_jobs
+    WHERE project_id = ?
+      AND id NOT IN (
+        SELECT id FROM index_jobs WHERE project_id = ? ORDER BY started_at DESC LIMIT ?
+      )
+  `).run(projectId, projectId, keep)
+  return result.changes
+}
+
+/**
+ * Mark jobs left `running` by a crash as `failed`, so history cannot show a run
+ * that never ends (the same reason `resetStaleIndexingStatus` exists).
+ */
+export function failStaleIndexJobs(): number {
+  const db = getDb()
+  const now = new Date().toISOString()
+  const result = db.prepare(`
+    UPDATE index_jobs
+    SET status = 'failed', error = COALESCE(error, 'interrupted by restart'), finished_at = ?
+    WHERE status = 'running'
+  `).run(now)
+  return result.changes
 }
 
 /**

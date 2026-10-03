@@ -21,6 +21,15 @@ describe('migration planning', () => {
     )
   })
 
+  it('upgrades a v4 index_jobs table into a job centre (kind / stages / node_count)', () => {
+    const steps = planMigrations(4, {
+      index_jobs: ['id', 'project_id', 'status', 'phase', 'progress', 'error', 'started_at', 'finished_at'],
+    })
+    expect(steps.map((s) => s.column)).toEqual(['kind', 'stages_json', 'node_count'])
+    expect(migrationSql(steps[0])).toBe("ALTER TABLE index_jobs ADD COLUMN kind TEXT NOT NULL DEFAULT 'full'")
+    expect(migrationSql(steps[1])).toBe("ALTER TABLE index_jobs ADD COLUMN stages_json TEXT NOT NULL DEFAULT '[]'")
+  })
+
   it('does nothing when the column is already present', () => {
     const steps = planMigrations(0, {
       chat_messages: ['id', 'project_id', 'role', 'content', 'steps_json', 'node_refs', 'created_at'],
@@ -44,8 +53,9 @@ describe('migration planning', () => {
   it('covers every table declared in ADDED_COLUMNS', () => {
     const tables = Object.keys(ADDED_COLUMNS)
     expect(tables).toContain('chat_messages')
+    expect(tables).toContain('index_jobs')
     // Guard against a version bump without a matching rule.
-    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(2)
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(5)
     for (const table of tables) {
       for (const { column, definition } of ADDED_COLUMNS[table]) {
         expect(column).toMatch(/^[a-z_]+$/)

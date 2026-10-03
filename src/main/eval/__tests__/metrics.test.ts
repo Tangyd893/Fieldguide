@@ -111,16 +111,30 @@ describe('scoreCitations', () => {
     expect(metrics.citationPrecision).toBe(1)
   })
 
-  it('computes recall as relevant citations over all expectations', () => {
+  it('counts satisfied expectations, so a node citation also satisfies its file', () => {
     const metrics = scoreCitations(
       ['function:a.go:Handle', 'function:b.go:Serve', 'file:c.go'],
       { nodes: ['function:a.go:Handle', 'function:b.go:Serve'], files: ['a.go'] },
       ALL,
       INDEX,
     )
-    // 3 expectations (2 nodes + 1 file); 2 citations are relevant, c.go is not
-    expect(metrics.citationRecall).toBeCloseTo(2 / 3, 5)
+    // 3 expectations (2 nodes + 1 file); Handle satisfies both its node and its
+    // file, Serve satisfies its node, and c.go satisfies nothing → 3/3.
+    // Recall deliberately uses the same satisfied-expectation rule as
+    // scoreRetrieval, so retrieval and answer numbers stay comparable.
+    expect(metrics.citationRecall).toBeCloseTo(1, 5)
+    // Precision, by contrast, is per citation: c.go is real but irrelevant.
     expect(metrics.citationPrecision).toBeCloseTo(2 / 3, 5)
+  })
+
+  it('reports partial recall when only some expectations are cited', () => {
+    const metrics = scoreCitations(
+      ['function:a.go:Handle'],
+      { nodes: ['function:a.go:Handle', 'function:b.go:Serve'], files: ['a.go'] },
+      ALL,
+      INDEX,
+    )
+    expect(metrics.citationRecall).toBeCloseTo(2 / 3, 5)
   })
 
   it('caps recall at 1 when several citations satisfy the same expectation', () => {
@@ -228,5 +242,22 @@ describe('report formatting', () => {
 
   it('returns an empty string when there is nothing to compare', () => {
     expect(formatComparisonTable([])).toBe('')
+  })
+
+  // Regression: the report for a k=10 run used to label its @k rows "Recall@5"
+  // because formatResultsTable called aggregate() with the default k. A mislabeled
+  // table is worse than a wrong number — it survives review.
+  it('labels @k rows with the cut-off the run was scored at', () => {
+    const md = formatResultsTable('变体 B', [{ id: 'q1', kind: 'locate', recallAtK: 0.5, reciprocalRank: 1 }], 10)
+    expect(md).toContain('| Recall@10 | 1 | 50.0% |')
+    expect(md).not.toContain('Recall@5')
+  })
+
+  it('reports the citation hallucination rate when answers cited unknown ids', () => {
+    const rows = aggregate([
+      { id: 'q1', kind: 'locate', faithful: 0.5, hallucinationRate: 0.5 },
+      { id: 'q2', kind: 'locate', faithful: 1, hallucinationRate: 0 },
+    ])
+    expect(rows.find((r) => r.label === '引用幻觉率（越低越好）')!.formatted).toBe('25.0%')
   })
 })

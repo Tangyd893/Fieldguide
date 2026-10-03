@@ -19,6 +19,11 @@ const api = {
     ipcRenderer.invoke('llm:listProviders'),
   llmFetchModels: (opts?: { providerId?: string; baseUrl?: string; apiKey?: string }): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('llm:fetchModels', opts ?? {}),
+  /** Real token/retry counters for this process — the cost side of the benchmark. */
+  llmUsage: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('llm:usage'),
+  llmResetUsage: (): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('llm:resetUsage'),
 
   // Projects
   projectList: (): Promise<IpcResult<unknown[]>> =>
@@ -64,6 +69,12 @@ const api = {
     ipcRenderer.invoke('project:indexCancel', { projectId }),
   projectExportGraph: (projectId: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('project:exportGraph', { projectId }),
+  /** Index history: what each run did, stage by stage. */
+  indexJobList: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('index:jobList', { projectId }),
+  /** Re-run the last job with the mode it was started with. */
+  indexJobRetry: (projectId: string): Promise<IpcResult<unknown>> =>
+    ipcRenderer.invoke('index:jobRetry', { projectId }),
   onIndexProgress: (cb: (data: unknown) => void) => {
     const handler = (_event: unknown, data: unknown) => cb(data)
     ipcRenderer.on('index:progress', handler)
@@ -230,6 +241,17 @@ const api = {
     }),
   chatHistory: (projectId: string): Promise<IpcResult<unknown>> =>
     ipcRenderer.invoke('chat:history', { projectId }),
+  /** Stop the answer currently being generated for a project. */
+  chatCancel: (projectId: string): Promise<IpcResult<null>> =>
+    ipcRenderer.invoke('chat:cancel', { projectId }),
+  /** Incremental events while an answer is generated: delta / step / done / error. */
+  onChatStream: (cb: (data: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => cb(data)
+    ipcRenderer.on('chat:stream', handler)
+    return () => {
+      ipcRenderer.removeListener('chat:stream', handler)
+    }
+  },
   chatClear: (projectId: string): Promise<IpcResult<null>> =>
     ipcRenderer.invoke('chat:clear', { projectId }),
 

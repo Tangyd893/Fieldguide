@@ -39,6 +39,26 @@ interface ProjectRow {
   indexed_at: string | null
 }
 
+/** One recorded index run, as surfaced by `index:jobList`. */
+interface IndexJobView {
+  id: string
+  status: 'running' | 'succeeded' | 'failed' | 'cancelled'
+  kind: string
+  phase: string | null
+  progress: number
+  error: string | null
+  nodeCount: number
+  startedAt: string | null
+  finishedAt: string | null
+  /** Per-stage outcomes: which phases produced results, and which degraded. */
+  stages: Array<{
+    stage: 'scan' | 'parse' | 'build' | 'llm' | 'save'
+    status: 'ok' | 'skipped' | 'failed'
+    durationMs: number
+    detail?: string
+  }>
+}
+
 interface PaperRow {
   id: string; arxiv_id: string; title: string; authors: string
   summary: string; published: string; pdf_path: string
@@ -259,6 +279,17 @@ interface FieldguideAPI {
     error?: { message: string }
   }>
 
+  /** Provider-reported usage for this process (tokens, calls, retries). */
+  llmUsage(): Promise<{ ok: boolean; data?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+    calls: number
+    failedCalls: number
+    retries: number
+  }; error?: { message: string } }>
+  llmResetUsage(): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
+
   // Projects
   projectList(): Promise<{ ok: boolean; data?: ProjectRow[]; error?: { message: string } }>
   projectAddLocal(path: string): Promise<{ ok: boolean; data?: ProjectRow; error?: { message: string } }>
@@ -279,6 +310,8 @@ interface FieldguideAPI {
   projectIndex(projectId: string, incremental?: boolean, skipLlm?: boolean): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   projectIndexCancel(projectId: string): Promise<{ ok: boolean; error?: { message: string } }>
   projectExportGraph(projectId: string): Promise<{ ok: boolean; data?: { exportPath?: string }; error?: { message: string } }>
+  indexJobList(projectId: string): Promise<{ ok: boolean; data?: { jobs: IndexJobView[]; running: boolean }; error?: { message: string } }>
+  indexJobRetry(projectId: string): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>
   onIndexProgress(cb: (data: unknown) => void): () => void
 
   // File tree & code
@@ -358,9 +391,13 @@ interface FieldguideAPI {
     projectId: string,
     messages: Array<{ role: string; content: string }>,
     opts?: { focusedNodeId?: string | null; tourStepIndex?: number | null },
-  ): Promise<{ ok: boolean; data?: { content: string; steps?: unknown[]; nodeRefs?: string[] }; error?: { message: string } }>
+  ): Promise<{ ok: boolean; data?: { content: string; steps?: unknown[]; nodeRefs?: string[]; streamed?: boolean }; error?: { code?: string; message: string } }>
   chatHistory(projectId: string): Promise<{ ok: boolean; data?: unknown[]; error?: { message: string } }>
   chatClear(projectId: string): Promise<{ ok: boolean; error?: { message: string } }>
+  /** Stop the answer currently being generated. */
+  chatCancel(projectId: string): Promise<{ ok: boolean; error?: { message: string } }>
+  /** Incremental answer events: `{ projectId, type: 'delta'|'step'|'done'|'error', ... }`. */
+  onChatStream(cb: (data: unknown) => void): () => void
 
   // Papers
   paperList(): Promise<{ ok: boolean; data?: PaperRow[]; error?: { message: string } }>

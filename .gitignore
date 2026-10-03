@@ -43,3 +43,7 @@ blob-report/
 
 # Reasonix
 .reasonix/
+
+# Market research: keep the written findings (.md), ignore fetched evidence/caches/binaries
+docs/research/*
+!docs/research/*.md

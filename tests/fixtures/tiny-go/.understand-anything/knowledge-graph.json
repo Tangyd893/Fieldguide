@@ -8,7 +8,7 @@
     ],
     "frameworks": [],
     "description": "",
-    "analyzedAt": "2026-06-30T04:27:19.710Z",
+    "analyzedAt": "2026-10-02T14:11:31.796Z",
     "gitCommitHash": ""
   },
   "nodes": [
@@ -30,8 +30,11 @@
         12,
         21
       ],
-      "summary": "",
-      "tags": [],
+      "summary": "创建存储与处理器，注册路由，阻塞在 HTTP 监听上。",
+      "tags": [
+        "入口",
+        "装配"
+      ],
       "complexity": "moderate"
     },
     {
@@ -52,8 +55,11 @@
         17,
         19
       ],
-      "summary": "",
-      "tags": [],
+      "summary": "处理器构造函数，注入存储依赖。",
+      "tags": [
+        "服务层",
+        "构造函数"
+      ],
       "complexity": "moderate"
     },
     {
@@ -65,8 +71,11 @@
         22,
         28
       ],
-      "summary": "",
-      "tags": [],
+      "summary": "读取查询参数 name，缺省为 World，向响应写入问候语。",
+      "tags": [
+        "http",
+        "查询参数"
+      ],
       "complexity": "moderate"
     },
     {
@@ -78,8 +87,12 @@
         31,
         35
       ],
-      "summary": "",
-      "tags": [],
+      "summary": "调用存储的 All 取数据，设置 Content-Type 后编码为 JSON。",
+      "tags": [
+        "http",
+        "json",
+        "读取路径"
+      ],
       "complexity": "moderate"
     },
     {
@@ -91,8 +104,11 @@
         12,
         14
       ],
-      "summary": "",
-      "tags": [],
+      "summary": "处理器类型，依赖存储接口，便于替换实现。",
+      "tags": [
+        "服务层",
+        "依赖注入"
+      ],
       "complexity": "moderate"
     },
     {
@@ -113,8 +129,11 @@
         18,
         25
       ],
-      "summary": "",
-      "tags": [],
+      "summary": "构造存储并预置两条示例记录。",
+      "tags": [
+        "存储层",
+        "构造函数"
+      ],
       "complexity": "moderate"
     },
     {
@@ -126,8 +145,12 @@
         28,
         34
       ],
-      "summary": "",
-      "tags": [],
+      "summary": "加读锁后复制切片返回，保证调用方不会改到内部状态。",
+      "tags": [
+        "存储层",
+        "读取路径",
+        "切片副本"
+      ],
       "complexity": "moderate"
     },
     {
@@ -139,8 +162,10 @@
         6,
         9
       ],
-      "summary": "",
-      "tags": [],
+      "summary": "存储记录类型，带 JSON 标签。",
+      "tags": [
+        "数据模型"
+      ],
       "complexity": "moderate"
     },
     {
@@ -152,8 +177,11 @@
         12,
         15
       ],
-      "summary": "",
-      "tags": [],
+      "summary": "内存存储类型：读写锁 + 记录切片。",
+      "tags": [
+        "存储层",
+        "并发安全"
+      ],
       "complexity": "moderate"
     },
     {
@@ -229,8 +257,47 @@
       "type": "contains",
       "direction": "forward",
       "weight": 1
+    },
+    {
+      "source": "file:cmd/main.go",
+      "target": "file:internal/service/handler.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:cmd/main.go",
+      "target": "file:internal/store/db.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/service/handler.go",
+      "target": "file:internal/store/db.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
     }
   ],
-  "layers": [],
+  "layers": [
+    {
+      "id": "layer:core",
+      "name": "Core",
+      "description": "Core application files",
+      "nodeIds": [
+        "file:cmd/main.go",
+        "file:internal/store/db.go"
+      ]
+    },
+    {
+      "id": "layer:service-layer",
+      "name": "Service Layer",
+      "description": "Business logic and application services",
+      "nodeIds": [
+        "file:internal/service/handler.go"
+      ]
+    }
+  ],
   "tour": []
 }

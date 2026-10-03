@@ -109,6 +109,19 @@ export default tseslint.config(
     },
   },
 
+  // ── Browser context inside Playwright callbacks ──
+  // `page.evaluate(...)` bodies are serialized and run in the renderer, so they
+  // legitimately touch `window`/`document` even though the file itself is Node.
+  {
+    files: ['e2e/**/*.ts', 'scripts/record-answers.mjs'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+      },
+    },
+  },
+
   // ── Tests ──
   {
     files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.ts'],

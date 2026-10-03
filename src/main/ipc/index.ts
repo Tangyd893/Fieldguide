@@ -8,7 +8,7 @@ import { ipcMain, BrowserWindow, shell, app, type IpcMainInvokeEvent } from 'ele
 import { join } from 'node:path'
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs'
 import { dataDir, loadConfig, updateConfig, type AppConfig } from '../config'
-import { chatCompletion, LlmError } from '../llm/client'
+import { chatCompletion, LlmError, llmUsageTotals, resetLlmUsage } from '../llm/client'
 import {
   listProjects,
   getProject,
@@ -53,8 +53,13 @@ import {
   listLearningPaths,
   insertLearningPath,
   removeLearningPaths,
+  insertIndexJob,
+  updateIndexJob,
+  listIndexJobs,
+  pruneIndexJobs,
 } from '../db'
 import type { LearnStatus, CodeNoteInput } from '../db'
+import type { IndexStageOutcome } from '../ua/client'
 import { readProjectTree } from '../file-tree'
 import { searchProjectContent } from '../content-search'
 import { writeLearningReport, scanProjectDebt } from '../insights'
@@ -71,6 +76,14 @@ import { resolveProjectPath, isAllowedOpenPath } from '../paths'
 import { indexProject, beginIndex, cancelIndex, isIndexRunning } from '../ua/client'
 import { runUnderstandPipeline, type UnderstandRunResult } from '../understand/pipeline'
 import type { AnalysisStage, ArchitectureSummary, InterviewQuestion, KnowledgeNode } from '../../shared/understand'
+
+/**
+ * In-flight coach runs, keyed by project.
+ *
+ * Kept here (not in the agent) because cancellation is an IPC concern: the stop
+ * button aborts the controller that this layer created for the request.
+ */
+const chatRuns = new Map<string, AbortController>()
 import { setDashboardGraph, setDashboardDiffOverlay } from '../ua/dashboard'
 import { isLLMConfigured, llmKeySource, maskedApiKey } from '../ua/config-bridge'
 import { getLlmProviderCatalog, fetchProviderModels } from '../llm/catalog'
@@ -211,8 +224,31 @@ ipcMain.handle(
   },
 )
 
-/* ──────────── App ──────────── */
+/**
+ * Real usage counters for this process.
+ *
+ * Deliberately reports provider tokens and retry counts instead of a money
+ * estimate: prices change per provider per model, and a fabricated cost line in
+ * an evaluation report is worse than no cost line at all.
+ */
+ipcMain.handle('llm:usage', (): IpcResult<unknown> => {
+  try {
+    return ipcOk(llmUsageTotals())
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
 
+ipcMain.handle('llm:resetUsage', (): IpcResult<unknown> => {
+  try {
+    resetLlmUsage()
+    return ipcOk(llmUsageTotals())
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/* ──────────── App ──────────── */
 ipcMain.handle('app:version', (): string => {
   try {
     const pkg = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf-8'))
@@ -728,6 +764,14 @@ ipcMain.handle('chat:send', async (_e, {
     })
   }
 
+  // One cancellable run per project: the stop button aborts this controller.
+  const controller = new AbortController()
+  chatRuns.set(projectId, controller)
+  const win = BrowserWindow.getAllWindows()[0]
+  const streamTo = (event: unknown) => {
+    win?.webContents.send('chat:stream', { projectId, ...(event as object) })
+  }
+
   try {
     const result = await runAgent(
       {
@@ -739,6 +783,14 @@ ipcMain.handle('chat:send', async (_e, {
         tourStepIndex: tourStepIndex ?? null,
       },
       messages,
+      {
+        signal: controller.signal,
+        onEvent: (event) => {
+          // Steps are streamed as they happen; deltas only carry answer text.
+          if (event.type === 'delta') streamTo({ type: 'delta', text: event.text })
+          else if (event.type === 'step') streamTo({ type: 'step', step: event.step })
+        },
+      },
     )
 
     insertChatMessage({
@@ -751,16 +803,41 @@ ipcMain.handle('chat:send', async (_e, {
     })
 
     logChatRequest(project.name, messages.length, result.content.length)
+    streamTo({ type: 'done', streamed: Boolean(result.streamed) })
     return ipcOk({
       content: result.content,
       steps: result.steps,
       nodeRefs: result.nodeRefs,
+      streamed: Boolean(result.streamed),
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    // A user-initiated stop is not a failure: report it as such and write nothing
+    // to history (the partial answer was never persisted).
+    if (controller.signal.aborted || msg === 'aborted') {
+      streamTo({ type: 'error', error: 'LLM_CANCELLED' })
+      return ipcErr('LLM_CANCELLED', '已停止生成', false)
+    }
+    streamTo({ type: 'error', error: msg })
     if (msg.includes('429')) return ipcErr('LLM_RATE_LIMIT', 'API 请求过于频繁，请稍后再试', true)
     return ipcErr('LLM_API_ERROR', `Agent 请求失败: ${msg}`, true)
+  } finally {
+    chatRuns.delete(projectId)
   }
+})
+
+/**
+ * Stop the answer currently being generated for a project.
+ *
+ * Cancellation semantics: the user message stays in history (they did ask), the
+ * partial answer is discarded rather than persisted half-written, and no retry is
+ * attempted after an abort — the LLM client treats a caller abort as final.
+ */
+ipcMain.handle('chat:cancel', (_e, { projectId }: { projectId: string }): IpcResult<null> => {
+  const controller = chatRuns.get(projectId)
+  if (!controller) return ipcErr('UNKNOWN', '当前没有正在生成的回答', false)
+  controller.abort()
+  return ipcOk(null)
 })
 
 ipcMain.handle('chat:history', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
@@ -792,7 +869,34 @@ ipcMain.handle('chat:clear', (_e, { projectId }: { projectId: string }): IpcResu
   }
 })
 
-ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: { projectId: string; incremental?: boolean; skipLlm?: boolean }): Promise<IpcResult<unknown>> => {
+/** Parse `index_jobs.stages_json`, tolerating rows written by an older build. */
+function safeParseStages(raw: string | null): IndexStageOutcome[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? (parsed as IndexStageOutcome[]) : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Run one index job and keep its row up to date.
+ *
+ * Extracted from the IPC handler so `index:jobRetry` can start a run through the
+ * exact same path (gating, job bookkeeping, progress forwarding) instead of
+ * re-entering the channel — a retry that behaved even slightly differently from a
+ * first run would be a bug factory.
+ */
+async function runIndexForProject({
+  projectId,
+  incremental,
+  skipLlm,
+}: {
+  projectId: string
+  incremental?: boolean
+  skipLlm?: boolean
+}): Promise<IpcResult<unknown>> {
   const project = getProject(projectId)
   if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
 
@@ -811,6 +915,14 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: 
   updateProjectStatus(projectId, 'indexing')
   const win = BrowserWindow.getAllWindows()[0]
 
+  // The job row is created *before* the work starts, so a crash mid-run still
+  // leaves evidence of what was attempted (failStaleIndexJobs closes it).
+  const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  insertIndexJob({ id: jobId, project_id: projectId, kind: incremental ? 'incremental' : 'full' })
+  const patchJob = (patch: Parameters<typeof updateIndexJob>[1]) => {
+    try { updateIndexJob(jobId, patch) } catch (err) { console.warn(`[ipc] job update failed: ${String(err)}`) }
+  }
+
   try {
     const startTime = Date.now()
     logIndexStart(project.name, 0, !!incremental)
@@ -823,9 +935,11 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: 
       project.root_path,
       project.name,
       (phase) => {
+        patchJob({ phase })
         win?.webContents.send('index:progress', { type: 'phase', phase, projectId })
       },
       (current, total) => {
+        patchJob({ progress: total > 0 ? current / total : 0 })
         win?.webContents.send('index:progress', {
           type: 'progress',
           phase: 'parse',
@@ -840,14 +954,27 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: 
       config.ua?.language,
     )
 
+    const stagesJson = JSON.stringify(result.stages ?? [])
+
     if (result.error === 'INDEX_CANCELLED') {
       updateProjectStatus(projectId, 'pending')
+      patchJob({ status: 'cancelled', stages_json: stagesJson, finished_at: new Date().toISOString() })
+      pruneIndexJobs(projectId)
       win?.webContents.send('index:progress', { type: 'cancelled', projectId })
       return ipcErr('INDEX_CANCELLED', '索引已取消', false)
     }
 
     if (result.success) {
       updateProjectStatus(projectId, 'ready', result.nodeCount)
+      patchJob({
+        status: 'succeeded',
+        phase: 'done',
+        progress: 1,
+        node_count: result.nodeCount,
+        stages_json: stagesJson,
+        finished_at: new Date().toISOString(),
+      })
+      pruneIndexJobs(projectId)
       logIndexComplete(project.name, result.nodeCount, result.edgeCount, Date.now() - startTime)
 
       // Progressive understanding stages (architecture → knowledge → interview)
@@ -877,6 +1004,13 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: 
       return ipcOk({ nodeCount: result.nodeCount, edgeCount: result.edgeCount, understand })
     } else {
       updateProjectStatus(projectId, 'failed')
+      patchJob({
+        status: 'failed',
+        error: result.error ?? '未知错误',
+        stages_json: stagesJson,
+        finished_at: new Date().toISOString(),
+      })
+      pruneIndexJobs(projectId)
       logIndexError(project.name, result.error ?? '未知错误')
       win?.webContents.send('index:progress', { type: 'error', projectId, error: result.error })
       return ipcErr('UNKNOWN', result.error ?? '索引失败')
@@ -884,10 +1018,64 @@ ipcMain.handle('project:index', async (_e, { projectId, incremental, skipLlm }: 
   } catch (err) {
     updateProjectStatus(projectId, 'failed')
     const msg = err instanceof Error ? err.message : String(err)
+    patchJob({ status: 'failed', error: msg, finished_at: new Date().toISOString() })
     logIndexError(project.name, msg)
     win?.webContents.send('index:progress', { type: 'error', projectId, error: msg })
     return ipcErr('UNKNOWN', msg)
   }
+}
+
+ipcMain.handle(
+  'project:index',
+  (_e, args: { projectId: string; incremental?: boolean; skipLlm?: boolean }): Promise<IpcResult<unknown>> =>
+    runIndexForProject(args),
+)
+
+/**
+ * Index history for one project, with the stage outcomes of each run.
+ *
+ * This is what turns "索引失败" into an actionable report: the UI can show that the
+ * structure was built and saved while the summary stage failed, and offer a retry
+ * that reuses the recorded mode.
+ */
+ipcMain.handle('index:jobList', (_e, { projectId }: { projectId: string }): IpcResult<unknown> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  try {
+    const jobs = listIndexJobs(projectId).map((job) => ({
+      id: job.id,
+      status: job.status,
+      kind: job.kind,
+      phase: job.phase,
+      progress: job.progress,
+      error: job.error,
+      nodeCount: job.node_count,
+      startedAt: job.started_at,
+      finishedAt: job.finished_at,
+      stages: safeParseStages(job.stages_json),
+    }))
+    return ipcOk({ jobs, running: isIndexRunning() })
+  } catch (err) {
+    return ipcErr('UNKNOWN', String(err))
+  }
+})
+
+/**
+ * Retry a recorded run with the mode it was started with.
+ *
+ * Retry is deliberately *not* a resume: partial results from the failed run are
+ * already on disk (the graph is saved before enrichment), so a plain re-run with
+ * the same mode is both simpler and safer than reconstructing mid-pipeline state.
+ */
+ipcMain.handle('index:jobRetry', async (_e, { projectId }: { projectId: string }): Promise<IpcResult<unknown>> => {
+  const project = getProject(projectId)
+  if (!project) return ipcErr('PROJECT_NOT_FOUND', `项目 ${projectId} 不存在`)
+  if (isIndexRunning()) {
+    return ipcErr('INDEX_IN_PROGRESS', '已有索引任务正在进行中，请等待完成或取消', true)
+  }
+  const last = listIndexJobs(projectId, 1)[0]
+  const incremental = last?.kind === 'incremental'
+  return runIndexForProject({ projectId, incremental })
 })
 
 ipcMain.handle('project:indexCancel', (_e, { projectId }: { projectId: string }): IpcResult<null> => {

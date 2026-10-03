@@ -15,6 +15,13 @@ export interface AgentResult {
   content: string
   steps: AgentStep[]
   nodeRefs: string[]
+  /**
+   * True when the answer text was already streamed to the caller.
+   *
+   * The UI needs this to know whether to render `content` from scratch or keep the
+   * text it has been appending — otherwise a streamed answer would appear twice.
+   */
+  streamed?: boolean
 }
 
 export interface AgentContext {

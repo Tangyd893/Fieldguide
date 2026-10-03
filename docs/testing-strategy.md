@@ -113,21 +113,45 @@ E2E 不调用真实 LLM；Analyze 阶段 mock 或使用 recorded fixtures。
 
 ---
 
-## 七、CI 建议（Phase 1 起）
+## 七、评测流水线（C1 / C2 / 答案级）
 
-```yaml
-# .github/workflows/test.yml
-- cd vendor/Understand-Anything && pnpm --filter @understand-anything/core test  # 或 npm 依赖时跳过
-- pnpm run test:unit
-- pnpm run test:integration
-```
+评测分两层，**只有一层需要 API Key**：
 
-Windows runner 必跑（Electron + UA native 依赖）。
+| 层 | 命令 | 需要 Key | 产物 |
+|----|------|----------|------|
+| 检索层（离线） | `pnpm eval:agent` | 否 | `docs/eval/agent-baseline.md` |
+| 答案层（录制 + 离线评分） | `pnpm eval:record-answers` → `pnpm eval:answers` | 录制需要，评分不需要 | `eval/answers/*.json` → `docs/eval/agent-answers.md` |
+
+规则（改动评测时一并遵守）：
+
+1. **数据集是数据，不是代码**：`eval/datasets/*.qa.json`；支持多仓库（`repos` + 逐题 `repo`），
+   某仓库不在本机时该数据集标记为「跳过」而不是静默消失，报告里能看见覆盖缺口。
+2. **文档由命令生成**：`docs/eval/*.md` 均由脚本重写，禁止手改数字；`formatResultsTable` 必须
+   带上该次运行真正的 k，否则 @10 的分表会被标成 @5（已有回归测试）。
+3. **回答先录制、后评分**：录制是唯一花钱的步骤，产物提交进仓库；评分在 CI 离线跑，
+   因此「引用忠实度 / 幻觉率」这类需要真实回答的指标也进入了可复现范围。
+   引用口径写在录制文件的 `citationSemantics` 里：`nodeRefs` 是「Agent 依据的节点」，
+   不是「答案正文点名的引用」。
+4. **测试仓库本身也要生成得出来**：`pnpm regen:tiny-go-graph` 用真实流水线重建 fixture 图谱，
+   并在脚本内断言 `imports` 边数与三条路径的跳数（1 / 1 / 3）——stale fixture 曾导致
+   tiny-go 只有 `contains` 边、路径题无解。
+5. **指标口径统一**：检索召回与引用召回都按「被满足的期望项（节点 / 文件分别计数）」计算，
+   两个指标族因此可比（见 `src/main/eval/metrics.ts` 的注释与 `metrics.test.ts` 的回归用例）。
 
 ---
 
-## 八、不在范围
+## 八、CI（现状）
+
+`.github/workflows/ci.yml` 在 `windows-latest` 上跑：typecheck → lint → 单测 → `qa:baseline`
+→ 场景冒烟 → `pnpm eval:agent`（召回崩塌或路径失效会让 CI 失败），并上传基准报告为构建产物。
+
+**不在 CI**：`pnpm test:e2e`（CI 无法构建 Dashboard dist，会以「环境缺件」恒红）、
+`qa:graph` / `qa:his-go`（依赖 sibling 仓库或打包产物）、`pnpm eval:record-answers`（需要 Key 与费用）。
+
+---
+
+## 九、不在范围
 
 - UA parser / Agent 输出质量（依赖上游 + 人工 spot check）
 - 重复 UA 已有单测
-- LLM 输出质量自动化评分
+- LLM 自由文本质量的自动评分（只评可判定的引用与路径）

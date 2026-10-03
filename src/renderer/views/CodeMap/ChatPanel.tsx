@@ -47,6 +47,8 @@ export default function ChatPanel({
   const [error, setError] = useState<string | null>(null)
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  /** Text streamed so far for the answer in flight (cleared when it completes). */
+  const [streamText, setStreamText] = useState('')
   const messagesEnd = useRef<HTMLDivElement>(null)
 
   const welcome = useCallback((): Message => {
@@ -90,7 +92,21 @@ export default function ChatPanel({
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, streamText])
+
+  // Incremental answer events for this project: append text as it arrives so a
+  // long answer is readable while it is being written, instead of a bare spinner.
+  useEffect(() => {
+    if (!projectId) return
+    const unsubscribe = window.fieldguide.onChatStream((raw) => {
+      const event = raw as { projectId?: string; type?: string; text?: string }
+      if (event.projectId !== projectId) return
+      if (event.type === 'delta' && event.text) setStreamText((prev) => prev + event.text)
+      // 'step' events intentionally do not render here: the finished message carries
+      // the full step list, and interleaving live steps with streamed prose reads badly.
+    })
+    return unsubscribe
+  }, [projectId])
 
   function toggleSteps(id: string) {
     setExpandedSteps(prev => {
@@ -106,6 +122,7 @@ export default function ChatPanel({
     if (!projectId) return
     setSending(true)
     setError(null)
+    setStreamText('')
 
     try {
       const result = await window.fieldguide.chatSend(
@@ -118,7 +135,7 @@ export default function ChatPanel({
       )
 
       if (result.ok && result.data) {
-        const data = result.data as { content: string; steps?: AgentStep[]; nodeRefs?: string[] }
+        const data = result.data as { content: string; steps?: AgentStep[]; nodeRefs?: string[]; streamed?: boolean }
         const assistantMsg: Message = {
           id: assistantId,
           role: 'assistant',
@@ -128,6 +145,9 @@ export default function ChatPanel({
           nodeRefs: data.nodeRefs,
         }
         setMessages((prev) => [...prev, assistantMsg])
+      } else if (result.error?.code === 'LLM_CANCELLED') {
+        // Stopping is a user action, not a failure: keep the user's question.
+        setError(t('chat.stopped'))
       } else {
         setError(result.error?.message ?? t('chat.requestFailed'))
       }
@@ -135,7 +155,14 @@ export default function ChatPanel({
       setError(String(err))
     } finally {
       setSending(false)
+      setStreamText('')
     }
+  }
+
+  /** Ask the main process to abort the in-flight answer. */
+  async function stop() {
+    if (!projectId) return
+    await window.fieldguide.chatCancel(projectId).catch(() => { /* already finished */ })
   }
 
   async function send() {
@@ -302,12 +329,20 @@ export default function ChatPanel({
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-xl px-4 py-2.5">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-[var(--fg-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-[var(--fg-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-[var(--fg-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
+            <div className="bg-[var(--fg-card)] border border-[var(--fg-border)] rounded-xl px-4 py-2.5 max-w-[92%]">
+              {streamText ? (
+                // Text is arriving: show it rather than a spinner.
+                <div className="text-sm whitespace-pre-wrap text-[var(--fg-text-primary)]">
+                  {streamText}
+                  <span className="inline-block w-1.5 h-4 ml-0.5 align-text-bottom bg-[var(--fg-accent)] animate-pulse" />
+                </div>
+              ) : (
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-[var(--fg-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-[var(--fg-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-[var(--fg-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -344,6 +379,15 @@ export default function ChatPanel({
           >
             {t('chat.send')}
           </button>
+          {sending && (
+            <button
+              onClick={stop}
+              title={t('chat.stopHint')}
+              className="px-3 py-2 border border-[var(--fg-border)] rounded-lg text-sm text-[var(--fg-text-secondary)] hover:border-[var(--fg-status-error)] hover:text-[var(--fg-status-error)] transition-colors"
+            >
+              {t('chat.stop')}
+            </button>
+          )}
         </div>
       </div>
     </div>

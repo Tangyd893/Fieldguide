@@ -4,7 +4,7 @@ import { warmLlmProviderCatalog } from './llm/catalog'
 import { createWindow } from './window'
 import { logError } from './logger'
 import { loadConfig } from './config'
-import { resetStaleIndexingStatus } from './db'
+import { resetStaleIndexingStatus, failStaleIndexJobs } from './db'
 import { setApplicationMenu } from './menu'
 
 // Side-effect import: registers all IPC handlers
@@ -43,6 +43,17 @@ app.whenReady().then(() => {
     logError('index:stale-status-reset-failed', {
       message: err instanceof Error ? err.message : String(err),
     })
+  }
+
+  // Same reasoning for the job history: a run that was still `running` when the
+  // process died would otherwise show up forever as "in progress".
+  try {
+    const staleJobs = failStaleIndexJobs()
+    if (staleJobs > 0) {
+      logError('index:stale-jobs-failed', { count: staleJobs })
+    }
+  } catch (err) {
+    logError('index:stale-jobs-failed', { message: err instanceof Error ? err.message : String(err) })
   }
 
   // Builtin provider catalog + optional local Ollama model discovery

@@ -388,6 +388,103 @@ flowchart TD
 
 ---
 
+### 评测体系强化（2026-10-02 · W1：多仓库 / 答案级 / 可复现）
+
+> 目标：把「实验与评估」从单仓库 25 题扩展成**多仓库、可复现、含答案级指标**的证据链。
+> 原则：所有数字由命令生成，缺失覆盖如实列出，绝不填 0。
+
+- [x] **eval-k-label-fix** · 修掉基准报告的制度性缺陷
+  - 问题：`formatResultsTable` 内部调用 `aggregate(results)` 用默认 k=5 生成标签，而 `runEvaluation` 传入的是 k=10 算出的结果 → 文档里 @10 的分表标题写成了 `Recall@5`（数值对、标签错）
+  - 实现：`formatResultsTable(title, results, k)` 显式传 k；`runEvaluation` 传 `variant.k`
+  - 验收：[`metrics.test.ts`](../src/main/eval/__tests__/metrics.test.ts) 新增回归（k=10 的表格不得出现 `Recall@5`）；`docs/eval/agent-baseline.md` 重新生成后 @10 分表标签正确
+
+- [x] **eval-multi-repo** · 数据集支持多仓库
+  - `EvalDataset.repos` + `EvalItem.repo` + `loadDatasetGraphs`（按仓库缓存图，逐题解析所属仓库并按仓库建 node→file 索引）
+  - `missingRepos()` 让「仓库不在本机」成为**报告里可见的跳过项**，而不是静默丢题
+  - 报告新增「数据集覆盖」表（每仓库节点/边/题数）与「提问语言 × 索引语言 对照」表
+
+- [x] **eval-tiny-go-dataset** · 第二个仓库：tiny-go（中文索引对照）
+  - [`tiny-go.qa.json`](../eval/datasets/tiny-go.qa.json)：9 题（locate 5 / explain 1 / path 3），三语提问形式
+  - [`regen-tiny-go-graph.test.ts`](../scripts/regen-tiny-go-graph.test.ts)（`pnpm regen:tiny-go-graph`）：用真实流水线重建 fixture 图谱 + 中文 curated notes
+  - 修掉的旧问题：fixture 图谱是**旧的**，只有 9 条 `contains`、**没有任何 import 边**，路径题无解；重建后 13 节点 / 12 边（含 3 条 imports），脚本内断言三条路径跳数 1 / 1 / 3
+  - 实测对照（语义 + 邻居扩展 @5）：中文提问在中文索引仓库 29.6% vs 英文索引仓库 12.8%
+
+- [x] **eval-neighbour-revised** · 修正「邻居扩展无用」这一过于笼统的结论
+  - 报告新增「邻居扩展的增益（按数据集拆开看）」表：pulsegate 三档均 +0.0pp，tiny-go 英文档 **+8.3pp**
+  - 结论改为按数据说话的表述：增益依赖图规模与索引语言，不能一概而论
+
+- [x] **eval-answer-level** · 答案级指标：录制 + 离线评分
+  - [`record-answers.mjs`](../scripts/record-answers.mjs)（`pnpm eval:record-answers`）：驱动**真实 Electron 应用**（Playwright，复用 E2E 的隔离数据目录手法），逐题走真实 `chat:send`，录制 `nodeRefs` 与 token 计量；无 Key 时打印配置方法并 **exit 0**（跳过不是失败）
+  - [`score-answers.test.ts`](../scripts/score-answers.test.ts)（`pnpm eval:answers`）：离线评分 → `docs/eval/agent-answers.md`；未录制的数据集列为「尚未录制」，不填 0
+  - 引用口径写进录制文件的 `citationSemantics`：`nodeRefs` = Agent 依据的节点（上下文种子 ∪ 工具 observation），**不是**答案正文里的引用标记
+  - `scoreCitations` 的召回口径与 `scoreRetrieval` 统一为「被满足的期望项」（修掉了"引用一个节点同时满足其节点与文件期望却只算 0.5"的口径不一致），并新增幻觉率行
+  - [`eval/answers/README.md`](../eval/answers/README.md) 说明约定与提交要求
+
+- [x] **eng-llm-usage-ipc** · 真实 token 计量可被外部读取
+  - 新增 `llm:usage` / `llm:resetUsage` 两个通道（`ipc/index.ts` + `preload/index.ts` + `renderer/env.d.ts` 三处同步，`qa:contracts` 通过）
+  - 只报 provider 真实 token / calls / retries，**不换算金额**（沿用"宁可报真数，不编造无法核验的价格"的既有决定）
+  - 旁证：录制脚本的冒烟（dummy key）验证了启动 → 注册项目 → `chat:send` → 401 失败的完整链路，且失败时不产出半成品录制文件
+
+> **本批规模**：单测 47 文件 / 460 通过（含 eval 新增 12 例）；lint 0 error / 0 warning；三个 tsconfig 全过；`qa:baseline` 全绿；基准报告覆盖 2 个仓库 / 48 个变体。
+> **下一步（W2）**：跨语言检索改进（CJK 分词 + 术语映射 + 混合检索），目标把中文档从 12.8% 提到 ≥40%。
+
+---
+
+### 检索改进 / 任务中心 / 流式 / 形式化 / 文档整理（2026-10-02 · W2、W3、W4、W6、W8）
+
+> 目标：把"系统实现"补成"有方法、有实验、有边界"的毕设；论文里的每个数字都由命令生成。
+
+- [x] **W2 跨语言检索改进**（论文的方法章节）
+  - 问题：纯语义引擎在英文摘要仓库上回答中文提问 Recall@5 仅 **12.8%**，同一套代码关键词档 68.0%
+  - 归因：① 中文无空格 → 词法通道"整句 = 一个词"完全失效；② 中文概念 vs 索引中的英文标识符/摘要
+  - 实现：[`ua/lexical.ts`](../src/main/ua/lexical.ts)：CJK 二元分词 + 标识符拆词 + BM25（k1=1.2 / b=0.75）
+    + **73 条中英术语映射**（扩展词权重 0.5）+ `rrfFuse` 名次融合；[`ua/search.ts`](../src/main/ua/search.ts)
+    新增 `semanticSearchOnly`（纯语义，供消融）与 `hybridSearch`（产品路径），`searchNodesDetailed` 委托后者
+  - 实测（`pnpm eval:agent`）：pulsegate 中文 12.8% → **42.9%**、关键词 68.0% → **70.2%**、英文 26.4% → 50.2%；
+    tiny-go（中文索引仓库）中文 29.6% → **89.2%**；两个机制各自的贡献也在报告里单列
+  - 断言进 CI：中文档 ≥40%、关键词不退化、术语映射必须优于纯词法、CJK 分词必须优于语义（中文索引仓库）
+  - 单测 21 例（分词 / 拆词 / 术语扩展 / BM25 / RRF）+ search 契约测试更新
+- [x] **W3 索引任务中心**（兑现"可取消 / 可重试 / 失败保留部分结果"）
+  - `db/index.ts`：`insertIndexJob` / `updateIndexJob` / `listIndexJobs` / `pruneIndexJobs` /
+    `failStaleIndexJobs`（启动时清理崩溃残留），schema 升到 **v5**（新增 `kind` / `stages_json` / `node_count`，
+    走既有 `ADDED_COLUMNS` 迁移机制，补迁移单测）
+  - [`ua/client.ts`](../src/main/ua/client.ts)：`IndexStageOutcome[]` 逐阶段结果（scan/parse/build/llm/save ×
+    ok/skipped/failed + 耗时），**LLM 富化失败仍保存结构图**并在结果中标注失败阶段
+  - IPC：`project:index` 写入任务行并回传 jobId；新增 `index:jobList` / `index:jobRetry`
+    （重试复用同一条执行路径，不重新进通道）；项目库显示"上次索引：成功 / 部分完成（摘要阶段失败）" + 重试按钮
+  - E2E 新例：真实跑一次索引后断言任务为 succeeded / kind=full / 阶段 scan+parse+build+save=ok / llm=skipped
+- [x] **W4 流式输出与可中止**
+  - `llm/client.ts`：SSE 流式（跨分片行缓冲、工具调用参数按 index 合并、usage 解析）；
+    `stream_options` 被网关拒绝时**自动退回非流式**（保住 token 计量）；
+    **一旦已有文字流给读者就不再重试**（重试只会重复读者已经看过的内容）
+  - `agent/react.ts`：`onEvent` / `signal` / **整轮 5 分钟截止时间**（原先最坏 6 轮 × 3 次重试 × 90s 无上限）
+  - IPC：`chat:stream` 事件（delta / step / done / error）+ `chat:cancel`（每项目一个 AbortController）、
+    新错误码 `LLM_CANCELLED`；取消语义 = **问题保留、半截回答不写历史、不重试**
+  - 单测 11 例（SSE 分片 / 工具调用合并 / 流式重试规则 / 非流式回退 / 取消不重试）；对话面板流式渲染 + 停止按钮
+- [x] **W6 所有权模型形式化 + 随机化属性测试**
+  - [`obsidian/__tests__/properties.test.ts`](../src/main/obsidian/__tests__/properties.test.ts)：80 个随机世界，
+    断言四条性质（幂等 / 最小改写 / 用户内容永不被删 / 路径封闭），并有**覆盖率守卫**要求七类决策
+    （create / update / skip / adopt / conflict / orphan-kept / delete）全部被触发过
+- [x] **W8 论文与答辩材料**
+  - [`项目介绍.md`](./项目介绍.md)（完整项目介绍）、[`thesis-outline.md`](./thesis-outline.md)（章节 → 素材 → 证据命令）、
+    [`presentation-script.md`](./presentation-script.md)（演示脚本 + 高频追问 + 局限页 + 演示前清单）
+  - `README.md` 核心特性 / 项目结构 / 命令表 / 硬性约束同步；`docs/` 从 **126 MB 精简到 1 MB**
+    （删除一次性取证材料与临时分析脚本，保留 7 份结论性调研报告）
+
+> **本批规模**：单测 50 文件 / **498 通过**（+38 例）；E2E 4 文件 / **19 例**；
+> `pnpm eval:agent` 2 仓库 / 34 题 / **84 变体**；lint 0 error / 0 warning；三个 tsconfig 与契约审计全过。
+
+> **未完成（如实列出）**：
+> 1. **W5 本地学习行为日志**（RQ4 的数据来源）未实现——它服务于用户研究，而用户研究需要真人；
+>    无真人数据时它只是空转的埋点，因此排在论文材料之后。
+> 2. **W7 真人用户研究**未执行：协议、SUS 量表、计分与统计代码齐备（n≥8、被试内设计、
+>    含无效问卷剔除与 95% CI），但**仓库不预置任何模拟结果**——数据必须由真实参与者产生。
+> 3. **答案级录制**（`pnpm eval:record-answers`）需要一次带 API Key 的运行（评测链上唯一花钱的步骤），
+>    本机无 Key，因此 `docs/eval/agent-answers.md` 当前如实显示"尚未录制"。
+> 4. 已知局限 10 条见 [`项目介绍.md`](./项目介绍.md) §8。
+
+---
+
 ## P1 — UA 图谱能力补齐（管线 / 桥接）
 
 > 在 P0 GUI 勾选之后可继续加深；对齐 [understand-anything-integration.md](./understand-anything-integration.md)。

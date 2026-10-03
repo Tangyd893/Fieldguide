@@ -67,6 +67,15 @@ export interface ChatOptions {
   backoffBaseMs?: number
   /** Caller cancellation, combined with the per-attempt timeout. */
   signal?: AbortSignal
+  /**
+   * Receive content incrementally (enables `stream: true`).
+   *
+   * Retry policy changes when this is set: once a delta has been handed to the
+   * caller, retrying would replay text the reader has already seen, so a failure
+   * after the first delta is final. Before the first delta, retries behave exactly
+   * as in the non-streaming path.
+   */
+  onDelta?: (text: string) => void
 }
 
 export interface LlmUsage {
@@ -205,6 +214,11 @@ export async function chatCompletion(config: LLMConfig, opts: ChatOptions): Prom
   const maxAttempts = Math.max(1, (opts.retries ?? DEFAULT_RETRIES) + 1)
   const timeoutMs = opts.timeoutMs ?? 120_000
   let lastError: LlmError | null = null
+  // Some OpenAI-compatible gateways reject `stream_options`; the first 400 turns
+  // streaming off for the remaining attempts. Falling back to a non-streamed call
+  // keeps the provider's token usage (and therefore the cost meter) intact, which
+  // matters more than incremental rendering.
+  let disableStreaming = false
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (opts.signal?.aborted) {
@@ -217,7 +231,12 @@ export async function chatCompletion(config: LLMConfig, opts: ChatOptions): Prom
     const timeout = AbortSignal.timeout(timeoutMs)
     const signal = opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout
 
+    // Whether the reader has already seen streamed text in *this* attempt (see the
+    // retry rule below).
+    let streamedAnyDelta = false
+
     try {
+      const streaming = Boolean(opts.onDelta) && !disableStreaming
       const resp = await fetch(url, {
         method: 'POST',
         headers: {
@@ -230,12 +249,19 @@ export async function chatCompletion(config: LLMConfig, opts: ChatOptions): Prom
           temperature: opts.temperature ?? 0.4,
           max_tokens: opts.maxTokens ?? 4096,
           ...(opts.tools?.length ? { tools: opts.tools, tool_choice: opts.toolChoice ?? 'auto' } : {}),
+          ...(streaming ? { stream: true } : {}),
+          ...(streaming ? { stream_options: { include_usage: true } } : {}),
         }),
         signal,
       })
 
       if (!resp.ok) {
         const body = await resp.text().catch(() => '')
+        // Ask for usage, not for permission: degrade instead of failing the question.
+        if (resp.status === 400 && streaming && /stream_options/i.test(body)) {
+          disableStreaming = true
+          continue
+        }
         const retriable = RETRYABLE_STATUS.has(resp.status)
         lastError = new LlmError(
           `LLM error ${resp.status}${body ? `: ${body.slice(0, 200)}` : ''}`,
@@ -250,6 +276,24 @@ export async function chatCompletion(config: LLMConfig, opts: ChatOptions): Prom
           opts.signal,
         )
         continue
+      }
+
+      if (streaming) {
+        const streamed = await readStreamedCompletion(resp, (text) => {
+          streamedAnyDelta = true
+          opts.onDelta!(text)
+        })
+        const usage = readUsage(streamed.usage)
+        meter.promptTokens += usage.promptTokens
+        meter.completionTokens += usage.completionTokens
+        meter.totalTokens += usage.totalTokens
+        meter.calls += 1
+        const hasToolCalls = Boolean(streamed.message.tool_calls?.length)
+        if (!streamed.message.content && !hasToolCalls) {
+          meter.failedCalls += 1
+          throw new LlmError('empty LLM response', { retriable: false, attempts: attempt + 1 })
+        }
+        return { message: streamed.message, usage, attempts: attempt + 1 }
       }
 
       const data = await resp.json() as {
@@ -297,7 +341,9 @@ export async function chatCompletion(config: LLMConfig, opts: ChatOptions): Prom
         )
       }
 
-      if (attempt === maxAttempts - 1) {
+      // Once text has reached the reader, a retry would duplicate what they saw.
+      const partialExposed = Boolean(streamedAnyDelta)
+      if (attempt === maxAttempts - 1 || partialExposed) {
         meter.failedCalls += 1
         throw lastError
       }
@@ -378,4 +424,130 @@ export function extractJson(text: string): unknown {
     }
     throw new Error('no JSON found in LLM response')
   }
+}
+
+/* ──────────── Streaming (SSE) ──────────── */
+
+/**
+ * Accumulated state of one streamed completion.
+ *
+ * Exposed as pure state + a pure reducer so the messy part (SSE framing, split
+ * chunks, tool-call fragment merging) is unit-testable without a network or a
+ * running Electron app.
+ */
+export interface StreamAccumulator {
+  content: string
+  /** Tool calls arrive as fragments keyed by index; arguments concatenate. */
+  toolCalls: Map<number, { id?: string; name?: string; args: string }>
+  usage?: unknown
+  done: boolean
+}
+
+export function createStreamAccumulator(): StreamAccumulator {
+  return { content: '', toolCalls: new Map(), done: false }
+}
+
+/**
+ * Fold one SSE `data:` payload into the accumulator.
+ *
+ * Returns the text delta of this payload (empty when it carries only tool-call
+ * fragments, usage, or the terminator), which is exactly what a UI needs to append.
+ */
+export function consumeStreamPayload(acc: StreamAccumulator, payload: string): string {
+  const trimmed = payload.trim()
+  if (!trimmed) return ''
+  if (trimmed === '[DONE]') {
+    acc.done = true
+    return ''
+  }
+
+  let parsed: {
+    choices?: Array<{ delta?: { content?: string | null; tool_calls?: Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }> } }>
+    usage?: unknown
+  }
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch {
+    // A malformed frame is not worth failing the whole answer over.
+    return ''
+  }
+
+  if (parsed.usage) acc.usage = parsed.usage
+  const delta = parsed.choices?.[0]?.delta
+  if (!delta) return ''
+
+  for (const fragment of delta.tool_calls ?? []) {
+    const index = fragment.index ?? acc.toolCalls.size
+    const current = acc.toolCalls.get(index) ?? { args: '' }
+    if (fragment.id) current.id = fragment.id
+    if (fragment.function?.name) current.name = fragment.function.name
+    if (fragment.function?.arguments) current.args += fragment.function.arguments
+    acc.toolCalls.set(index, current)
+  }
+
+  const text = delta.content ?? ''
+  if (text) acc.content += text
+  return text
+}
+
+/** Turn the accumulated fragments into the same message shape the non-streaming path returns. */
+export function streamAccumulatorToMessage(acc: StreamAccumulator): ChatMessage {
+  const toolCalls: ToolCall[] = [...acc.toolCalls.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, fragment], i) => ({
+      id: fragment.id ?? `call_${i}`,
+      type: 'function' as const,
+      function: { name: fragment.name ?? '', arguments: fragment.args || '{}' },
+    }))
+    .filter((call) => call.function.name)
+
+  return {
+    role: 'assistant',
+    content: acc.content || null,
+    ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+  }
+}
+
+/**
+ * Read an SSE response body to completion, forwarding text deltas as they arrive.
+ *
+ * Chunk boundaries do not respect line boundaries, so a partial line is buffered
+ * until its newline arrives — the single most common bug in hand-written SSE readers.
+ */
+export async function readStreamedCompletion(
+  resp: Response,
+  onDelta: (text: string) => void,
+): Promise<{ message: ChatMessage; usage?: unknown }> {
+  const acc = createStreamAccumulator()
+  const body = resp.body
+  if (!body) return { message: streamAccumulatorToMessage(acc) }
+
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    let newline = buffer.indexOf('\n')
+    while (newline >= 0) {
+      const line = buffer.slice(0, newline).replace(/\r$/, '')
+      buffer = buffer.slice(newline + 1)
+      if (line.startsWith('data:')) {
+        const delta = consumeStreamPayload(acc, line.slice(5))
+        if (delta) onDelta(delta)
+      }
+      newline = buffer.indexOf('\n')
+    }
+  }
+
+  // A final frame may arrive without a trailing newline.
+  if (buffer.trim().startsWith('data:')) {
+    const delta = consumeStreamPayload(acc, buffer.trim().slice(5))
+    if (delta) onDelta(delta)
+  }
+
+  return { message: streamAccumulatorToMessage(acc), usage: acc.usage }
 }

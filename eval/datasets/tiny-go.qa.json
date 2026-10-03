@@ -1,0 +1,137 @@
+{
+  "name": "tiny-go",
+  "projectPath": "tests/fixtures/tiny-go",
+  "description": "第二个评测仓库：3 个 Go 文件、13 节点 / 12 边（9 contains + 3 imports）的最小多包项目。与 pulsegate 的关键差别是**索引正文为中文**（见 scripts/regen-tiny-go-graph.test.ts 的 curated notes），因此它构成一组对照：同一套检索代码、同样的提问形式，索引语言不同。图谱由真实流水线离线再生成，import 边来自 Go 包路径导入解析。",
+  "annotationNotes": "ground truth 只标注真正能回答问题的节点/文件，不追求穷举；expectedHops 由图谱 import 结构核对（regen 脚本内已断言 1/1/3 跳）。条目少是因为仓库本身只有 3 个源文件——它的价值在对照与路径验证，不在题目数量。",
+  "queryFields": [
+    { "field": "question", "label": "中文自然语言" },
+    { "field": "questionEn", "label": "英文自然语言" },
+    { "field": "keywords", "label": "关键词" }
+  ],
+  "items": [
+    {
+      "id": "t01",
+      "kind": "locate",
+      "question": "程序入口在哪，HTTP 路由是在哪里注册的？",
+      "questionEn": "Where is the program entry point and where are the HTTP routes registered?",
+      "keywords": "main.go main http.HandleFunc /hello /items entrypoint",
+      "expect": {
+        "nodes": ["file:cmd/main.go", "function:cmd/main.go:main"],
+        "files": ["cmd/main.go"]
+      }
+    },
+    {
+      "id": "t02",
+      "kind": "locate",
+      "question": "存储层用什么方式保证并发安全？",
+      "questionEn": "How does the store layer guarantee concurrency safety?",
+      "keywords": "db.go DB sync.RWMutex 读写锁 mutex store",
+      "expect": {
+        "nodes": ["class:internal/store/db.go:DB", "file:internal/store/db.go"],
+        "files": ["internal/store/db.go"]
+      }
+    },
+    {
+      "id": "t03",
+      "kind": "locate",
+      "question": "为什么读取全部记录时要返回一个副本？在哪实现的？",
+      "questionEn": "Why does reading all records return a copy, and where is that done?",
+      "keywords": "All 切片副本 copy RLock db.go",
+      "expect": {
+        "nodes": ["function:internal/store/db.go:All"],
+        "files": ["internal/store/db.go"]
+      }
+    },
+    {
+      "id": "t04",
+      "kind": "locate",
+      "question": "HTTP 处理器定义在哪，它依赖什么？",
+      "questionEn": "Where is the HTTP handler defined and what does it depend on?",
+      "keywords": "Handler NewHandler service handler.go store 依赖注入",
+      "expect": {
+        "nodes": [
+          "class:internal/service/handler.go:Handler",
+          "function:internal/service/handler.go:NewHandler"
+        ],
+        "files": ["internal/service/handler.go"]
+      }
+    },
+    {
+      "id": "t05",
+      "kind": "locate",
+      "question": "/items 这个接口的处理逻辑写在哪里？",
+      "questionEn": "Where is the handler logic for the /items endpoint?",
+      "keywords": "ListItems json Content-Type handler.go 读取路径",
+      "expect": {
+        "nodes": ["function:internal/service/handler.go:ListItems"],
+        "files": ["internal/service/handler.go"]
+      }
+    },
+    {
+      "id": "t06",
+      "kind": "explain",
+      "question": "一次 /items 请求从入口到拿到内存里的数据，经过了哪些环节？",
+      "questionEn": "Which components does a /items request pass through from the entry point to the in-memory data?",
+      "keywords": "request flow main.go Handler ListItems DB All 读取路径",
+      "expect": {
+        "nodes": [
+          "file:cmd/main.go",
+          "function:cmd/main.go:main",
+          "class:internal/service/handler.go:Handler",
+          "function:internal/service/handler.go:ListItems",
+          "class:internal/store/db.go:DB",
+          "function:internal/store/db.go:All"
+        ],
+        "files": ["cmd/main.go", "internal/service/handler.go", "internal/store/db.go"]
+      }
+    },
+    {
+      "id": "t07",
+      "kind": "path",
+      "question": "入口文件是怎么引用到存储实现的？",
+      "questionEn": "How does the entry file reach the store implementation?",
+      "keywords": "cmd/main.go internal/store import 依赖",
+      "expect": {
+        "nodes": ["file:cmd/main.go", "file:internal/store/db.go"],
+        "files": ["cmd/main.go", "internal/store/db.go"]
+      },
+      "path": {
+        "from": "file:cmd/main.go",
+        "to": "file:internal/store/db.go",
+        "expectedHops": 1
+      }
+    },
+    {
+      "id": "t08",
+      "kind": "path",
+      "question": "服务层的文件到存储层的文件之间隔着几跳？",
+      "questionEn": "How many hops separate the service file from the store file?",
+      "keywords": "handler.go db.go internal/service internal/store import",
+      "expect": {
+        "nodes": ["file:internal/service/handler.go", "file:internal/store/db.go"],
+        "files": ["internal/service/handler.go", "internal/store/db.go"]
+      },
+      "path": {
+        "from": "file:internal/service/handler.go",
+        "to": "file:internal/store/db.go",
+        "expectedHops": 1
+      }
+    },
+    {
+      "id": "t09",
+      "kind": "path",
+      "question": "main 函数与 DB 类型之间怎么连通？",
+      "questionEn": "How are the main function and the DB type connected?",
+      "keywords": "function:cmd/main.go:main class:internal/store/db.go:DB contains imports",
+      "expect": {
+        "nodes": ["function:cmd/main.go:main", "class:internal/store/db.go:DB"],
+        "files": ["cmd/main.go", "internal/store/db.go"]
+      },
+      "path": {
+        "from": "function:cmd/main.go:main",
+        "to": "class:internal/store/db.go:DB",
+        "expectedHops": 3
+      }
+    }
+  ]
+}

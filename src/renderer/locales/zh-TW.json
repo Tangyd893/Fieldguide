@@ -88,7 +88,14 @@
     "analyzeFailed": "分析失敗",
     "deleteFailed": "刪除失敗",
     "noChanges": "未檢測到檔案變更。",
-    "analyzeDone": "分析完成。"
+    "analyzeDone": "分析完成。",
+    "jobRunning": "上次索引：進行中",
+    "jobSucceeded": "上次索引：成功 · {{count}} 節點",
+    "jobFailed": "上次索引：失敗",
+    "jobCancelled": "上次索引：已取消",
+    "jobPartial": "上次索引：部分完成（{{stages}} 階段失敗，結構與圖譜已保存）",
+    "retry": "重試",
+    "retryHint": "用上次的模式重新索引（已保存的部分結果不會遺失）"
   },
   "codeMap": {
     "noProject": "請先在專案庫中加入專案",
@@ -112,10 +119,12 @@
     "searchMode": "搜尋模式",
     "searchModeSemantic": "語意",
     "searchModeText": "精確",
-    "searchModeSemanticHint": "語意搜尋：由 UA SearchEngine 在本機排序，可用詞義與摘要比對",
+    "searchModeSemanticHint": "語意搜尋：UA SearchEngine 與本機詞法（CJK 分詞 + 術語對映）雙通道，依 RRF 融合排序",
     "searchModeTextHint": "精確搜尋：依名稱／摘要子字串比對",
     "searchBackendUa": "UA 語意引擎",
     "searchBackendSubstring": "子字串降級",
+    "searchBackendHybrid": "混合檢索（語意 + 詞法）",
+    "searchBackendLexical": "詞法檢索（語意引擎不可用）",
     "searchInFile": "檔案內搜尋 (Ctrl+F)",
     "noMatchInFile": "無符合",
     "matchCount": "{{current}}/{{total}}",
@@ -214,7 +223,10 @@
     "copyAnswer": "複製回答",
     "copied": "已複製",
     "regenerate": "重新生成",
-    "regenerateHint": "丟棄上一則回答並重新提問"
+    "regenerateHint": "丟棄上一則回答並重新提問",
+    "stop": "停止",
+    "stopHint": "中止正在生成的回答（已提出的問題保留，半截回答不寫入歷史）",
+    "stopped": "已停止生成。"
   },
   "commandPalette": {
     "placeholder": "搜尋命令、檔案或節點…",

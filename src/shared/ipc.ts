@@ -9,6 +9,8 @@ export type IpcErrorCode =
   | 'LLM_RATE_LIMIT'
   | 'LLM_NOT_CONFIGURED'
   | 'LLM_API_ERROR'
+  /** The reader pressed stop: not a failure, and never retried automatically. */
+  | 'LLM_CANCELLED'
   | 'PARSE_ERROR'
   | 'SOURCE_UNAVAILABLE'
   | 'EMBED_API_ERROR'

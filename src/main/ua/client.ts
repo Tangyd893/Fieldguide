@@ -437,6 +437,25 @@ export async function extractStructure(
 
 // ─── Full Pipeline ───
 
+/** Stages of one index run, in order. */
+export type IndexStageName = 'scan' | 'parse' | 'build' | 'llm' | 'save'
+export type IndexStageStatus = 'ok' | 'skipped' | 'failed'
+
+/**
+ * What one stage actually did.
+ *
+ * Recorded so "the index failed" can be turned into "the structure was built and
+ * saved, the LLM summary stage failed" — the product requirement is that a failed
+ * run keeps its partial results, and that promise is only checkable if the run
+ * reports per-stage outcomes instead of a single boolean.
+ */
+export interface IndexStageOutcome {
+  stage: IndexStageName
+  status: IndexStageStatus
+  durationMs: number
+  detail?: string
+}
+
 export interface IndexResult {
   success: boolean
   graphPath: string
@@ -444,6 +463,8 @@ export interface IndexResult {
   edgeCount: number
   error?: string
   llmEnriched?: boolean
+  /** Per-stage outcomes of this run (empty for results produced before v5). */
+  stages?: IndexStageOutcome[]
 }
 
 export interface LLMEnrichConfig {
@@ -685,9 +706,15 @@ async function runIndexProject(
   signal?: AbortSignal,
   language?: string,
 ): Promise<IndexResult> {
+  // Per-stage bookkeeping: see IndexStageOutcome.
+  const stages: IndexStageOutcome[] = []
+  const recordStage = (stage: IndexStageName, status: IndexStageStatus, startedAt: number, detail?: string) => {
+    stages.push({ stage, status, durationMs: Date.now() - startedAt, ...(detail ? { detail } : {}) })
+  }
+
   try {
     if (signal?.aborted) {
-      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: 'INDEX_CANCELLED' }
+      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: 'INDEX_CANCELLED', stages }
     }
     // Determine changedAfter for incremental mode
     let changedAfter: string | undefined
@@ -703,7 +730,9 @@ async function runIndexProject(
 
     // Phase 1: Scan
     onPhase?.('scan')
+    const scanStarted = Date.now()
     const scanResult = await scanProject(rootPath, changedAfter)
+    recordStage('scan', 'ok', scanStarted, `${scanResult.files.length} files`)
     if (scanResult.files.length === 0) {
       if (incremental) {
         // Zero changes: return the actual node/edge count from the existing graph.
@@ -718,20 +747,28 @@ async function runIndexProject(
             edgeCount = existing?.edges?.length || 0
           } catch { /* corrupt graph — return 0 counts */ }
         }
-        return { success: true, graphPath, nodeCount, edgeCount }
+        recordStage('parse', 'skipped', Date.now(), 'incremental run found no changes')
+        recordStage('build', 'skipped', Date.now(), 'unchanged graph kept')
+        recordStage('llm', 'skipped', Date.now(), 'nothing to enrich')
+        recordStage('save', 'skipped', Date.now(), 'graph left untouched')
+        return { success: true, graphPath, nodeCount, edgeCount, stages }
       }
-      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: '未发现可解析的文件' }
+      recordStage('parse', 'failed', Date.now(), 'no parseable files')
+      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: '未发现可解析的文件', stages }
     }
 
     // Phase 2: Extract structure
     onPhase?.('parse')
+    const parseStarted = Date.now()
     const extractResult = await extractStructure(rootPath, scanResult.files, onProgress, signal)
+    recordStage('parse', 'ok', parseStarted, `${extractResult.filesAnalyzed} analysed files${extractResult.filesSkipped.length > 0 ? `, ${extractResult.filesSkipped.length} skipped` : ''}`)
     if (signal?.aborted) {
-      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: 'INDEX_CANCELLED' }
+      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: 'INDEX_CANCELLED', stages }
     }
 
     // Phase 3: Build graph
     onPhase?.('build')
+    const buildStarted = Date.now()
     await loadCore()
     const builder = new GraphBuilder(projectName, '', undefined)
 
@@ -810,9 +847,11 @@ async function runIndexProject(
     }
 
     // Phase 4: LLM enrichment (conditional on API key)
+    recordStage('build', 'ok', buildStarted, `${graph.nodes.length} nodes / ${graph.edges.length} edges`)
     let llmEnriched = false
     const hasLLM = llmConfig && llmConfig.apiKey && llmConfig.baseUrl && llmConfig.chatModel
     if (hasLLM) {
+      const llmStarted = Date.now()
       try {
         await enrichWithLLM(
           graph,
@@ -829,10 +868,16 @@ async function runIndexProject(
           },
         )
         llmEnriched = true
+        recordStage('llm', 'ok', llmStarted, 'summaries + layers + tour')
       } catch (err) {
-        // LLM enrichment failure is non-fatal — graph still has structure
-        console.error(`[ua/client] LLM enrichment failed: ${String(err)}`)
+        // Non-fatal by design: the structural graph is still worth saving, and the
+        // run reports exactly which stage degraded instead of failing wholesale.
+        const detail = err instanceof Error ? err.message : String(err)
+        console.error(`[ua/client] LLM enrichment failed: ${detail}`)
+        recordStage('llm', 'failed', llmStarted, detail)
       }
+    } else {
+      recordStage('llm', 'skipped', Date.now(), 'no LLM configured')
     }
 
     // Structure-only (or LLM without layers): UA Dashboard overview requires layers
@@ -846,6 +891,7 @@ async function runIndexProject(
 
     // Phase 5: Save
     onPhase?.('save')
+    const saveStarted = Date.now()
     const graphFilePath = join(rootPath, '.understand-anything', 'knowledge-graph.json')
     saveGraph(rootPath, graph)
 
@@ -856,15 +902,18 @@ async function runIndexProject(
       console.warn('[ua/client] graph file unreadable after save — rewriting atomically')
       atomicWriteJson(graphFilePath, graph)
       if (!isJsonReadable(graphFilePath)) {
+        recordStage('save', 'failed', saveStarted, 'graph file unreadable after rewrite')
         return {
           success: false,
           graphPath: graphFilePath,
           nodeCount: 0,
           edgeCount: 0,
           error: 'GRAPH_WRITE_FAILED',
+          stages,
         }
       }
     }
+    recordStage('save', 'ok', saveStarted, graphFilePath)
 
     // The graph file changed: drop any cached parse so the next read is fresh
     // even if the write landed in the same millisecond with the same size.
@@ -876,11 +925,18 @@ async function runIndexProject(
       nodeCount: graph.nodes.length,
       edgeCount: graph.edges.length,
       llmEnriched,
+      stages,
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    // The failing stage is whichever one never reported an outcome.
+    const completed = new Set(stages.map((s) => s.stage))
+    const failedStage = (['scan', 'parse', 'build', 'llm', 'save'] as IndexStageName[]).find(
+      (name) => !completed.has(name),
+    )
+    if (failedStage) recordStage(failedStage, 'failed', Date.now(), msg)
     if (msg === 'INDEX_CANCELLED') {
-      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: 'INDEX_CANCELLED' }
+      return { success: false, graphPath: '', nodeCount: 0, edgeCount: 0, error: 'INDEX_CANCELLED', stages }
     }
     return {
       success: false,
@@ -888,6 +944,7 @@ async function runIndexProject(
       nodeCount: 0,
       edgeCount: 0,
       error: msg,
+      stages,
     }
   }
 }

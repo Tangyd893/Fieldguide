@@ -1,11 +1,12 @@
 /**
- * Node search: deterministic substring matcher + backend reporting.
+ * Node search: hybrid semantic ⊕ lexical ranking, backend reporting, and the
+ * plain substring matcher kept as an explicit fallback.
  *
  * The UA `SearchEngine` may or may not load depending on the environment, so these
  * tests assert ranking/limit contracts and backend tagging rather than a fixed backend.
  */
 import { describe, it, expect } from 'vitest'
-import { substringSearch, searchNodesDetailed, type SearchableNode } from '../search'
+import { substringSearch, searchNodesDetailed, invalidateLexicalIndex, type SearchableNode } from '../search'
 
 function node(id: string, name: string, extra: Partial<SearchableNode> = {}): SearchableNode {
   return {
@@ -70,14 +71,16 @@ describe('substringSearch', () => {
 })
 
 describe('searchNodesDetailed', () => {
-  it('reports a backend for a live query', async () => {
+  it('reports the backend that actually ran and finds the node', async () => {
     const { hits, backend } = await searchNodesDetailed(NODES, 'token')
-    expect(['ua', 'substring']).toContain(backend)
+    // 'hybrid' when the UA engine loads, 'lexical' when it does not — both are
+    // real, reported states; 'substring' is reserved for an empty query.
+    expect(['hybrid', 'lexical']).toContain(backend)
     expect(hits.length).toBeGreaterThan(0)
     expect(hits.map((h) => h.nodeId)).toContain('c:TokenStore')
   })
 
-  it('short-circuits an empty query without touching the engine', async () => {
+  it('short-circuits an empty query without touching either channel', async () => {
     const result = await searchNodesDetailed(NODES, '  ')
     expect(result).toEqual({ hits: [], backend: 'substring' })
   })
@@ -87,5 +90,25 @@ describe('searchNodesDetailed', () => {
     const ids = new Set(NODES.map((n) => n.id))
     for (const hit of hits) expect(ids.has(hit.nodeId)).toBe(true)
     expect(hits.length).toBeLessThanOrEqual(3)
+  })
+
+  it('finds a node from a chinese question about an english-summarised graph', async () => {
+    invalidateLexicalIndex()
+    // The mechanism's precondition, made explicit: expansion only helps when the
+    // index actually contains the English term it suggests.
+    //   内存 → memory  ⇒ "in-memory token store" (c:TokenStore)
+    //   入口 → main    ⇒ "process entry, wires handlers" (f:main.go)
+    const memory = await searchNodesDetailed(NODES, '内存是怎么存的')
+    expect(memory.hits.map((h) => h.nodeId)).toContain('c:TokenStore')
+
+    const entry = await searchNodesDetailed(NODES, '入口在哪')
+    expect(entry.hits.map((h) => h.nodeId)).toContain('f:main.go')
+  })
+
+  it('returns rank-derived scores in descending order', async () => {
+    const { hits } = await searchNodesDetailed(NODES, 'handle', 5)
+    for (let i = 1; i < hits.length; i += 1) {
+      expect(hits[i - 1].score).toBeGreaterThanOrEqual(hits[i].score)
+    }
   })
 })

@@ -54,18 +54,23 @@ clone 一个热门仓库下来，打开后对着目录发呆——入口在哪�
 ## ✨ 核心特性
 
 - 🗺️ **知识图谱** —— 交互式代码地图、架构分层、引导 Tour、节点 ↔ 源码联动。没有 LLM Key 也能看结构图。
-- 🧑‍🏫 **问答教练** —— 回答前注入项目身份、分层、Tour、当前焦点与图谱检索结果；工具可查邻居 / 层 / Tour / 调用路径 / 论文片段，绑定 vault 后还能读写 Obsidian 卡片。
+- 🧑‍🏫 **问答教练** —— 回答前注入项目身份、分层、Tour、当前焦点与图谱检索结果；**回答流式输出、可随时停止**；工具可查邻居 / 层 / Tour / 调用路径 / 论文片段，绑定 vault 后还能读写 Obsidian 卡片。
+- 🌏 **混合检索（中文提问可用）** —— 语义引擎 ⊕ 本地 BM25（CJK 二元分词 + 73 条中英术语映射），按名次融合（RRF）。基准实测：中文自然语言提问的 Recall@5 从 12.8% 提升到 **42.9%**（中文索引仓库 29.6% → **89.2%**），关键词档不退化。见 [`docs/eval/agent-baseline.md`](docs/eval/agent-baseline.md)。
 - 📚 **理论与桥接** —— arXiv 搜索、PDF 导入与阅读、论文 RAG；论文段落 ↔ 代码节点的概念桥接，AI 推荐 + 一键生成「论文概念 → 代码实现」对照 Tour。
 - 🎯 **学习闭环** —— 进度标记（未读 / 在读 / 已掌握）、逐行代码笔记、间隔复习卡、导师提问与评分、按目标生成学习路径。
 - 🧠 **洞察面板** —— 图谱统计与类型分布、邻居浏览（1/2 跳）、两点路径查找（「A 怎么调到 B」）、技术债扫描（TODO/FIXME、超大文件、高扇入）、Git 演化时间轴、模块簇、AI 代码审查。
-- 🔗 **Obsidian 联动** —— 把拆解产物同步成 vault 卡片 + 索引笔记；生成块之外的批注永不被覆盖，冲突由你决定（[用法](#连接-obsidian可选)）。
+- 🗂️ **索引任务中心** —— 每次索引都留一条任务记录，带**逐阶段结果**（扫描 / 解析 / 建图 / 摘要 / 保存）：摘要阶段失败不再让整次索引失败，结构图照常保存，界面显示"部分完成"并可一键重试。
+- 🔗 **Obsidian 联动** —— 把拆解产物同步成 vault 卡片 + 索引笔记；生成块之外的批注永不被覆盖，二次同步 0 写入（幂等），冲突由你决定（[用法](#连接-obsidian可选)）。
 - 🧩 **分屏工作台** —— VS Code 风格布局：左文件树 + 右可分隔面板（总览 / 图谱 / 代码 / 问答 / 导览 / 知识 / 面试 / 探索 / 进度 / 笔记 / 导师 / Vault），布局可持久化，另有预设一键切换。
-- 🔍 **搜索** —— `Ctrl+K` 命令面板（命令 / 文件 / 节点），`Ctrl+Shift+F` 全库内容搜索（跳过二进制与超大文件，命中直接跳行），代码面板内 `Ctrl+F` 搜当前文件。
+- 🔍 **搜索** —— `Ctrl+K` 命令面板（命令 / 文件 / 节点），`Ctrl+Shift+F` 全库内容搜索（跳过二进制与超大文件，命中直接跳行），代码面板内 `Ctrl+F` 搜当前文件；搜索徽标显示实际使用的检索通道（混合 / 词法降级）。
 - 📄 **学习报告导出** —— 一键把架构映射、知识卡片、面试题与论文桥接汇总成 Markdown。
-- 🚀 **增量索引** —— 指纹合并，改一个文件不会把整张图重画；索引过程非阻塞，状态栏有进度、可取消。
+- 🚀 **增量索引** —— 变更文件合并（改一个文件不会把整张图重画）；索引过程非阻塞，状态栏有进度、可取消。
 - 🎨 **外观与语言** —— 5 套主题预设、50%–200% 缩放、界面与代码字体分开；简体中文 / 繁體中文 / English 即时切换。
 - 💾 **本地优先** —— 应用数据在 `%APPDATA%/Fieldguide/`；图谱权威源在项目目录 `.understand-anything/` 就地生成，不复制源码、不改写项目。API Key 经系统钥匙串（`safeStorage`）加密落盘，也可只放在环境变量里（见下）。
+- 📊 **可复现的评测** —— `pnpm eval:agent` 离线跑多仓库检索基准与消融（2 仓库 / 34 题 / 84 变体），`pnpm eval:answers` 离线评引用忠实度与幻觉率；报告由命令生成，数字不可手改。
 - 📦 **Windows 安装包** —— NSIS 安装包与免安装版可构建。
+
+> 想看完整介绍（架构、关键技术、评测数据、已知局限），见 [`docs/项目介绍.md`](docs/项目介绍.md)。
 
 ## 🚀 快速开始
 
@@ -158,23 +163,26 @@ clone 一个热门仓库下来，打开后对着目录发呆——入口在哪�
 
 ```
 Fieldguide/
-  docs/                       设计文档（入口：docs/doc-index.md）
+  docs/                       设计文档（入口：docs/doc-index.md；总览：docs/项目介绍.md）
   src/
     main/                     Electron 主进程
-      ua/                     UA 集成层（client / dashboard / config-bridge / graph-reader / diff / cross-tour）
+      ua/                     UA 集成层（client / dashboard / graph-reader / diff / cross-tour
+                              / search 混合检索 / lexical 词法层 / 增量合并）
       obsidian/               Obsidian 联动（CLI 探测 / 卡片与索引同步 / Agent 工具）
-      agent/                  学习教练（ReAct 循环 + 工具 + 上下文装配）
+      agent/                  学习教练（ReAct 循环 + 工具 + 上下文装配 + 流式与中止）
       understand/             渐进分析（架构 → 知识 → 面试）
       vector/                 论文分块 + 向量检索
-      llm/                    统一 LLM 客户端与供应商目录
+      llm/                    统一 LLM 客户端（重试 / 计量 / 工具调用 / SSE 流式）
+      eval/                   评测（指标 / harness / SUS 量表）
       ipc/                    IPC handler 聚合
-      db/                     SQLite（projects / papers / concept_links / chat / 学习产物）
+      db/                     SQLite（projects / index_jobs / papers / 学习产物 / vault_notes）
     preload/                  contextBridge 暴露的安全 API
     renderer/                 React UI（项目库 / 代码地图 / 理论 / 桥接 / 设置）
     shared/                   三端共用的类型与 IPC schema
   resources/                  图标、内置 Demo（104 节点 / 9 分层、预置图谱）、Dashboard 构建产物
-  scripts/                    bootstrap / QA / 打包脚本
-  tests/                      单元测试 fixture
+  eval/                       评测数据集（多仓库）与答案录制
+  scripts/                    bootstrap / QA / 评测 / 打包脚本
+  tests/                      单元测试 fixture（tiny-go：真实流水线生成的图谱）
   e2e/                        Playwright 端到端（驱动真实 Electron 二进制）
   picture/                    运行截图
 ```
@@ -190,7 +198,10 @@ Fieldguide/
 | `pnpm qa:baseline` | 基线套件（typecheck + 单测 + fixture + 契约审计） |
 | `pnpm qa:contracts` | 契约审计（IPC ↔ preload ↔ 渲染层类型、i18n 键、数据目录一致性） |
 | `pnpm qa:scenario` · `pnpm qa:graph` | 场景冒烟 · 图谱闭环校验（含打包产物） |
-| `pnpm eval:agent` | 离线检索评测（Recall / 路径解析） |
+| `pnpm eval:agent` | 离线检索评测（多仓库数据集 × 检索方式 × 提问形式：Recall / MRR / 路径） |
+| `pnpm eval:record-answers` | 录制真实模型回答（唯一需要 API Key 的评测步骤；录制文件提交后即可离线复现） |
+| `pnpm eval:answers` | 离线评答案级指标（引用忠实度 / 精确率 / 召回率 / 幻觉率） |
+| `pnpm regen:tiny-go-graph` · `pnpm regen:sample-graph` | 用真实流水线重新生成评测仓库/内置 Demo 的图谱 |
 | `pnpm bootstrap:ua` | 准备 UA（clone 到 sibling 并构建 Dashboard） |
 | `pnpm dist` · `pnpm pack` | 打 Windows 安装包 · 打包但不发布 |
 
@@ -244,14 +255,16 @@ npx electron-builder --win --publish never --config.directories.output=dist-buil
 
 1. [docs/doc-index.md](docs/doc-index.md) —— 文档地图、一致性检查、动工门禁
 2. [docs/understand-anything-integration.md](docs/understand-anything-integration.md) —— UA 集成边界与数据流，**改 UA 相关决策必须先改它**
+3. [docs/项目介绍.md](docs/项目介绍.md) —— 完整项目介绍（架构、关键技术、评测数据、已知局限）
 
 **硬性约束**（踩过坑之后的决定）：
 
 - **禁止**自研 Tree-sitter parser / FileAnalyzer / 独立图谱画布 —— UA 已有能力，重复实现只会让两边漂移。
 - **禁止**把图谱节点 / 边写进 SQLite —— 权威源是 `.understand-anything/knowledge-graph.json`。
+- **禁止**手改评测数字 —— `docs/eval/*.md` 由 `pnpm eval:agent` / `pnpm eval:answers` 生成，缺失的覆盖要如实列成"未录制/已跳过"，不许填 0。
 - 动工前先跑一遍 [docs/spike-ua.md](docs/spike-ua.md) 里的集成 Spike（硬门禁）。
 
-提交前跑 `pnpm typecheck && pnpm lint && pnpm test:unit`，涉及交互的改动再跑 `pnpm test:e2e`；图谱相关改动用 `pnpm qa:graph` 验收「Demo 图谱 + Dashboard 加载 + 点节点开文件」闭环，`pnpm qa:his-go` 可对真实大项目（HIS-Go）跑无头冒烟。
+提交前跑 `pnpm typecheck && pnpm lint && pnpm test:unit`，涉及交互的改动再跑 `pnpm test:e2e`；图谱相关改动用 `pnpm qa:graph` 验收「Demo 图谱 + Dashboard 加载 + 点节点开文件」闭环，`pnpm qa:his-go` 可对真实大项目（HIS-Go）跑无头冒烟；改检索或评测改动用 `pnpm eval:agent` 复核召回没有退化（CI 会跑这一项）。
 
 ## 许可与致谢
 

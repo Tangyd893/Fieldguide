@@ -1,7 +1,7 @@
 /**
  * Fieldguide Coach Agent — context-first ReAct loop.
  * Injects packed project context, forces a final answer on the last round,
- * and deduplicates identical tool calls.
+ * deduplicates identical tool calls, streams answer text and is cancellable.
  */
 import { loadConfig } from '../config'
 import { buildAgentTools, executeTool, extractNodeRefsFromObservation, toolCallKey } from './tools'
@@ -11,6 +11,28 @@ import type { AgentContext, AgentResult, AgentStep } from './types'
 import { chatCompletion, type ChatMessage, type ToolCall } from '../llm/client'
 
 const MAX_ITERATIONS = 6
+
+/**
+ * Whole-run deadline.
+ *
+ * Per-attempt timeouts bound a single request, but nothing bounded the *loop*:
+ * 6 rounds × 3 attempts × 90s ≈ 27 minutes of a spinner, with no way out. The
+ * deadline answers "how long am I willing to wait for this question?".
+ */
+const AGENT_DEADLINE_MS = 5 * 60_000
+
+/** Incremental events a UI can render while the answer is being produced. */
+export type AgentStreamEvent =
+  | { type: 'delta'; text: string }
+  | { type: 'step'; step: AgentStep }
+  | { type: 'error'; message: string }
+
+export interface RunAgentOptions {
+  /** Called for answer text as it arrives, and for each completed step. */
+  onEvent?: (event: AgentStreamEvent) => void
+  /** Caller cancellation (the UI stop button). */
+  signal?: AbortSignal
+}
 
 interface LLMMessage extends ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
@@ -36,17 +58,33 @@ function fallbackMessage(locale: string): string {
 export async function runAgent(
   ctx: AgentContext,
   userMessages: Array<{ role: string; content: string }>,
+  options: RunAgentOptions = {},
 ): Promise<AgentResult> {
   const config = loadConfig()
   const steps: AgentStep[] = []
   const nodeRefs = new Set<string>()
   const seenToolCalls = new Set<string>()
 
+  // The deadline and the caller's stop button both end the run; whichever fires
+  // first wins, and the loop stops instead of starting another round.
+  const deadline = AbortSignal.timeout(AGENT_DEADLINE_MS)
+  const signal = options.signal ? AbortSignal.any([deadline, options.signal]) : deadline
+  /** Whether the current round has already streamed text to the UI. */
+  let streamedThisRound = false
+  const emit = (event: AgentStreamEvent) => {
+    try { options.onEvent?.(event) } catch { /* UI teardown must not break the run */ }
+  }
+  /** Record a step and tell the UI about it immediately. */
+  const recordStep = (step: AgentStep) => {
+    steps.push(step)
+    emit({ type: 'step', step })
+  }
+
   const lastUser = [...userMessages].reverse().find((m) => m.role === 'user')
   const userQuery = lastUser?.content?.trim() || ''
 
   const packed = await packCoachContext(ctx, userQuery)
-  steps.push({
+  recordStep({
     type: 'context',
     content: `intent=${packed.intent}; seeded ${packed.seedNodeIds.length} nodes`,
   })
@@ -92,6 +130,7 @@ export async function runAgent(
 
     // Shared transport: retries on 429/5xx/timeouts. A long tool loop is exactly
     // where a single transient failure used to kill the whole answer.
+    streamedThisRound = false
     const { message: choice } = await chatCompletion(
       { baseUrl: config.llm.baseUrl, apiKey: config.llm.apiKey, chatModel: config.llm.chatModel },
       {
@@ -101,18 +140,27 @@ export async function runAgent(
         temperature: 0.3,
         maxTokens: 2048,
         timeoutMs: 90_000,
+        signal,
+        // Stream only on the round that can actually answer: a tool-call round has
+        // no prose, and forwarding its fragments would render noise.
+        onDelta: isLast
+          ? (text: string) => {
+              streamedThisRound = true
+              emit({ type: 'delta', text })
+            }
+          : undefined,
       },
     )
 
     if (choice.content?.trim()) {
-      steps.push({ type: 'thought', content: choice.content.trim() })
+      recordStep({ type: 'thought', content: choice.content.trim() })
     }
 
     const toolCalls = isLast ? undefined : choice.tool_calls
     if (!toolCalls?.length) {
       const answer = choice.content?.trim() || 'No response.'
-      steps.push({ type: 'answer', content: answer })
-      return { content: answer, steps, nodeRefs: [...nodeRefs] }
+      recordStep({ type: 'answer', content: answer })
+      return { content: answer, steps, nodeRefs: [...nodeRefs], streamed: streamedThisRound }
     }
 
     messages.push({
@@ -130,7 +178,7 @@ export async function runAgent(
       } catch { /* empty args */ }
 
       const key = toolCallKey(toolName, args)
-      steps.push({
+      recordStep({
         type: 'action',
         content: JSON.stringify(args),
         tool: toolName,
@@ -148,7 +196,7 @@ export async function runAgent(
         observation = await executeTool(toolName, args, ctx)
       }
 
-      steps.push({ type: 'observation', content: observation, tool: toolName })
+      recordStep({ type: 'observation', content: observation, tool: toolName })
 
       for (const ref of extractNodeRefsFromObservation(observation)) {
         nodeRefs.add(ref)
@@ -172,6 +220,6 @@ export async function runAgent(
   }
 
   const fallback = fallbackMessage(ctx.locale)
-  steps.push({ type: 'answer', content: fallback })
-  return { content: fallback, steps, nodeRefs: [...nodeRefs] }
+  recordStep({ type: 'answer', content: fallback })
+  return { content: fallback, steps, nodeRefs: [...nodeRefs], streamed: false }
 }

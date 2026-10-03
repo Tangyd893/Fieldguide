@@ -119,6 +119,12 @@ export interface CitationMetrics {
  * `allNodeIds` is the ground truth for existence: anything cited that is not in
  * the graph is counted as a hallucinated reference. Precision/recall are computed
  * only against real citations, so one made-up id cannot inflate them.
+ *
+ * Recall uses the **same satisfied-expectation rule as `scoreRetrieval`**: an
+ * expectation (node id or file path) counts once when it is met, so citing a node
+ * that satisfies both its node and its file annotation scores 1.0 rather than
+ * being capped at 0.5 by the doubled denominator. Keeping the two families on one
+ * rule is what makes a retrieval number and an answer number comparable.
  */
 export function scoreCitations(
   citedNodeIds: string[],
@@ -140,12 +146,21 @@ export function scoreCitations(
     return Boolean(file && expectedFiles.has(file))
   })
 
+  // Distinct expectations satisfied (a citation can satisfy a node and a file).
+  const matchedNodes = new Set(valid.filter((id) => expectedNodes.has(id)))
+  const matchedFiles = new Set(
+    valid
+      .map((id) => nodeFileIndex.get(id))
+      .filter((file): file is string => Boolean(file && expectedFiles.has(file))),
+  )
+  const satisfied = matchedNodes.size + matchedFiles.size
+
   return {
     validRefs: valid.length,
     hallucinatedRefs: hallucinated.length,
     faithfulness: unique.length > 0 ? valid.length / unique.length : 1,
     citationPrecision: valid.length > 0 ? relevant.length / valid.length : 0,
-    citationRecall: expectedCount > 0 ? Math.min(1, relevant.length / expectedCount) : 1,
+    citationRecall: expectedCount > 0 ? Math.min(1, satisfied / expectedCount) : 1,
     relevantRefs: relevant.length,
   }
 }
@@ -177,6 +192,8 @@ export interface ItemResult {
   faithful?: number
   citationPrecision?: number
   citationRecall?: number
+  /** Cited ids that are not in the graph, over all cited ids (0 when nothing was cited). */
+  hallucinationRate?: number
   pathFound?: boolean
   pathHopsMatch?: boolean
   error?: string
@@ -222,6 +239,10 @@ export function aggregate(results: ItemResult[], k = 5): AggregateRow[] {
   push('引用忠实度', results.map((r) => r.faithful).filter((v): v is number => v !== undefined))
   push('引用精确率', results.map((r) => r.citationPrecision).filter((v): v is number => v !== undefined))
   push('引用召回率', results.map((r) => r.citationRecall).filter((v): v is number => v !== undefined))
+  push(
+    '引用幻觉率（越低越好）',
+    results.map((r) => r.hallucinationRate).filter((v): v is number => v !== undefined),
+  )
 
   const pathResults = results.filter((r) => r.pathFound !== undefined)
   if (pathResults.length > 0) {
@@ -246,9 +267,15 @@ export function aggregate(results: ItemResult[], k = 5): AggregateRow[] {
   return rows
 }
 
-/** Markdown table for a run, ready to paste into the thesis. */
-export function formatResultsTable(title: string, results: ItemResult[]): string {
-  const rows = aggregate(results)
+/**
+ * Markdown table for a run, ready to paste into the thesis.
+ *
+ * `k` **must** be the cut-off the results were scored at: it only labels the
+ * @k rows, so passing the default (5) for a k=10 run silently mislabels the
+ * table. Callers that own the run (see `runEvaluation`) pass it explicitly.
+ */
+export function formatResultsTable(title: string, results: ItemResult[], k = 5): string {
+  const rows = aggregate(results, k)
   const lines = [
     `### ${title}`,
     '',

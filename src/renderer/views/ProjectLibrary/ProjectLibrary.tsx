@@ -12,12 +12,62 @@ interface ProjectRow {
   language: string; node_count: number; created_at: string; indexed_at: string|null
 }
 
+/**
+ * Last recorded index run for a project.
+ *
+ * Declared locally like `ProjectRow`: `env.d.ts` is a module (it imports shared
+ * types), so its interfaces describe the bridge, not global component state.
+ */
+interface IndexJobView {
+  id: string
+  status: 'running' | 'succeeded' | 'failed' | 'cancelled'
+  kind: string
+  phase: string | null
+  progress: number
+  error: string | null
+  nodeCount: number
+  startedAt: string | null
+  finishedAt: string | null
+  stages: Array<{
+    stage: 'scan' | 'parse' | 'build' | 'llm' | 'save'
+    status: 'ok' | 'skipped' | 'failed'
+    durationMs: number
+    detail?: string
+  }>
+}
+
 interface Props {
   selected: ProjectRow | null
   onSelect: (p: ProjectRow | null) => void
   onIndex?: (projectId: string) => void
   onFullReindex?: (projectId: string) => void
   t: (key: string, opts?: Record<string, unknown>) => string
+}
+
+const STAGE_LABEL: Record<string, string> = {
+  scan: '扫描',
+  parse: '解析',
+  build: '建图',
+  llm: '摘要',
+  save: '保存',
+}
+
+/** One-line summary of the last run, naming the stage that degraded. */
+function jobLabel(job: IndexJobView, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  const failed = job.stages.filter((s) => s.status === 'failed')
+  if (job.status === 'running') return t('project.jobRunning')
+  if (job.status === 'cancelled') return t('project.jobCancelled')
+  if (failed.length > 0) {
+    return t('project.jobPartial', { stages: failed.map((s) => STAGE_LABEL[s.stage] ?? s.stage).join('、') })
+  }
+  if (job.status === 'failed') return t('project.jobFailed')
+  return t('project.jobSucceeded', { count: job.nodeCount })
+}
+
+function jobTone(job: IndexJobView): string {
+  if (job.status === 'failed' || job.stages.some((s) => s.status === 'failed')) return 'text-[var(--fg-status-warning)]'
+  if (job.status === 'running') return 'text-[var(--fg-text-tertiary)]'
+  return 'text-[var(--fg-status-success)]'
 }
 
 export default function ProjectLibrary({ selected, onSelect, onIndex, onFullReindex, t }: Props) {
@@ -33,10 +83,60 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, onFullRein
   const [deleting, setDeleting] = useState<string|null>(null)
   const [analyzingDiff, setAnalyzingDiff] = useState<string|null>(null)
   const [diffResult, setDiffResult] = useState<{ projectId: string; summary: string } | null>(null)
+  /** Last recorded index run per project — what actually happened, stage by stage. */
+  const [jobs, setJobs] = useState<Record<string, IndexJobView | null>>({})
+  const [retrying, setRetrying] = useState<string | null>(null)
   const idxProgress = useIndexProgress()
   const idxPct = progressPercent(idxProgress.progress)
 
-  useEffect(() => { loadProjects() }, [])
+  // Mount-only load: `loadProjects` is a stable function declaration and must not
+  // re-run on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void loadProjects() }, [])
+
+  // Refresh job history after every progress event that ends a run.
+  useEffect(() => {
+    const type = idxProgress.progress?.type
+    if (type === 'complete' || type === 'error' || type === 'cancelled') {
+      void (async () => {
+        try {
+          const list = await window.fieldguide.projectList()
+          if (!list.ok || !list.data) return
+          const entries = await Promise.all(
+            list.data.map(async (p) => {
+              const r = await window.fieldguide.indexJobList(p.id)
+              return [p.id, r.ok ? (r.data?.jobs?.[0] ?? null) : null] as const
+            }),
+          )
+          setJobs(Object.fromEntries(entries))
+        } catch { /* informational only */ }
+      })()
+    }
+  }, [idxProgress.progress?.type])
+
+  async function loadJobs() {
+    try {
+      const list = await window.fieldguide.projectList()
+      if (!list.ok || !list.data) return
+      const entries = await Promise.all(
+        list.data.map(async (p) => {
+          const r = await window.fieldguide.indexJobList(p.id)
+          return [p.id, r.ok ? (r.data?.jobs?.[0] ?? null) : null] as const
+        }),
+      )
+      setJobs(Object.fromEntries(entries))
+    } catch { /* job history is informational — never block the library */ }
+  }
+
+  async function handleRetry(projectId: string) {
+    setRetrying(projectId)
+    try {
+      await window.fieldguide.indexJobRetry(projectId)
+    } finally {
+      setRetrying(null)
+      setTimeout(() => void loadJobs(), 500)
+    }
+  }
 
   async function loadProjects() {
     try {
@@ -44,6 +144,7 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, onFullRein
       if (r.ok && r.data) setProjects(r.data)
     } catch { /* ignore */ }
     finally { setLoading(false) }
+    void loadJobs()
   }
 
   async function handleAdd() {
@@ -167,6 +268,24 @@ export default function ProjectLibrary({ selected, onSelect, onIndex, onFullRein
                   {p.indexed_at&&<span>{t('project.indexedAt',{date:new Date(p.indexed_at).toLocaleDateString('zh-CN')})}</span>}
                   {p.node_count>0&&<span>{t('project.nodes',{count:p.node_count})}</span>}
                 </div>
+                {/* What the last run actually did: a partial failure is reported as
+                    "structure saved, summaries failed" instead of a bare error. */}
+                {jobs[p.id] && (
+                  <div className="flex items-center gap-2 mt-1 text-xs">
+                    <span className={jobTone(jobs[p.id]!)}>{jobLabel(jobs[p.id]!, t)}</span>
+                    {(jobs[p.id]!.status === 'failed' || jobs[p.id]!.stages.some((s) => s.status === 'failed')) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void handleRetry(p.id) }}
+                        disabled={retrying === p.id}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-[var(--fg-border)] rounded hover:border-[var(--fg-accent)] hover:text-[var(--fg-accent)] transition-colors disabled:opacity-40"
+                        title={t('project.retryHint')}
+                      >
+                        {retrying === p.id ? <Loader2 size={11} className="animate-spin" /> : <RotateCw size={11} />}
+                        {t('project.retry')}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); if (window.confirm(t('project.deleteConfirm', { name: p.name }))) handleDelete(p.id) }}

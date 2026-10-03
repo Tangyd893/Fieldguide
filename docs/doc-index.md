@@ -6,7 +6,6 @@
 ---
 
 ## 一、产品一句话（不可漂移）
-
 **Fieldguide** = **[Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)** 代码地图引擎 + **Electron 桌面学习工作台**（多项目、理论、概念桥接、跨源 Agent）。
 
 | 问题 | 标准答案 |
@@ -26,31 +25,46 @@
 
 ```
 doc-index（本文）
+    → 项目介绍（30 分钟看懂整个项目：定位 / 功能 / 架构 / 技术 / 评测 / 局限）
     → understand-anything-integration（集成边界）
     → getting-started（动工清单）
     → product-spec（做什么）
     → architecture（怎么做）
     → ui-spec（长什么样）
     → onboarding-spec（首次启动）
-    → testing-strategy（怎么测）
+    → testing-strategy（怎么测 + 评测流水线）
+    → eval/（评测结果：基准、答案级指标、用户研究协议）
     → roadmap（分阶段）
     → design-review（风险与验收）
+    → thesis-outline / presentation-script（论文与答辩）
     → todos（工程待办，实现期维护）
 ```
+
+> **文档整理（2026-10-02）**：`docs/research/` 下 126 MB 的一次性取证材料
+> （抓取的 HTML / PDF / 临时分析脚本，均已 gitignore）已删除，只保留 7 份结论性
+> Markdown 调研报告作为背景与相关工作素材；`docs/` 现为 1 MB 的可读文档树。
 
 ### 2.2 文档职责（单一事实来源）
 
 | 文档 | 权威内容 | 不重复定义 |
 |------|----------|------------|
 | [product-spec.md](./product-spec.md) | 愿景、用户场景、功能 F-01–F-17、非目标 | IPC 字段、SQL schema |
+| [项目介绍.md](./项目介绍.md) | **完整项目介绍**（定位 / 功能全景 / 架构 / 关键技术 / 评测数据 / 规模 / 已知局限 / 快速开始）——对外与答辩的门面文档 | 各专题细节（见对应文档） |
+| [thesis-outline.md](./thesis-outline.md) | **论文章节 → 仓库素材 → 证据命令**的映射表；写作纪律 | 设计细节（见各专题） |
+| [presentation-script.md](./presentation-script.md) | **答辩演示脚本**（无 Key / 有 Key 两版）、高频追问答法、局限页、演示前检查清单 | 功能实现（见 architecture） |
+| [eval/agent-baseline.md](./eval/agent-baseline.md) | **检索基准与消融**（由 `pnpm eval:agent` 生成，禁止手改） | 指标定义（见 `src/main/eval/metrics.ts`） |
+| [eval/agent-answers.md](./eval/agent-answers.md) | **答案级指标**（引用忠实度 / 精确率 / 召回率 / 幻觉率；由 `pnpm eval:answers` 生成） | 录制约定（见 `eval/answers/README.md`） |
+| [eval/user-study-protocol.md](./eval/user-study-protocol.md) | 用户研究设计（被试内、SUS、任务脚本、统计口径、执行清单） | 计分实现（见 `src/main/eval/usability.ts`） |
 | [understand-anything-integration.md](./understand-anything-integration.md) | UA/FG 边界、数据流、Spike、禁止重复实现 | UI 像素级规格 |
 | [architecture.md](./architecture.md) | 进程模型、目录结构、IPC、SQLite 表、Agent 工具表 | Phase 排期 |
 | [ui-spec.md](./ui-spec.md) | 布局、文件树、可分隔面板、面板 Tab 分工 | graph schema |
 | [roadmap.md](./roadmap.md) | Phase 任务 ID、验收、周期 | 架构细节 |
 | [todos.md](./todos.md) | **工程待办**、优先级、完成勾选 | Phase 级排期（见 roadmap） |
 | [gap-analysis-and-feature-roadmap.md](./gap-analysis-and-feature-roadmap.md) | **差距审计 + 功能点扩展规划**（P0 缺陷 / 功能缺口 / A–D 档功能点 / 评测实验设计） | Phase 任务 ID（见 roadmap）、IPC 字段规格 |
+| [architecture-differentiation-proposal.md](./architecture-differentiation-proposal.md) | **差异化架构提案 v1.5（⚠️ 待评审，非定稿）**：检索主干（Understand Engine）+ 三出口（体检 / 导览包 / 可审计的理解证据）的解决方案与可行性分析；含「语义搜索实为 Fuse.js」的契约漂移更正、竞品品类判断、需求侧最强证据（§1.9）、**分发策略的先例检验（§1.10：Sourcegraph 已试过并关停）**、以及**与本文档 §一 冲突的定位建议**（需正式决议） | 已定稿的架构细节（见 architecture）、Phase 排期权威表（见 roadmap）、已决项（见 design-review / 本文档 §四） |
+| [research/REPORT.md](./research/REPORT.md) | **外部竞品与市场调研（一手取证，659 行 / 108 条来源链接）**：竞品格局与差异化判断、需求与痛点证据、采用机制、定价与付费意愿、知识流失；`research/` 下另有 11 个支撑文件（抓取物已 gitignore） | 产品愿景（见 product-spec）、定位结论（见差异化提案 §1.6–§1.8 / §3.9） |
 | [onboarding-spec.md](./onboarding-spec.md) | 引导四步、Demo 仓库约定 | — |
-| [testing-strategy.md](./testing-strategy.md) | 测试金字塔、fixture | 产品愿景 |
+| [testing-strategy.md](./testing-strategy.md) | 测试金字塔、fixture、**评测流水线（录制-评分分离）与 CI 现状** | 产品愿景 |
 | [design-review.md](./design-review.md) | 最终验收 §3.5、风险、已决项 | 任务拆解 |
 | [getting-started.md](./getting-started.md) | 动工清单、陷阱、第一周节奏 | 全文架构 |
 
@@ -263,6 +277,8 @@ flowchart TD
 | onboarding-spec | v0.2 |
 | understand-anything-integration | v0.1 |
 | doc-index | v0.2 |
+| architecture-differentiation-proposal | v1.8（待评审） |
+| research/REPORT | 2026-09（调研快照，时点读数） |
 | spike-ua | 模板（Spike 后填写） |
 | fixtures-tiny-go-spec | v0.1 |
 | NOTICE.md | v0.1 |

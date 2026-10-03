@@ -3,9 +3,10 @@
  *
  * Phase 2.5 originally did client-side `label.includes()` over a full `graph:get`
  * payload (a "fake" semantic search). It now calls `graph:search` with an explicit
- * mode: `semantic` runs the UA SearchEngine in the main process (falling back to a
- * deterministic substring matcher), `text` does exact substring matching over
- * labels/summaries. The backend actually used is surfaced in the UI.
+ * mode: `semantic` runs the main-process retrieval (UA SearchEngine ⊕ local BM25
+ * fused by RRF), `text` does exact substring matching over labels/summaries.
+ * The channel that actually produced the results is surfaced in the UI, so a
+ * degraded engine is visible rather than silent.
  */
 import { useState, useEffect, useRef } from 'react'
 import { Sparkles, Type, Search } from 'lucide-react'
@@ -19,6 +20,19 @@ interface Props {
 }
 
 type SearchMode = 'semantic' | 'text'
+
+/** Mirrors `SearchBackend` in src/main/ua/search.ts. */
+type SearchBackend = 'hybrid' | 'lexical' | 'ua' | 'substring'
+
+const BACKEND_LABEL_KEY: Record<SearchBackend, string> = {
+  hybrid: 'codeMap.searchBackendHybrid',
+  lexical: 'codeMap.searchBackendLexical',
+  ua: 'codeMap.searchBackendUa',
+  substring: 'codeMap.searchBackendSubstring',
+}
+
+/** Engines that still see the whole graph are shown as healthy; the rest warn. */
+const HEALTHY_BACKENDS = new Set<SearchBackend>(['hybrid', 'ua'])
 
 interface SearchResultNode {
   id: string
@@ -38,7 +52,7 @@ export default function NodeSearchBar({ projectId, onNodeSelect, t }: Props) {
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState<SearchMode>('semantic')
   const [results, setResults] = useState<SearchResultNode[]>([])
-  const [backend, setBackend] = useState<'ua' | 'substring' | null>(null)
+  const [backend, setBackend] = useState<SearchBackend | null>(null)
   const [searching, setSearching] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -67,7 +81,7 @@ export default function NodeSearchBar({ projectId, onNodeSelect, t }: Props) {
         })
         if (seq !== requestSeq.current) return // stale response
         if (r.ok && r.data) {
-          const payload = r.data as { backend?: 'ua' | 'substring'; results?: SearchResultNode[] }
+          const payload = r.data as { backend?: SearchBackend; results?: SearchResultNode[] }
           setResults(payload.results ?? [])
           setBackend(payload.backend ?? null)
           setShowDropdown((payload.results ?? []).length > 0)
@@ -176,12 +190,12 @@ export default function NodeSearchBar({ projectId, onNodeSelect, t }: Props) {
           <span
             className={cn(
               'shrink-0 text-[10px] px-1.5 py-0.5 rounded',
-              backend === 'ua'
+              HEALTHY_BACKENDS.has(backend)
                 ? 'bg-[var(--fg-status-success-bg)] text-[var(--fg-status-success)]'
                 : 'bg-[var(--fg-status-warning-bg)] text-[var(--fg-status-warning)]',
             )}
           >
-            {t(backend === 'ua' ? 'codeMap.searchBackendUa' : 'codeMap.searchBackendSubstring')}
+            {t(BACKEND_LABEL_KEY[backend])}
           </span>
         )}
       </div>

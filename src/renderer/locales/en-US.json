@@ -88,7 +88,14 @@
     "analyzeFailed": "Analysis failed",
     "deleteFailed": "Delete failed",
     "noChanges": "No file changes detected.",
-    "analyzeDone": "Analysis complete."
+    "analyzeDone": "Analysis complete.",
+    "jobRunning": "Last index: running",
+    "jobSucceeded": "Last index: succeeded · {{count}} nodes",
+    "jobFailed": "Last index: failed",
+    "jobCancelled": "Last index: cancelled",
+    "jobPartial": "Last index: partial ({{stages}} stage failed; structure and graph were saved)",
+    "retry": "Retry",
+    "retryHint": "Re-run with the previous mode (saved partial results are kept)"
   },
   "codeMap": {
     "noProject": "Add a project in the library first",
@@ -112,10 +119,12 @@
     "searchMode": "Search mode",
     "searchModeSemantic": "Semantic",
     "searchModeText": "Exact",
-    "searchModeSemanticHint": "Semantic search: ranked locally by the UA SearchEngine, matches meaning and summaries",
+    "searchModeSemanticHint": "Semantic search: UA SearchEngine plus a local lexical channel (CJK tokenization + term map), fused by RRF",
     "searchModeTextHint": "Exact search: substring match on name / summary",
     "searchBackendUa": "UA semantic engine",
     "searchBackendSubstring": "Substring fallback",
+    "searchBackendHybrid": "Hybrid search (semantic + lexical)",
+    "searchBackendLexical": "Lexical search (no semantic engine)",
     "searchInFile": "Find in file (Ctrl+F)",
     "noMatchInFile": "no match",
     "matchCount": "{{current}}/{{total}}",
@@ -214,7 +223,10 @@
     "copyAnswer": "Copy answer",
     "copied": "Copied",
     "regenerate": "Regenerate",
-    "regenerateHint": "Discard the last answer and ask again"
+    "regenerateHint": "Discard the last answer and ask again",
+    "stop": "Stop",
+    "stopHint": "Abort the answer being generated (your question stays; the partial answer is not saved)",
+    "stopped": "Generation stopped."
   },
   "commandPalette": {
     "placeholder": "Search commands, files, or nodes…",

@@ -8,7 +8,7 @@
  */
 
 /** Bump when the schema changes and add the matching entry to ADDED_COLUMNS. */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 /**
  * Columns introduced after the initial schema, keyed by table.
@@ -20,6 +20,13 @@ export const ADDED_COLUMNS: Record<string, Array<{ column: string; definition: s
   chat_messages: [
     // v2: assistant answers persist the code nodes they cited.
     { column: 'node_refs', definition: "TEXT NOT NULL DEFAULT '[]'" },
+  ],
+  index_jobs: [
+    // v5: the job centre records what kind of run it was and, stage by stage,
+    // which phases actually produced results (partial failures are first-class).
+    { column: 'kind', definition: "TEXT NOT NULL DEFAULT 'full'" },
+    { column: 'stages_json', definition: "TEXT NOT NULL DEFAULT '[]'" },
+    { column: 'node_count', definition: 'INTEGER DEFAULT 0' },
   ],
 }
 

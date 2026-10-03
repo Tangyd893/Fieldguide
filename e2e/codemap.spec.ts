@@ -46,9 +46,13 @@ test('searching a node opens its file in the code panel', async () => {
     // The node search bar sits above the split panels.
     const search = page.getByPlaceholder(/搜索函数、类/)
     await search.fill('worker')
-    // The engine flag reports which matcher ran (UA engine vs deterministic
-    // substring); either is acceptable, it just must not be missing.
-    await expect(page.getByText(/UA 语义引擎|子串降级/).first()).toBeVisible({ timeout: 30_000 })
+    // The backend flag reports which channel actually ran: hybrid (semantic ⊕
+    // lexical), lexical-only when the semantic engine is unavailable, or the
+    // explicit substring fallback. Any of them is acceptable — it just must be
+    // surfaced rather than silent.
+    await expect(
+      page.getByText(/混合检索|词法检索|UA 语义引擎|子串降级/).first(),
+    ).toBeVisible({ timeout: 30_000 })
 
     // Debounced server-side search → results dropdown. Pick the `pool.go` entry
     // explicitly: "worker" also matches `pool_test.go`, which sorts differently.
